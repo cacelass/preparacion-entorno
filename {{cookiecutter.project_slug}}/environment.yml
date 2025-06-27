@@ -7,7 +7,7 @@ dependencies:
   {% if cookiecutter.project_packages == "All" -%}
   - fs
   - jupyter
-  - jupiterlab
+  - jupyterlab
   - pathlib
   {% endif -%}
   - pip
@@ -18,7 +18,7 @@ dependencies:
   - pyprojroot
   {% endif -%}
   - python={{ cookiecutter.python_version }}
-  -pip
+  - pip:
     {% if cookiecutter.project_packages == "All" -%}
     - pyhere
     {% endif -%}
