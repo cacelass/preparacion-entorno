@@ -1,0 +1,17 @@
+name: cookiecutter-personal
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - conda==25.5.1
+  - setuptools
+  - pip
+  - wheel
+  - conda-anaconda-telemetry
+  - conda-anaconda-tos[version='>=0.2.0']
+  - conda-content-trust
+  - conda-libmamba-solver
+  - menuinst
+  - anaconda-anon-usage
+prefix: /root/miniconda3
