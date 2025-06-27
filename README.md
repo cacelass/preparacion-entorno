@@ -22,6 +22,7 @@ cookiecutter https://github.com/cacelass/preparacion-entorno
 Instalar lo necesario para el proyecto...
 
 ```bash
+cd <nombre_directorio_creado>
 conda env create --file environment.yml  
 ```
 
