@@ -1,4 +1,4 @@
-# Cookiecuter Personal Platzi
+# Cookiecuter Personal
 
 ## Requiremientos
 
