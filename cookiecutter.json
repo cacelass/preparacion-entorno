@@ -1,5 +1,5 @@
 {
-	"project_title": "Cookiecutter personal",
+	"project_name": "Cookiecutter personal",
 	"project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '_').replace('-', '_') }}",
 	"project_description": "Descripcion del proyecto",
 	"project_author_name": "Autor",
