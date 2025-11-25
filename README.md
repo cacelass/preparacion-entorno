@@ -24,6 +24,7 @@ apt install cookiecutter
    ```bash
    cd <nombre_directorio_creado>
    uv sync
+   source .venv/bin/activate
    ```
 
 Esto instalará todas las dependencias que se encuentran en el archivo `pyproject.toml`.
