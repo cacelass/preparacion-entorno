@@ -6,28 +6,25 @@
 - [Cookiecutter Python package](http://cookiecutter.readthedocs.org/en/latest/installation.html) >= 1.4.0
 - [uv](https://github.com/astral-sh/uv)
 
+
 ### Instalación rápida de uv
 
 ```bash
 wget -qO- https://astral.sh/uv/install.sh | sh
 ```
-
-## Crear un nuevo proyecto
-
-En el directorio en el que quieras guardar tu proyecto generado:
+### Instalación rápida de cookiecutter
 
 ```bash
-cookiecutter https://github.com/cacelass/preparacion-entorno
+apt install cookiecutter
 ```
 
-## Reproducir el entorno del proyecto generado
+### Configura tu entorno de proyecto
 
-```bash
-cd <nombre_directorio_creado>
-python3 -m venv .venv
-source .venv/bin/activate  # En Windows: .venv\Scripts\activate
-uv sync
-```
+1. Instala todas las dependencias del proyecto:
+   ```bash
+   cd <nombre_directorio_creado>
+   uv sync
+   ```
 
 Esto instalará todas las dependencias que se encuentran en el archivo `pyproject.toml`.
 
