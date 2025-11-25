@@ -2,7 +2,9 @@
 name = "{{ cookiecutter.project_slug }}"
 version = "{{ cookiecutter.project_version }}"
 description = "{{ cookiecutter.project_description }}"
-authors = "{{ cookiecutter.project_author_name }}"
+authors = [
+  "{{ cookiecutter.project_author_name }}"
+]
 readme = "README.md"
 requires-python = ">= {{ cookiecutter.python_version }}"
 license = {text = "{{ cookiecutter.project_open_source_license if cookiecutter.project_open_source_license != 'No license file' else ''}}"}
