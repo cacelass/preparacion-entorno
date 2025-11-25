@@ -2,6 +2,35 @@
 
 {{ cookiecutter.project_description }}
 
+---
+
+## Instalación del entorno de desarrollo con [uv](https://github.com/astral-sh/uv)
+
+[uv](https://github.com/astral-sh/uv) es una herramienta moderna y extremadamente rápida para instalar dependencias de Python, compatible con `pyproject.toml`. Reemplaza a `pip` y permite crear entornos replicables en segundos.
+
+### Instalación rápida de uv
+
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
+```
+
+### Configura tu entorno de proyecto
+
+1. Crea y activa el entorno virtual:
+   ```bash
+   python{{ cookiecutter.python_version }} -m venv .venv
+   source .venv/bin/activate  # En Windows: .venv\Scripts\activate
+   ```
+
+2. Instala todas las dependencias del proyecto:
+   ```bash
+   uv sync
+   ```
+
+> Si agregas nuevos paquetes a `pyproject.toml`, recuerda volver a ejecutar `uv sync` para actualizar tu entorno.
+
+---
+
 ## Project Organization
 
         ├── LICENSE
@@ -23,14 +52,11 @@
         ├── references         <- Documentación de apoyo: diccionarios de datos, manuales, etc.
         │
         ├── reports            <- Resultados generados en formatos como HTML, PDF o LaTeX.
-        │   └── figures         <- Gráficos e imágenes usados en los reportes.
+        │   └── figures        <- Gráficos e imágenes usados en los reportes.
         │
-        ├── environment.yml    <- Archivo con las dependencias necesarias para reproducir el entorno.
+        ├── pyproject.toml     <- Archivo con las dependencias necesarias para reproducir el entorno.
         │
         ├── .here              <- Archivo que indica el directorio raíz del proyecto.
-        │
-        ├── setup.py           <- Permite instalar el proyecto con `pip install -e .` para
-        │                         usar {{ cookiecutter.project_module_name }} como módulo.
         │
         └── {{ cookiecutter.project_module_name }}               <- Código fuente principal del proyecto.
             ├── __init__.py    <- Indica que este directorio es un módulo de Python.
@@ -46,7 +72,15 @@
             │   └── train_model.py
             │
             ├── utils          <- Funciones auxiliares para tareas comunes del proyecto.
-                └── paths.py   <- Funciones para manejar rutas de archivos dentro del proyecto.
+            │   └── paths.py   <- Funciones para manejar rutas de archivos dentro del proyecto.
             │
             └── visualization  <- Scripts para crear visualizaciones y gráficos de resultados.
                 └── visualize.py
+
+---
+
+¿Necesitas instalar algún paquete más tarde? Simplemente agrégalo en `pyproject.toml` y ejecuta de nuevo:
+
+```bash
+uv sync
+```

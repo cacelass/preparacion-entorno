@@ -1,15 +1,15 @@
-# Cookiecuter Personal
+# Cookiecutter Personal
 
-## Requiremientos
+## Requerimientos
 
 - [git](https://git-scm.com/) >= 2.x
-- [Cookiecutter Python package](http://cookiecutter.readthedocs.org/en/latest/installation.html) >= 1.4.0:
+- [Cookiecutter Python package](http://cookiecutter.readthedocs.org/en/latest/installation.html) >= 1.4.0
+- [uv](https://github.com/astral-sh/uv)
 
-``` bash
-apt install cookiecutter
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-chmod +x Miniconda3-latest-Linux-x86_64.sh
-./Miniconda3-latest-Linux-x86_64.sh
+### Instalación rápida de uv
+
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
 ```
 
 ## Crear un nuevo proyecto
@@ -19,13 +19,17 @@ En el directorio en el que quieras guardar tu proyecto generado:
 ```bash
 cookiecutter https://github.com/cacelass/preparacion-entorno
 ```
-Instalar lo necesario para el proyecto...
+
+## Reproducir el entorno del proyecto generado
 
 ```bash
 cd <nombre_directorio_creado>
-conda env create --file environment.yml  
+python3 -m venv .venv
+source .venv/bin/activate  # En Windows: .venv\Scripts\activate
+uv sync
 ```
 
+Esto instalará todas las dependencias que se encuentran en el archivo `pyproject.toml`.
 
 ## Estructura de directorios y archivos resultantes
 
@@ -41,7 +45,10 @@ conda env create --file environment.yml
         │
         ├── .gitignore         <- Lista de archivos y carpetas que `git` debe ignorar.
         │
-        ├── environment.yml    <- Archivo con las dependencias necesarias para reproducir
-        │                         el entorno de análisis.
-        │
-        └── README.md          <- El README principal para desarrolladores que trabajen con este proyecto.
+        ├── pyproject.toml
+        │                      
+        └── README.md
+
+---
+
+> Si necesitas instalar más paquetes en tu proyecto, agrégalos a `pyproject.toml` y vuelve a ejecutar `uv sync` dentro del entorno.
