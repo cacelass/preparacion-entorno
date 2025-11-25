@@ -4,52 +4,49 @@
 
 ## Project Organization
 
-    ├── LICENSE
-    ├── tasks.py           <- Invoke with commands like `notebook`.
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── install.md         <- Detailed instructions to set up this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries.
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures         <- Generated graphics and figures to be used in reporting.
-    │
-    ├── environment.yml    <- The requirements file for reproducing the analysis environment.
-    │
-    ├── .here              <- File that will stop the search if none of the other criteria
-    │                         apply when searching head of project.
-    │
-    ├── setup.py           <- Makes project pip installable (pip install -e .)
-    │                         so {{ cookiecutter.project_module_name }} can be imported.
-    │
-    └── {{ cookiecutter.project_module_name }}               <- Source code for use in this project.
-        ├── __init__.py    <- Makes {{ cookiecutter.project_module_name }} a Python module.
+        ├── LICENSE
+        ├── tasks.py           <- Archivo con tareas que puedes ejecutar con comandos como `notebook`.
+        ├── README.md          <- Guía principal para desarrolladores que trabajen con este proyecto.
+        ├── install.md         <- Instrucciones paso a paso para instalar y configurar el entorno.
+        ├── data
+        │   ├── external       <- Datos obtenidos de fuentes externas.
+        │   ├── interim        <- Datos intermedios, ya transformados pero no finales.
+        │   ├── processed      <- Datos finales listos para ser usados en modelos.
+        │   └── raw            <- Datos originales sin modificar.
         │
-        ├── data           <- Scripts to download or generate data.
-        │   └── make_dataset.py
+        ├── models             <- Modelos entrenados, guardados y sus predicciones o reportes.
         │
-        ├── features       <- Scripts to turn raw data into features for modeling.
-        │   └── build_features.py
+        ├── notebooks          <- Notebooks de Jupyter. Se nombran con un número (para ordenar),
+        │                         iniciales del autor y una breve descripción, por ejemplo:
+        │                         `1.0-jqp-exploracion-inicial`.
         │
-        ├── models         <- Scripts to train models and then use trained models to make
-        │   │                 predictions.
-        │   ├── predict_model.py
-        │   └── train_model.py
+        ├── references         <- Documentación de apoyo: diccionarios de datos, manuales, etc.
         │
-        ├── utils          <- Scripts to help with common tasks.
-            └── paths.py   <- Helper functions to relative file referencing across project.
+        ├── reports            <- Resultados generados en formatos como HTML, PDF o LaTeX.
+        │   └── figures         <- Gráficos e imágenes usados en los reportes.
         │
-        └── visualization  <- Scripts to create exploratory and results oriented visualizations.
-            └── visualize.py
-
+        ├── environment.yml    <- Archivo con las dependencias necesarias para reproducir el entorno.
+        │
+        ├── .here              <- Archivo que indica el directorio raíz del proyecto.
+        │
+        ├── setup.py           <- Permite instalar el proyecto con `pip install -e .` para
+        │                         usar {{ cookiecutter.project_module_name }} como módulo.
+        │
+        └── {{ cookiecutter.project_module_name }}               <- Código fuente principal del proyecto.
+            ├── __init__.py    <- Indica que este directorio es un módulo de Python.
+            │
+            ├── data           <- Scripts para descargar, generar o preparar datos.
+            │   └── make_dataset.py
+            │
+            ├── features       <- Scripts para convertir datos crudos en características útiles.
+            │   └── build_features.py
+            │
+            ├── models         <- Scripts para entrenar modelos y generar predicciones.
+            │   ├── predict_model.py
+            │   └── train_model.py
+            │
+            ├── utils          <- Funciones auxiliares para tareas comunes del proyecto.
+                └── paths.py   <- Funciones para manejar rutas de archivos dentro del proyecto.
+            │
+            └── visualization  <- Scripts para crear visualizaciones y gráficos de resultados.
+                └── visualize.py
