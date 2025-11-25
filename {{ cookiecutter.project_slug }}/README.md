@@ -4,10 +4,6 @@
 
 ---
 
-## Instalación del entorno de desarrollo con [uv](https://github.com/astral-sh/uv)
-
-[uv](https://github.com/astral-sh/uv) es una herramienta moderna y extremadamente rápida para instalar dependencias de Python, compatible con `pyproject.toml`. Reemplaza a `pip` y permite crear entornos replicables en segundos.
-
 ### Instalación rápida de uv
 
 ```bash
