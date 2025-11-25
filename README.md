@@ -31,15 +31,17 @@ conda env create --file environment.yml
 
     {{ cookiecutter.project_slug }}
         ├── data
-        │   ├── processed      <- The final, canonical data sets for modeling.
-        │   └── raw            <- The original, immutable data dump.
+        │   ├── processed      <- Conjuntos de datos finales y limpios, listos para el modelado.
+        │   └── raw            <- Datos originales sin modificar, tal como fueron obtenidos.
         │
-        ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-        │                         the creator's initials, and a short `-` delimited description, e.g.
-        │                         `1.0-jvelezmagic-initial-data-exploration`.
+        ├── notebooks          <- Notebooks de Jupyter. La convención de nombres usa un número
+        │                         (para ordenar), las iniciales del autor y una breve descripción
+        │                         separada por guiones. Ejemplo:
+        │                         `1.0-jvelezmagic-exploracion-inicial-datos`.
         │
-        ├── .gitignore         <- Files to ignore by `git`.
+        ├── .gitignore         <- Lista de archivos y carpetas que `git` debe ignorar.
         │
-        ├── environment.yml    <- The requirements file for reproducing the analysis environment.
+        ├── environment.yml    <- Archivo con las dependencias necesarias para reproducir
+        │                         el entorno de análisis.
         │
-        └── README.md          <- The top-level README for developers using this project.
+        └── README.md          <- El README principal para desarrolladores que trabajen con este proyecto.
