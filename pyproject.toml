@@ -9,31 +9,7 @@ readme = "README.md"
 requires-python = ">= {{ cookiecutter.python_version }}"
 license = {text = "{{ cookiecutter.project_open_source_license if cookiecutter.project_open_source_license != 'No license file' else ''}}"}
 dependencies = [
-  "black",
-  "invoke",
-  "jupyter",
-  "jupyterlab",
-  "matplotlib",
-  "nbdime",
-  "numpy",
-  "pandas",
-  "plotly",
-  "pyjanitor",
-  "pyprojroot",
-  "seaborn",
-  {% if cookiecutter.project_packages == "All" -%}
-  "keras",
-  "lightgbm",
-  "missingno",
-  "pandas-flavor",
-  "pandas-profiling",
-  "pylint",
-  "pyspark",
-  "python-dotenv",
-  "scikit-learn",
-  "statsmodels",
-  "tensorflow",
-  {% endif -%}
+  "cookiecutter"
 ]
 
 [tool.setuptools]
