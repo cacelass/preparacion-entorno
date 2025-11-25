@@ -13,17 +13,17 @@
 ```bash
 wget -qO- https://astral.sh/uv/install.sh | sh
 ```
+### Instalación rápida de cookiecutter
+
+```bash
+apt install cookiecutter
+```
 
 ### Configura tu entorno de proyecto
 
-1. Crea y activa el entorno virtual:
+1. Instala todas las dependencias del proyecto:
    ```bash
-   python{{ cookiecutter.python_version }} -m venv .venv
-   source .venv/bin/activate  # En Windows: .venv\Scripts\activate
-   ```
-
-2. Instala todas las dependencias del proyecto:
-   ```bash
+   cd <nombre_directorio_creado>
    uv sync
    ```
 
