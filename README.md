@@ -23,7 +23,7 @@ apt install cookiecutter
 En el directorio en el que quieras guardar tu proyecto generado:
 
 ```bash
-cookiecutter https://github.com/cacelass/preparacion-entorno-python.git
+cookiecutter https://github.com/cacelass/preparacion-entorno.git
 ```
 ### Configura tu entorno de proyecto
 
