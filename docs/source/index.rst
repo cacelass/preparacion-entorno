@@ -15,5 +15,6 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
-modules
-{{ cookiecutter.project_slug }}
+   modules
+   {{ cookiecutter.project_slug }}
+   test
