@@ -3,31 +3,6 @@
 {{ cookiecutter.project_description }}
 
 ---
-
-### Instalación rápida de uv
-
-```bash
-wget -qO- https://astral.sh/uv/install.sh | sh
-```
-### Instalación rápida de cookiecutter
-
-```bash
-apt install cookiecutter
-```
-
-### Configura tu entorno de proyecto
-
-1. Instala todas las dependencias del proyecto:
-   ```bash
-   cd <nombre_directorio_creado>
-   uv sync
-   source .venv/bin/activate
-   ```
-
-> Si agregas nuevos paquetes a `pyproject.toml`, recuerda volver a ejecutar `uv sync` para actualizar tu entorno.
-
----
-
 ## Project Organization
 
         ├── LICENSE
