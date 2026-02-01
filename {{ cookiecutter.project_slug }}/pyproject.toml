@@ -34,7 +34,6 @@ ml = [
     "statsmodels",
     "pyjanitor",
     "pandas-flavor",
-    "pandas-profiling",
     "pyspark",
     "python-dotenv",
     "missingno",
