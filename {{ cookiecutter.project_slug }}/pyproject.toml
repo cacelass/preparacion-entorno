@@ -16,6 +16,8 @@ dependencies = [
     "plotly",
     "jupyter",
     "jupyterlab",
+    "python-dotenv",
+    "missingno",
 ]
 
 [project.optional-dependencies]
@@ -23,25 +25,42 @@ dev = [
     "black",
     "invoke",
     "nbdime",
-    "pylint",
+    "ruff",
+    "pytest",
     "sphinx",
 ]
 
-ml = [
+# ML supervisado: clasificación y regresión con scikit-learn y boosting
+supervisado = [
     "scikit-learn",
-    "keras",
-    "tensorflow",
     "lightgbm",
+    "xgboost",
     "statsmodels",
-    "pyjanitor",
-    "pandas-flavor",
-    "pyspark",
-    "python-dotenv",
-    "missingno",
+    "imbalanced-learn",
+    "joblib",
+]
+
+# ML no supervisado: clustering, reducción de dimensionalidad
+no_supervisado = [
+    "scikit-learn",
+    "umap-learn",
+    "hdbscan",
+    "joblib",
+]
+
+# Redes neuronales: deep learning con PyTorch
+redes_neuronales = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "torchmetrics[visual]",
+    "tensorboard",
+    "scikit-learn",
+    "joblib",
 ]
 
 [tool.setuptools]
-packages = ["{{ cookiecutter.project_slug }}"]
+packages = ["{{ cookiecutter.project_module_name }}"]
 
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]

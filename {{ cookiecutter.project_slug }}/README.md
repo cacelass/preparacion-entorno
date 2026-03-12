@@ -1,58 +1,56 @@
 # {{ cookiecutter.project_name }}
 
-{{ cookiecutter.project_description }}
+> {{ cookiecutter.project_description }}
 
----
-## Project Organization
-
-        ├── LICENSE
-        ├── tasks.py           <- Archivo con tareas que puedes ejecutar con comandos como `notebook`.
-        ├── README.md          <- Guía principal para desarrolladores que trabajen con este proyecto.
-        ├── install.md         <- Instrucciones paso a paso para instalar y configurar el entorno.
-        ├── data
-        │   ├── external       <- Datos obtenidos de fuentes externas.
-        │   ├── interim        <- Datos intermedios, ya transformados pero no finales.
-        │   ├── processed      <- Datos finales listos para ser usados en modelos.
-        │   └── raw            <- Datos originales sin modificar.
-        │
-        ├── models             <- Modelos entrenados, guardados y sus predicciones o reportes.
-        │
-        ├── notebooks          <- Notebooks de Jupyter. Se nombran con un número (para ordenar),
-        │                         iniciales del autor y una breve descripción, por ejemplo:
-        │                         `1.0-jqp-exploracion-inicial`.
-        │
-        ├── references         <- Documentación de apoyo: diccionarios de datos, manuales, etc.
-        │
-        ├── reports            <- Resultados generados en formatos como HTML, PDF o LaTeX.
-        │   └── figures        <- Gráficos e imágenes usados en los reportes.
-        │
-        ├── pyproject.toml     <- Archivo con las dependencias necesarias para reproducir el entorno.
-        │
-        ├── .here              <- Archivo que indica el directorio raíz del proyecto.
-        │
-        └── {{ cookiecutter.project_module_name }}               <- Código fuente principal del proyecto.
-            ├── __init__.py    <- Indica que este directorio es un módulo de Python.
-            │
-            ├── data           <- Scripts para descargar, generar o preparar datos.
-            │   └── make_dataset.py
-            │
-            ├── features       <- Scripts para convertir datos crudos en características útiles.
-            │   └── build_features.py
-            │
-            ├── models         <- Scripts para entrenar modelos y generar predicciones.
-            │   ├── predict_model.py
-            │   └── train_model.py
-            │
-            ├── utils          <- Funciones auxiliares para tareas comunes del proyecto.
-            │   └── paths.py   <- Funciones para manejar rutas de archivos dentro del proyecto.
-            │
-            └── visualization  <- Scripts para crear visualizaciones y gráficos de resultados.
-                └── visualize.py
+**Tipo de ML:** `{{ cookiecutter.ml_type }}`  
+**Autor:** {{ cookiecutter.project_author_name }}  
+**Versión:** {{ cookiecutter.project_version }}
 
 ---
 
-¿Necesitas instalar algún paquete más tarde? Simplemente agrégalo en `pyproject.toml` y ejecuta de nuevo:
+## Estructura del proyecto
+
+```
+{{ cookiecutter.project_slug }}/
+├── data/
+│   ├── raw/            ← datos originales (nunca modificar)
+│   ├── interim/        ← datos en proceso
+│   └── processed/      ← datos listos para modelar
+├── models/             ← modelos entrenados (.joblib / .pt)
+│   └── artifacts/      ← encoders, scalers, etc.
+├── notebooks/
+│   ├── 0-0-...-Descargadatos.ipynb
+│   ├── 0-1-...-ProcesamientoDatos.ipynb
+│   └── 0-2-...-Ejecucion.ipynb
+├── reports/figures/    ← gráficos generados
+├── {{ cookiecutter.project_module_name }}/
+│   ├── data/           make_dataset.py
+│   ├── features/       build_features.py
+│   ├── models/         train_model.py · predict_model.py
+│   ├── visualization/  visualize.py
+│   └── utils/          paths.py
+├── tests/
+├── main.py             ← pipeline completo
+├── Makefile
+└── pyproject.toml
+```
+
+## Inicio rápido
 
 ```bash
-uv sync
+# 1. Instalar dependencias
+make setup
+
+# 2. Activar entorno
+source .venv/bin/activate
+
+# 3. Colocar datos en data/raw/ y editar DATA_FILE / TARGET_COL en main.py
+
+# 4. Explorar con notebooks
+invoke lab
+
+# 5. Pipeline completo
+python main.py
 ```
+
+Consulta el archivo `ayuda` para más detalles.

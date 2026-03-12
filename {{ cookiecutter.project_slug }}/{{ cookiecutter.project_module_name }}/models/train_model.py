@@ -1,33 +1,306 @@
+{% if cookiecutter.ml_type == "supervisado" %}
+import numpy as np
 import joblib
-from tasa_churn.utils.paths import MODELS_DIR
-from sklearn.ensemble import RandomForestClassifier
 
-def train_models(X_train, y_train):
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
+
+from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
+
+
+# ---------------------------------------------------------------------------
+# Configuración de modelos
+# ---------------------------------------------------------------------------
+
+def _build_models() -> dict:
     """
-    Entrena los modelos y guarda los artefactos.
-     - Random Forest con parámetros específicos para evitar overfitting.
-     - Guarda cada modelo entrenado en la carpeta models.
-     - Devuelve un diccionario con los modelos entrenados.
-     - X_train: DataFrame con las características de entrenamiento.
-     - y_train: Serie con las etiquetas de entrenamiento.
-     - return: dict con modelos entrenados, e.g. {'RandomForest': model_object}
+    Define los modelos a entrenar.
+
+    KNN            → lazy learner, sin suposiciones sobre los datos.
+                     Requiere features escaladas. Sensible a k y a dimensiones altas.
+
+    LogisticReg    → modelo base en clasificación binaria. Rápido, interpretable
+                     y genera probabilidades calibradas.
+
+    DecisionTree   → caja blanca, fácil de interpretar. Propenso a overfitting
+                     → regularizar con max_depth, min_samples_leaf.
+
+    RandomForest   → ensemble de árboles. Robusto y buen rendimiento por defecto.
+                     Permite calcular importancia de variables (feature_importances_).
+
+    GradBoost      → mayor precisión que RF en muchos casos, pero más lento
+                     y más sensible a hiperparámetros.
+
+    SVM (RBF)      → potente en espacios de alta dimensión. Lento en datasets grandes.
+                     El pipeline incluye StandardScaler propio.
     """
-    print("--> Entrenando modelos...")
+    return {
+        # --- KNN: el valor de n_neighbors se optimiza automáticamente en train_models() ---
+        "KNN": KNeighborsClassifier(n_neighbors=7, weights="distance"),
+
+        # --- Regresión Logística: modelo base rápido e interpretable ---
+        "LogisticRegression": LogisticRegression(
+            max_iter=1000,
+            class_weight="balanced",
+            random_state=42,
+        ),
+
+        # --- Árbol de Decisión: ajustar max_depth para evitar overfitting ---
+        "DecisionTree": DecisionTreeClassifier(
+            max_depth=7,
+            min_samples_leaf=5,
+            class_weight="balanced",
+            random_state=42,
+        ),
+
+        # --- Random Forest: robusto, con importancia de variables ---
+        "RandomForest": RandomForestClassifier(
+            n_estimators=200,
+            max_depth=10,
+            max_features="sqrt",   # sqrt(n_features) por árbol
+            max_samples=0.8,       # bootstrap sample del 80%
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+
+        # --- Gradient Boosting: alta precisión, mayor coste computacional ---
+        # "GradientBoosting": GradientBoostingClassifier(
+        #     n_estimators=200, max_depth=5, learning_rate=0.05, random_state=42
+        # ),
+
+        # --- SVM RBF: muy eficaz en dimensiones altas ---
+        # El pipeline escala internamente; no necesita X ya escalado.
+        # "SVM": make_pipeline(
+        #     StandardScaler(),
+        #     SVC(
+        #         kernel="rbf",
+        #         C=1.0,
+        #         gamma="scale",
+        #         class_weight="balanced",
+        #         probability=True,   # necesario para ROC y predict_proba
+        #         random_state=42,
+        #     ),
+        # ),
+    }
+
+
+def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
+    """
+    Busca el mejor k para KNN por validación cruzada (5-fold, métrica F1_weighted).
+    Devuelve el k con mayor F1 medio, priorizando k más alto en empates.
+    """
+    print("    Buscando mejor k para KNN...")
+    best_k, best_score = 1, 0.0
+    for k in k_range:
+        knn = KNeighborsClassifier(n_neighbors=k, weights="distance")
+        score = cross_val_score(knn, X_train, y_train, cv=5, scoring="f1_weighted").mean()
+        if score >= best_score:   # >= → preferimos k más alto en empates
+            best_k, best_score = k, score
+    print(f"    Mejor k = {best_k}  (F1_weighted CV = {best_score:.3f})")
+    return best_k
+
+
+def train_models(
+    X_train,
+    y_train,
+    tune_knn: bool = True,
+    cv_evaluate: bool = True,
+) -> dict:
+    """
+    Entrena todos los modelos definidos en _build_models() y los guarda en models/.
+
+    Parameters
+    ----------
+    tune_knn     : si True, optimiza k de KNN por cross-validation antes de entrenar.
+    cv_evaluate  : si True, muestra F1_weighted (5-fold CV) de cada modelo.
+
+    Returns
+    -------
+    dict : {nombre_modelo: modelo_entrenado}
+    """
+    print("--> Entrenando modelos supervisados...")
+    models = _build_models()
+
+    # Optimización automática de k
+    if tune_knn and "KNN" in models:
+        best_k = _find_best_k(X_train, y_train)
+        models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
+
+    trained = {}
+    for name, model in models.items():
+        print(f"    [{name}] entrenando...")
+        model.fit(X_train, y_train)
+
+        if cv_evaluate:
+            cv_score = cross_val_score(
+                model, X_train, y_train, cv=5, scoring="f1_weighted"
+            ).mean()
+            print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
+
+        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
+        print(f"      Guardado → {name}.joblib")
+        trained[name] = model
+
+    print(f"--> {len(trained)} modelos guardados en {MODELS_DIR}")
+    return trained
+
+
+def load_models(model_names: list = None) -> dict:
+    """
+    Carga modelos desde disco.
+
+    Parameters
+    ----------
+    model_names : lista de nombres sin extensión, e.g. ["RandomForest", "KNN"].
+                  Si None, carga todos los .joblib disponibles en models/.
+
+    Returns
+    -------
+    dict : {nombre_modelo: modelo_cargado}
+    """
+    if model_names is None:
+        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
+
+    models = {}
+    for name in model_names:
+        path = MODELS_DIR / f"{name}.joblib"
+        if path.exists():
+            models[name] = joblib.load(path)
+            print(f"    Cargado: {name}")
+        else:
+            print(f"    ⚠ No encontrado: {path}")
+    return models
+
+{% elif cookiecutter.ml_type == "no_supervisado" %}
+import joblib
+from sklearn.cluster import KMeans, DBSCAN
+from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
+
+
+def train_models(X, n_clusters: int = 3) -> dict:
+    """
+    Ajusta modelos de clustering.
+
+    Returns
+    -------
+    dict : {nombre_modelo: modelo_ajustado}
+    """
+    print("--> Ajustando modelos no supervisados...")
     models = {}
 
-    print("    Entrenando el random forest...")
-    # dt = RandomForestClassifier(
-    #     n_estimators=100,
-    #     class_weight='balanced',  
-    #     max_depth=10,
-    #     random_state=42
-    # )
-    
-    dt.fit(X_train, y_train)
-    models['<nombre_modelo>'] = dt
+    km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+    km.fit(X)
+    models["KMeans"] = km
 
-    # Guardar modelos
+    # db = DBSCAN(eps=0.5, min_samples=5)
+    # db.fit(X)
+    # models["DBSCAN"] = db
+
     for name, model in models.items():
         joblib.dump(model, MODELS_DIR / f"{name}.joblib")
-    
+        print(f"    Guardado: {name}.joblib")
+
     return models
+
+{% elif cookiecutter.ml_type == "redes_neuronales" %}
+import os
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.tensorboard import SummaryWriter
+
+from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR, RUNS_DIR
+
+
+# ---------------------------------------------------------------------------
+# Detección de dispositivo (CPU / CUDA)
+# ---------------------------------------------------------------------------
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Dispositivo: {device}")
+if device.type == "cuda":
+    print(f"  GPU: {torch.cuda.get_device_name(0)}")
+    print(f"  VRAM: {round(torch.cuda.memory_allocated(0)/1024**3, 1)} GB")
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+
+
+class MLP(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dims=None, dropout=0.3):
+        super().__init__()
+        if hidden_dims is None:
+            hidden_dims = [128, 64]
+        layers = []
+        prev = input_dim
+        for h in hidden_dims:
+            layers += [nn.Linear(prev, h), nn.BatchNorm1d(h), nn.ReLU(), nn.Dropout(dropout)]
+            prev = h
+        layers.append(nn.Linear(prev, output_dim))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+
+def train_models(X_train, y_train, input_dim, output_dim,
+                 epochs=50, batch_size=32, lr=1e-3, checkpoint_every=10) -> dict:
+    print("--> Entrenando red neuronal...")
+    X_t = torch.tensor(X_train.values, dtype=torch.float32)
+    y_t = torch.tensor(y_train.values, dtype=torch.long)
+    loader = DataLoader(TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True)
+
+    model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
+    tb = SummaryWriter(log_dir=str(RUNS_DIR))
+
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0.0
+        for X_b, y_b in loader:
+            X_b, y_b = X_b.to(device), y_b.to(device)
+            optimizer.zero_grad()
+            loss = criterion(model(X_b), y_b)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        avg_loss = total_loss / len(loader)
+        tb.add_scalar("Loss/train", avg_loss, epoch)
+        if (epoch + 1) % 10 == 0:
+            print(f"    Epoch {epoch+1}/{epochs} — Loss: {avg_loss:.4f}")
+        if checkpoint_every > 0 and (epoch + 1) % checkpoint_every == 0:
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": avg_loss,
+            }, MODELS_DIR / f"checkpoint-{epoch+1}.pt")
+    tb.close()
+    torch.save(model.state_dict(), MODELS_DIR / "MLP.pt")
+    print("    Guardado: MLP.pt")
+    return {"MLP": model}
+
+
+def load_model(input_dim, output_dim, weights_path="MLP.pt"):
+    path = MODELS_DIR / weights_path if not str(weights_path).startswith("/") else weights_path
+    model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    model.load_state_dict(torch.load(path, map_location=device))
+    model.eval()
+    return model
+
+
+def load_checkpoint(input_dim, output_dim, checkpoint_path):
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    optimizer = torch.optim.Adam(model.parameters())
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    return model, optimizer, checkpoint["epoch"]
+{% endif %}
