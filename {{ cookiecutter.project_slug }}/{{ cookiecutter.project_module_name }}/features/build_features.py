@@ -1,4 +1,4 @@
-{% if cookiecutter.ml_type == "supervisado" %}
+{% if cookiecutter.ml_type == 'supervisado' %}
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -193,7 +193,7 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
 
     return scaler.transform(df_new)
 
-{% elif cookiecutter.ml_type == "no_supervisado" %}
+{% elif cookiecutter.ml_type == 'no_supervisado' %}
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -248,7 +248,7 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     )
     return X_scaled
 
-{% elif cookiecutter.ml_type == "redes_neuronales" %}
+{% elif cookiecutter.ml_type == 'redes_neuronales' %}
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split

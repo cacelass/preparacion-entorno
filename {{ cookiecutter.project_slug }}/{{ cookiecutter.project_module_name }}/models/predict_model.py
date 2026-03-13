@@ -1,288 +1,464 @@
-{% if cookiecutter.ml_type == "supervisado" %}
+{% if cookiecutter.ml_type == 'supervisado' %}
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib
+import joblib
 
-matplotlib.use("Agg")  # sin GUI, necesario en entornos headless
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
 
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    ConfusionMatrixDisplay,
-    roc_curve,
-    auc,
-)
-
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
+from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
 
 
-# ---------------------------------------------------------------------------
-# Umbral de decisión
-# ---------------------------------------------------------------------------
-# Por defecto, sklearn usa 0.5. Ajústalo si tus clases están desbalanceadas:
-#   - Umbral < 0.5 → detecta más positivos (mayor recall, menor precisión)
-#   - Umbral > 0.5 → más conservador (mayor precisión, menor recall)
-DECISION_THRESHOLD: float = 0.5
-
-
-def _predict_with_threshold(model, X_test, threshold: float):
-    """Aplica un umbral personalizado sobre predict_proba (si disponible)."""
-    if hasattr(model, "predict_proba"):
-        probs = model.predict_proba(X_test)[:, 1]
-        return (probs >= threshold).astype(int), probs
-    else:
-        # LinearSVC y modelos sin predict_proba
-        return model.predict(X_test), None
-
-
-def evaluate_models(
-    models: dict,
-    X_train,
-    y_train,
-    X_test,
-    y_test,
-    threshold: float = DECISION_THRESHOLD,
-) -> pd.DataFrame:
+def _build_models() -> dict:
     """
-    Evalúa todos los modelos y genera:
-      - Informe de clasificación en consola
-      - Matriz de confusión por modelo  → figures/confusion_matrix_{nombre}.png
-      - Tabla comparativa               → figures/model_comparison.png
-      - Curvas ROC conjuntas            → figures/roc_curves.png
+    Define los modelos a entrenar.
+
+    KNN            → lazy learner, sin suposiciones sobre los datos.
+                     Requiere features escaladas. Sensible a k y a dimensiones altas.
+
+    LogisticReg    → modelo base en clasificación binaria. Rápido, interpretable
+                     y genera probabilidades calibradas.
+
+    DecisionTree   → caja blanca, fácil de interpretar. Propenso a overfitting
+                     → regularizar con max_depth, min_samples_leaf.
+
+    RandomForest   → ensemble de árboles. Robusto y buen rendimiento por defecto.
+                     Permite calcular importancia de variables (feature_importances_).
+
+    GradBoost      → mayor precisión que RF en muchos casos, pero más lento
+                     y más sensible a hiperparámetros.
+
+    SVM (RBF)      → potente en espacios de alta dimensión. Lento en datasets grandes.
+                     El pipeline incluye StandardScaler propio.
+    """
+    return {
+        "KNN": KNeighborsClassifier(n_neighbors=7, weights="distance"),
+        "LogisticRegression": LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=42,
+        ),
+        "DecisionTree": DecisionTreeClassifier(
+            max_depth=7, min_samples_leaf=5, class_weight="balanced", random_state=42,
+        ),
+        "RandomForest": RandomForestClassifier(
+            n_estimators=200, max_depth=10, max_features="sqrt",
+            max_samples=0.8, class_weight="balanced", random_state=42, n_jobs=-1,
+        ),
+        # "GradientBoosting": GradientBoostingClassifier(
+        #     n_estimators=200, max_depth=5, learning_rate=0.05, random_state=42
+        # ),
+        # "SVM": make_pipeline(
+        #     StandardScaler(),
+        #     SVC(kernel="rbf", C=1.0, gamma="scale", class_weight="balanced",
+        #         probability=True, random_state=42),
+        # ),
+    }
+
+
+def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
+    """Busca el mejor k para KNN por validación cruzada (5-fold, F1_weighted)."""
+    print("    Buscando mejor k para KNN...")
+    best_k, best_score = 1, 0.0
+    for k in k_range:
+        knn = KNeighborsClassifier(n_neighbors=k, weights="distance")
+        score = cross_val_score(knn, X_train, y_train, cv=5, scoring="f1_weighted").mean()
+        if score >= best_score:
+            best_k, best_score = k, score
+    print(f"    Mejor k = {best_k}  (F1_weighted CV = {best_score:.3f})")
+    return best_k
+
+
+def train_models(X_train, y_train, tune_knn: bool = True, cv_evaluate: bool = True) -> dict:
+    """
+    Entrena todos los modelos definidos en _build_models() y los guarda en models/.
 
     Parameters
     ----------
-    threshold : umbral de probabilidad para decidir clase positiva (default 0.5)
+    tune_knn     : si True, optimiza k de KNN por cross-validation.
+    cv_evaluate  : si True, muestra F1_weighted (5-fold CV) de cada modelo.
 
     Returns
     -------
-    pd.DataFrame con columnas: Modelo, Acc_train, Acc_test, F1_macro, AUC
+    dict : {nombre_modelo: modelo_entrenado}
     """
-    print(f"--> Evaluando modelos (umbral = {threshold})...")
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    print("--> Entrenando modelos supervisados...")
+    models = _build_models()
 
-    results = []
+    if tune_knn and "KNN" in models:
+        best_k = _find_best_k(X_train, y_train)
+        models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
 
-    # ─── Curvas ROC (todas en el mismo gráfico) ───
-    fig_roc, ax_roc = plt.subplots(figsize=(9, 7))
-    ax_roc.plot([0, 1], [0, 1], "k--", lw=1.5, label="Random (AUC = 0.50)")
-
+    trained = {}
     for name, model in models.items():
-        print(f"\n  [{name}]")
+        print(f"    [{name}] entrenando...")
+        model.fit(X_train, y_train)
+        if cv_evaluate:
+            cv_score = cross_val_score(
+                model, X_train, y_train, cv=5, scoring="f1_weighted"
+            ).mean()
+            print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
+        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
+        print(f"      Guardado → {name}.joblib")
+        trained[name] = model
 
-        # Predicciones
-        y_pred, y_prob = _predict_with_threshold(model, X_test, threshold)
-
-        # Puntuaciones
-        acc_train = model.score(X_train, y_train)
-        acc_test = model.score(X_test, y_test)
-        report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
-        f1_macro = report["macro avg"]["f1-score"]
-
-        print(f"    Acc train: {acc_train:.3f}  |  Acc test: {acc_test:.3f}")
-        print(classification_report(y_test, y_pred, zero_division=0))
-
-        # ─── Matriz de confusión ───
-        cm = confusion_matrix(y_test, y_pred)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
-        disp.plot(ax=ax_cm, colorbar=False, cmap="Blues")
-        ax_cm.set_title(f"Matriz de confusión — {name}")
-        fig_cm.tight_layout()
-        fig_cm.savefig(FIGURES_DIR / f"confusion_matrix_{name}.png", dpi=150)
-        plt.close(fig_cm)
-
-        # ─── ROC ───
-        roc_auc = float("nan")
-        if y_prob is not None:
-            try:
-                fpr, tpr, _ = roc_curve(y_test, y_prob)
-                roc_auc = auc(fpr, tpr)
-                ax_roc.plot(fpr, tpr, lw=2, label=f"{name} (AUC = {roc_auc:.2f})")
-            except Exception:
-                pass
-
-        results.append({
-            "Modelo": name,
-            "Acc_train": round(acc_train, 3),
-            "Acc_test": round(acc_test, 3),
-            "F1_macro": round(f1_macro, 3),
-            "AUC": round(roc_auc, 3) if not np.isnan(roc_auc) else "N/A",
-        })
-
-    # Guardar curvas ROC
-    ax_roc.set_xlabel("Tasa de Falsos Positivos (FPR)", fontsize=12)
-    ax_roc.set_ylabel("Tasa de Verdaderos Positivos (TPR)", fontsize=12)
-    ax_roc.set_title("Curvas ROC — comparación de modelos", fontsize=14)
-    ax_roc.legend(loc="lower right")
-    ax_roc.grid(alpha=0.3)
-    fig_roc.tight_layout()
-    fig_roc.savefig(FIGURES_DIR / "roc_curves.png", dpi=150)
-    plt.close(fig_roc)
-    print(f"\n    ROC guardado → figures/roc_curves.png")
-
-    # ─── Tabla comparativa ───
-    df_results = pd.DataFrame(results)
-    _plot_comparison_table(df_results)
-    print("\n--> Resumen comparativo:")
-    print(df_results.to_string(index=False))
-
-    return df_results
+    print(f"--> {len(trained)} modelos guardados en {MODELS_DIR}")
+    return trained
 
 
-def _plot_comparison_table(df: pd.DataFrame):
-    """Genera una tabla visual con los resultados de todos los modelos."""
-    fig, ax = plt.subplots(figsize=(max(8, len(df) * 2), 2.5))
-    ax.axis("off")
+def load_models(model_names: list = None) -> dict:
+    """Carga modelos desde disco. Si model_names es None, carga todos los .joblib."""
+    if model_names is None:
+        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
+    models = {}
+    for name in model_names:
+        path = MODELS_DIR / f"{name}.joblib"
+        if path.exists():
+            models[name] = joblib.load(path)
+            print(f"    Cargado: {name}")
+        else:
+            print(f"    Advertencia: no encontrado {path}")
+    return models
 
-    table = ax.table(
-        cellText=df.values,
-        colLabels=df.columns,
-        loc="center",
-        cellLoc="center",
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(11)
-    table.scale(1.2, 1.8)
-
-    # Destacar el mejor Acc_test
-    try:
-        acc_vals = [float(v) for v in df["Acc_test"]]
-        best_row = acc_vals.index(max(acc_vals)) + 1  # +1 por la fila de cabecera
-        for col in range(len(df.columns)):
-            table[best_row, col].set_facecolor("#c6efce")  # verde claro
-    except Exception:
-        pass
-
-    ax.set_title("Comparación de modelos supervisados", fontsize=13, pad=12)
-    fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "model_comparison.png", dpi=150)
-    plt.close(fig)
-    print("    Tabla comparativa → figures/model_comparison.png")
-
-
-def predict_new(model, X_new, threshold: float = DECISION_THRESHOLD):
-    """
-    Genera predicciones sobre datos nuevos.
-
-    Returns
-    -------
-    predictions : np.ndarray con clases predichas
-    probabilities : np.ndarray de probabilidades (None si el modelo no lo soporta)
-    """
-    preds, probs = _predict_with_threshold(model, X_new, threshold)
-    return preds, probs
-
-{% elif cookiecutter.ml_type == "no_supervisado" %}
+{% elif cookiecutter.ml_type == 'no_supervisado' %}
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
+import joblib
 
-matplotlib.use("Agg")
-
-from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN, MiniBatchKMeans
 from sklearn.metrics import silhouette_score
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
+from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
 
 
-def evaluate_models(models: dict, X) -> None:
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# Configuración de modelos
+# ---------------------------------------------------------------------------
+# Descomenta los modelos que quieras incluir.
+# ---------------------------------------------------------------------------
+
+def _build_models(n_clusters: int = 3) -> dict:
+    """
+    Define los modelos de clustering a ajustar.
+
+    KMeans            → rápido y escalable. Asume clusters esféricos.
+                        Inicialización k-means++ reduce el riesgo de mínimos locales.
+
+    AgglomerativeClustering → clustering jerárquico aglomerativo (bottom-up).
+                               No requiere reinicializaciones. Permite usar un dendrograma
+                               para elegir k antes de ajustar.
+                               linkage: 'ward' (minimiza varianza intraclúster, mejor general),
+                               'complete', 'average', 'single'.
+
+    MiniBatchKMeans   → versión acelerada de KMeans para datasets grandes.
+                        Usa mini-lotes; ligeramente peor calidad, mucho más rápido.
+
+    DBSCAN            → basado en densidad; detecta clusters de cualquier forma
+                        y es robusto a outliers. No necesita especificar k,
+                        pero requiere ajustar eps y min_samples.
+    """
+    return {
+        "KMeans": KMeans(
+            n_clusters=n_clusters,
+            init="k-means++",   # mejor inicialización que random
+            n_init=10,
+            max_iter=300,
+            random_state=42,
+        ),
+
+        "AgglomerativeClustering": AgglomerativeClustering(
+            n_clusters=n_clusters,
+            linkage="ward",     # 'ward' | 'complete' | 'average' | 'single'
+        ),
+
+        # "MiniBatchKMeans": MiniBatchKMeans(
+        #     n_clusters=n_clusters, n_init=10, random_state=42
+        # ),
+
+        # "DBSCAN": DBSCAN(eps=0.5, min_samples=5),
+    }
+
+
+def find_optimal_k(X, k_range=range(2, 11)) -> dict:
+    """
+    Calcula el método del codo (inercia) y el Silhouette Score para cada k.
+
+    Devuelve un diccionario con:
+      - 'k_range'    : lista de k probados
+      - 'inertias'   : inercia (WCSS) por k — buscar el codo
+      - 'silhouettes': Silhouette Score por k — mayor es mejor
+
+    Uso típico:
+      metrics = find_optimal_k(X)
+      plot_elbow_and_silhouette(metrics)   # en visualize.py
+    """
+    print("--> Calculando métricas para selección de k...")
+    inertias, silhouettes = [], []
+
+    for k in k_range:
+        km = KMeans(n_clusters=k, init="k-means++", n_init=10, random_state=42)
+        km.fit(X)
+        inertias.append(km.inertia_)
+        sil = silhouette_score(X, km.labels_, metric="euclidean")
+        silhouettes.append(sil)
+        print(f"    k={k}  inercia={km.inertia_:.1f}  silhouette={sil:.3f}")
+
+    return {"k_range": list(k_range), "inertias": inertias, "silhouettes": silhouettes}
+
+
+def train_models(X, n_clusters: int = 3) -> dict:
+    """
+    Ajusta todos los modelos definidos en _build_models() y los guarda en models/.
+
+    ⚠ AgglomerativeClustering no tiene método .predict() — usa .labels_ para
+    asignar clusters a los datos de entrenamiento.
+
+    Parameters
+    ----------
+    n_clusters : número de clusters (ajústalo tras analizar el codo y silhouette)
+
+    Returns
+    -------
+    dict : {nombre_modelo: modelo_ajustado}
+    """
+    print(f"--> Ajustando modelos de clustering (k={n_clusters})...")
+    models = _build_models(n_clusters)
+    fitted = {}
+
     for name, model in models.items():
+        print(f"    [{name}] ajustando...")
+        model.fit(X)
+
+        # Silhouette Score (no aplicable a DBSCAN con un solo cluster)
         labels = model.labels_ if hasattr(model, "labels_") else model.predict(X)
-        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-        sil = silhouette_score(X, labels) if n_clusters > 1 else float("nan")
-        print(f"[{name}] clusters={n_clusters}  silhouette={sil:.3f}")
+        n_unique = len(set(labels)) - (1 if -1 in labels else 0)
+        if n_unique > 1:
+            sil = silhouette_score(X, labels)
+            print(f"      Silhouette Score: {sil:.3f}")
 
-        pca = PCA(n_components=2)
-        X_2d = pca.fit_transform(X)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(X_2d[:, 0], X_2d[:, 1], c=labels, cmap="tab10", s=10, alpha=0.7)
-        plt.colorbar(scatter, ax=ax, label="Cluster")
-        ax.set_title(f"{name} — PCA 2D  (silhouette={sil:.3f})")
-        fig.savefig(FIGURES_DIR / f"clusters_{name}.png", dpi=150)
-        plt.close(fig)
+        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
+        print(f"      Guardado → {name}.joblib")
+        fitted[name] = model
 
-{% elif cookiecutter.ml_type == "redes_neuronales" %}
+    return fitted
+
+
+def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
+    """
+    Pipeline KMeans → LogisticRegression.
+    Usa el clustering como reducción de dimensionalidad antes de un clasificador.
+
+    Útil cuando se dispone de etiquetas (semisupervisado):
+      la distancia a cada centroide se usa como features para el clasificador.
+
+    Returns
+    -------
+    pipeline entrenado
+    """
+    print(f"--> Entrenando pipeline KMeans({n_clusters}) + LogisticRegression...")
+    pipeline = Pipeline([
+        ("kmeans", KMeans(n_clusters=n_clusters, n_init="auto", random_state=42)),
+        ("log_reg", LogisticRegression(max_iter=1000, random_state=42)),
+    ])
+    pipeline.fit(X_train, y_train)
+    joblib.dump(pipeline, MODELS_DIR / "KMeansPipeline.joblib")
+    print("    Guardado → KMeansPipeline.joblib")
+    return pipeline
+
+
+def load_models(model_names: list = None) -> dict:
+    """Carga modelos desde disco. Si model_names es None, carga todos los .joblib."""
+    if model_names is None:
+        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
+    models = {}
+    for name in model_names:
+        path = MODELS_DIR / f"{name}.joblib"
+        if path.exists():
+            models[name] = joblib.load(path)
+            print(f"    Cargado: {name}")
+        else:
+            print(f"    Advertencia: no encontrado {path}")
+    return models
+
+{% elif cookiecutter.ml_type == 'redes_neuronales' %}
+import os
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.tensorboard import SummaryWriter
 
-matplotlib.use("Agg")
+from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR, RUNS_DIR
 
-import torchmetrics
-from torchmetrics.classification import (
-    MulticlassAccuracy,
-    MulticlassConfusionMatrix,
-    MulticlassROC,
-    MulticlassAUROC,
-)
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
-
+# ---------------------------------------------------------------------------
+# Detección de dispositivo (CPU / CUDA)
+# ---------------------------------------------------------------------------
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Dispositivo: {device}")
+if device.type == "cuda":
+    print(f"  GPU: {torch.cuda.get_device_name(0)}")
+    print(f"  VRAM: {round(torch.cuda.memory_allocated(0)/1024**3, 1)} GB")
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
 
-def evaluate_models(models: dict, X_test, y_test, num_classes: int, tb_writer=None) -> None:
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    X_t = torch.tensor(X_test.values, dtype=torch.float32).to(device)
-    y_t = torch.tensor(y_test.values, dtype=torch.long).to(device)
+# ---------------------------------------------------------------------------
+# StandardScaler nativo PyTorch
+# ---------------------------------------------------------------------------
+class TorchStandardScaler:
+    """
+    StandardScaler que opera directamente sobre PyTorch Tensors (sin conversión a numpy).
+    Útil dentro de un Dataset personalizado donde solo se dispone de mini-lotes.
 
-    for name, model in models.items():
-        model.eval()
-        with torch.no_grad():
-            logits = model(X_t)
-            preds = torch.argmax(logits, dim=1)
-            probs = torch.softmax(logits, dim=1)
+    Uso:
+        scaler = TorchStandardScaler()
+        scaler.fit(X_tensor_completo)       # calcular media y std
+        X_scaled = scaler.transform(X_batch) # aplicar a cualquier tensor
+    """
 
-        acc_micro = MulticlassAccuracy(num_classes=num_classes, average="micro").to(device)
-        acc_per_class = MulticlassAccuracy(num_classes=num_classes, average="none").to(device)
-        cm_metric = MulticlassConfusionMatrix(num_classes=num_classes).to(device)
-        roc_metric = MulticlassROC(num_classes=num_classes).to(device)
-        auroc_metric = MulticlassAUROC(num_classes=num_classes, average="macro").to(device)
+    def __init__(self, mean=None, std=None, epsilon=1e-7):
+        self.mean = mean
+        self.std = std
+        self.epsilon = epsilon
 
-        acc_micro.update(preds, y_t)
-        acc_per_class.update(preds, y_t)
-        cm_metric.update(preds, y_t)
-        roc_metric.update(probs, y_t)
-        auroc_metric.update(probs, y_t)
+    def fit(self, X: torch.Tensor):
+        self.mean = X.mean(dim=0)
+        self.std = X.std(dim=0)
+        return self
 
-        acc_val = acc_micro.compute().item()
-        acc_cls = acc_per_class.compute().cpu().numpy()
-        cm_val = cm_metric.compute().cpu().numpy()
-        auroc_val = auroc_metric.compute().item()
-        fpr_list, tpr_list, _ = roc_metric.compute()
+    def transform(self, X: torch.Tensor) -> torch.Tensor:
+        return (X - self.mean) / (self.std + self.epsilon)
 
-        print(f"[{name}] Accuracy: {acc_val:.3f}  AUROC: {auroc_val:.3f}")
+    def fit_transform(self, X: torch.Tensor) -> torch.Tensor:
+        return self.fit(X).transform(X)
 
-        # Confusion matrix
-        fig, ax = plt.subplots(figsize=(6, 5))
-        ax.imshow(cm_val, cmap="Blues")
-        ax.set_title(f"Confusion Matrix — {name}")
-        fig.savefig(FIGURES_DIR / f"confusion_matrix_{name}.png", dpi=150)
-        plt.close(fig)
 
-        # Accuracy per class
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.bar(range(num_classes), acc_cls)
-        ax.set_title(f"Accuracy por clase — {name}")
-        ax.set_xlabel("Clase")
-        ax.set_ylabel("Accuracy")
-        fig.savefig(FIGURES_DIR / f"accuracy_per_class_{name}.png", dpi=150)
-        plt.close(fig)
+# ---------------------------------------------------------------------------
+# Arquitectura MLP configurable
+# ---------------------------------------------------------------------------
+class MLP(nn.Module):
+    """
+    Red neuronal densa (MLP) con capas ocultas configurables.
 
-        # ROC
-        fig, ax = plt.subplots(figsize=(8, 6))
-        for i, (fpr, tpr) in enumerate(zip(fpr_list, tpr_list)):
-            ax.plot(fpr.cpu(), tpr.cpu(), label=f"Clase {i}")
-        ax.set_title(f"ROC — {name} (AUROC={auroc_val:.3f})")
-        ax.legend()
-        fig.savefig(FIGURES_DIR / f"roc_{name}.png", dpi=150)
-        plt.close(fig)
+    Parameters
+    ----------
+    input_dim   : número de features de entrada
+    output_dim  : número de clases (clasificación) o 1 (regresión)
+    hidden_dims : lista con el tamaño de cada capa oculta, e.g. [128, 64]
+    dropout     : tasa de dropout aplicada tras cada capa oculta (regularización)
+    """
 
-        if tb_writer:
-            tb_writer.add_scalar(f"Accuracy/{name}", acc_val)
-            tb_writer.add_scalar(f"AUROC/{name}", auroc_val)
+    def __init__(self, input_dim, output_dim, hidden_dims=None, dropout=0.3):
+        super().__init__()
+        if hidden_dims is None:
+            hidden_dims = [128, 64]
+        layers = []
+        prev = input_dim
+        for h in hidden_dims:
+            layers += [nn.Linear(prev, h), nn.BatchNorm1d(h), nn.ReLU(), nn.Dropout(dropout)]
+            prev = h
+        layers.append(nn.Linear(prev, output_dim))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+
+# ---------------------------------------------------------------------------
+# Entrenamiento
+# ---------------------------------------------------------------------------
+def train_models(
+    X_train,
+    y_train,
+    input_dim: int,
+    output_dim: int,
+    epochs: int = 50,
+    batch_size: int = 32,
+    lr: float = 1e-3,
+    checkpoint_every: int = 10,
+) -> dict:
+    """
+    Entrena una MLP con PyTorch.
+
+    Características:
+    - CUDA automático si está disponible
+    - TensorBoard: loss por época en runs/
+    - Checkpoints periódicos en models/checkpoint-{epoch}.pt
+    - Guardado final de pesos en models/MLP.pt
+
+    Returns
+    -------
+    dict : {'MLP': modelo_entrenado}
+    """
+    print("--> Entrenando red neuronal...")
+
+    X_t = torch.tensor(X_train.values, dtype=torch.float32)
+    y_t = torch.tensor(y_train.values, dtype=torch.long)
+    loader = DataLoader(TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True)
+
+    model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    # model = torch.compile(model)   # PyTorch ≥ 2.0: descomentar para mayor velocidad
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()  # cambiar a MSELoss para regresión
+    tb = SummaryWriter(log_dir=str(RUNS_DIR))
+    print(f"    TensorBoard → tensorboard --logdir {RUNS_DIR}")
+
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0.0
+        for X_b, y_b in loader:
+            X_b, y_b = X_b.to(device), y_b.to(device)
+            optimizer.zero_grad()
+            loss = criterion(model(X_b), y_b)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+
+        avg_loss = total_loss / len(loader)
+        tb.add_scalar("Loss/train", avg_loss, epoch)
+
+        if (epoch + 1) % 10 == 0:
+            print(f"    Epoch {epoch+1}/{epochs} — Loss: {avg_loss:.4f}")
+
+        if checkpoint_every > 0 and (epoch + 1) % checkpoint_every == 0:
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": avg_loss,
+            }, MODELS_DIR / f"checkpoint-{epoch+1}.pt")
+
+    tb.close()
+    torch.save(model.state_dict(), MODELS_DIR / "MLP.pt")
+    print("    Guardado: MLP.pt")
+    return {"MLP": model}
+
+
+def load_model(input_dim, output_dim, weights_path="MLP.pt"):
+    """Carga pesos finales y devuelve el modelo en modo eval."""
+    path = MODELS_DIR / weights_path if not str(weights_path).startswith("/") else weights_path
+    model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    model.load_state_dict(torch.load(path, map_location=device))
+    model.eval()
+    print(f"    Modelo cargado desde {path}")
+    return model
+
+
+def load_checkpoint(input_dim, output_dim, checkpoint_path):
+    """Carga un checkpoint para continuar el entrenamiento."""
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    optimizer = torch.optim.Adam(model.parameters())
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    epoch_inicio = checkpoint["epoch"]
+    print(f"    Checkpoint cargado: epoch {epoch_inicio}")
+    return model, optimizer, epoch_inicio
 {% endif %}

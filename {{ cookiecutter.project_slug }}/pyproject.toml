@@ -43,18 +43,21 @@ supervisado = [
 # ML no supervisado: clustering, reducción de dimensionalidad
 no_supervisado = [
     "scikit-learn",
-    "umap-learn",
-    "hdbscan",
+    "scipy",          # dendrogramas y clustering jerárquico
+    "yellowbrick",    # SilhouetteVisualizer
+    "umap-learn",     # reducción de dimensionalidad no lineal
+    "hdbscan",        # clustering basado en densidad
     "joblib",
 ]
 
-# Redes neuronales: deep learning con PyTorch
+# Redes neuronales: deep learning con PyTorch + Polars
 redes_neuronales = [
     "torch",
     "torchvision",
     "torchaudio",
     "torchmetrics[visual]",
     "tensorboard",
+    "polars",         # carga eficiente de datos con dtypes explícitos
     "scikit-learn",
     "joblib",
 ]
