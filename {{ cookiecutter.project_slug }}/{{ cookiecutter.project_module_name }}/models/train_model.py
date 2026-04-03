@@ -180,33 +180,179 @@ def load_models(model_names: list = None) -> dict:
 
 {% elif cookiecutter.ml_type == "no_supervisado" %}
 import joblib
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN, MiniBatchKMeans
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+
 from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
+
+
+# ---------------------------------------------------------------------------
+# Configuración de modelos
+# ---------------------------------------------------------------------------
+
+def _build_models(n_clusters: int = 3) -> dict:
+    """
+    Define los modelos de clustering a ajustar.
+
+    KMeans            → rápido y escalable. Asume clusters esféricos.
+                        Inicialización k-means++ reduce el riesgo de mínimos locales.
+
+    AgglomerativeClustering → clustering jerárquico aglomerativo (bottom-up).
+                               No requiere reinicializaciones. Permite usar un dendrograma
+                               para elegir k antes de ajustar.
+                               linkage: 'ward' (minimiza varianza intraclúster, mejor general),
+                               'complete', 'average', 'single'.
+
+    MiniBatchKMeans   → versión acelerada de KMeans para datasets grandes.
+                        Usa mini-lotes; ligeramente peor calidad, mucho más rápido.
+
+    DBSCAN            → basado en densidad; detecta clusters de cualquier forma
+                        y es robusto a outliers. No necesita especificar k,
+                        pero requiere ajustar eps y min_samples.
+    """
+    return {
+        "KMeans": KMeans(
+            n_clusters=n_clusters,
+            init="k-means++",   # mejor inicialización que random
+            n_init=10,
+            max_iter=300,
+            random_state=42,
+        ),
+
+        "AgglomerativeClustering": AgglomerativeClustering(
+            n_clusters=n_clusters,
+            linkage="ward",     # 'ward' | 'complete' | 'average' | 'single'
+        ),
+
+        # "MiniBatchKMeans": MiniBatchKMeans(
+        #     n_clusters=n_clusters, n_init=10, random_state=42
+        # ),
+
+        # "DBSCAN": DBSCAN(eps=0.5, min_samples=5),
+    }
+
+
+def find_optimal_k(X, k_range=range(2, 11)) -> dict:
+    """
+    Calcula el método del codo (inercia), el Silhouette Score
+    y el Davies-Bouldin Score para cada k.
+
+    Devuelve un diccionario con:
+      - 'k_range'    : lista de k probados
+      - 'inertias'   : inercia (WCSS) por k — buscar el codo
+      - 'silhouettes': Silhouette Score por k — mayor es mejor (+1 máximo)
+      - 'db_scores'  : Davies-Bouldin por k   — menor es mejor (0 mínimo)
+      - 'ch_scores'  : Calinski-Harabasz por k — mayor es mejor
+
+    Uso típico:
+      metrics = find_optimal_k(X)
+      plot_elbow_and_silhouette(metrics)   # en visualize.py
+    """
+    print("--> Calculando métricas para selección de k...")
+    inertias, silhouettes, db_scores, ch_scores = [], [], [], []
+
+    for k in k_range:
+        km = KMeans(n_clusters=k, init="k-means++", n_init=10, random_state=42)
+        km.fit(X)
+        labels = km.labels_
+
+        inertias.append(km.inertia_)
+        sil = silhouette_score(X, labels, metric="euclidean")
+        db  = davies_bouldin_score(X, labels)
+        ch  = calinski_harabasz_score(X, labels)
+
+        silhouettes.append(sil)
+        db_scores.append(db)
+        ch_scores.append(ch)
+
+        print(f"    k={k}  inercia={km.inertia_:.1f}  silhouette={sil:.3f}  "
+              f"davies-bouldin={db:.3f}  calinski-harabasz={ch:.1f}")
+
+    return {
+        "k_range":     list(k_range),
+        "inertias":    inertias,
+        "silhouettes": silhouettes,
+        "db_scores":   db_scores,
+        "ch_scores":   ch_scores,
+    }
 
 
 def train_models(X, n_clusters: int = 3) -> dict:
     """
-    Ajusta modelos de clustering.
+    Ajusta todos los modelos definidos en _build_models() y los guarda en models/.
+
+    ⚠ AgglomerativeClustering no tiene método .predict() — usa .labels_ para
+    asignar clusters a los datos de entrenamiento.
+
+    Parameters
+    ----------
+    n_clusters : número de clusters (ajústalo tras analizar el codo y silhouette)
 
     Returns
     -------
     dict : {nombre_modelo: modelo_ajustado}
     """
-    print("--> Ajustando modelos no supervisados...")
-    models = {}
-
-    km = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
-    km.fit(X)
-    models["KMeans"] = km
-
-    # db = DBSCAN(eps=0.5, min_samples=5)
-    # db.fit(X)
-    # models["DBSCAN"] = db
+    print(f"--> Ajustando modelos de clustering (k={n_clusters})...")
+    models = _build_models(n_clusters)
+    fitted = {}
 
     for name, model in models.items():
-        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
-        print(f"    Guardado: {name}.joblib")
+        print(f"    [{name}] ajustando...")
+        model.fit(X)
 
+        # Silhouette Score (no aplicable a DBSCAN con un solo cluster)
+        labels = model.labels_ if hasattr(model, "labels_") else model.predict(X)
+        n_unique = len(set(labels)) - (1 if -1 in labels else 0)
+        if n_unique > 1:
+            sil = silhouette_score(X, labels)
+            db  = davies_bouldin_score(X, labels)
+            print(f"      Silhouette Score  : {sil:.3f}  (mejor → +1)")
+            print(f"      Davies-Bouldin    : {db:.3f}   (mejor → 0)")
+
+        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
+        print(f"      Guardado → {name}.joblib")
+        fitted[name] = model
+
+    return fitted
+
+
+def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
+    """
+    Pipeline KMeans → LogisticRegression.
+    Usa el clustering como reducción de dimensionalidad antes de un clasificador.
+
+    Útil cuando se dispone de etiquetas (semisupervisado):
+      la distancia a cada centroide se usa como features para el clasificador.
+
+    Returns
+    -------
+    pipeline entrenado
+    """
+    print(f"--> Entrenando pipeline KMeans({n_clusters}) + LogisticRegression...")
+    pipeline = Pipeline([
+        ("kmeans", KMeans(n_clusters=n_clusters, n_init="auto", random_state=42)),
+        ("log_reg", LogisticRegression(max_iter=1000, random_state=42)),
+    ])
+    pipeline.fit(X_train, y_train)
+    joblib.dump(pipeline, MODELS_DIR / "KMeansPipeline.joblib")
+    print("    Guardado → KMeansPipeline.joblib")
+    return pipeline
+
+
+def load_models(model_names: list = None) -> dict:
+    """Carga modelos desde disco. Si model_names es None, carga todos los .joblib."""
+    if model_names is None:
+        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
+    models = {}
+    for name in model_names:
+        path = MODELS_DIR / f"{name}.joblib"
+        if path.exists():
+            models[name] = joblib.load(path)
+            print(f"    Cargado: {name}")
+        else:
+            print(f"    ⚠ No encontrado: {path}")
     return models
 
 {% elif cookiecutter.ml_type == "redes_neuronales" %}
@@ -233,6 +379,16 @@ if device.type == "cuda":
 
 
 class MLP(nn.Module):
+    """
+    Red neuronal densa (MLP) con capas ocultas configurables.
+
+    Parameters
+    ----------
+    input_dim   : número de features de entrada
+    output_dim  : número de clases (clasificación) o 1 (regresión)
+    hidden_dims : lista con el tamaño de cada capa oculta, e.g. [128, 64]
+    dropout     : tasa de dropout aplicada tras cada capa oculta (regularización)
+    """
     def __init__(self, input_dim, output_dim, hidden_dims=None, dropout=0.3):
         super().__init__()
         if hidden_dims is None:
@@ -251,15 +407,32 @@ class MLP(nn.Module):
 
 def train_models(X_train, y_train, input_dim, output_dim,
                  epochs=50, batch_size=32, lr=1e-3, checkpoint_every=10) -> dict:
+    """
+    Entrena una MLP con PyTorch.
+
+    Características:
+    - CUDA automático si está disponible
+    - TensorBoard: loss por época en runs/
+    - Checkpoints periódicos en models/checkpoint-{epoch}.pt
+    - Guardado final de pesos en models/MLP.pt
+
+    Returns
+    -------
+    dict : {'MLP': modelo_entrenado}
+    """
     print("--> Entrenando red neuronal...")
+
     X_t = torch.tensor(X_train.values, dtype=torch.float32)
     y_t = torch.tensor(y_train.values, dtype=torch.long)
     loader = DataLoader(TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True)
 
     model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
+    # model = torch.compile(model)   # PyTorch ≥ 2.0: descomentar para mayor velocidad
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()  # cambiar a MSELoss para regresión
     tb = SummaryWriter(log_dir=str(RUNS_DIR))
+    print(f"    TensorBoard → tensorboard --logdir {RUNS_DIR}")
 
     model.train()
     for epoch in range(epochs):
@@ -271,10 +444,13 @@ def train_models(X_train, y_train, input_dim, output_dim,
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+
         avg_loss = total_loss / len(loader)
         tb.add_scalar("Loss/train", avg_loss, epoch)
+
         if (epoch + 1) % 10 == 0:
             print(f"    Epoch {epoch+1}/{epochs} — Loss: {avg_loss:.4f}")
+
         if checkpoint_every > 0 and (epoch + 1) % checkpoint_every == 0:
             torch.save({
                 "epoch": epoch,
@@ -282,6 +458,7 @@ def train_models(X_train, y_train, input_dim, output_dim,
                 "optimizer_state_dict": optimizer.state_dict(),
                 "loss": avg_loss,
             }, MODELS_DIR / f"checkpoint-{epoch+1}.pt")
+
     tb.close()
     torch.save(model.state_dict(), MODELS_DIR / "MLP.pt")
     print("    Guardado: MLP.pt")
@@ -289,18 +466,23 @@ def train_models(X_train, y_train, input_dim, output_dim,
 
 
 def load_model(input_dim, output_dim, weights_path="MLP.pt"):
+    """Carga pesos finales y devuelve el modelo en modo eval."""
     path = MODELS_DIR / weights_path if not str(weights_path).startswith("/") else weights_path
     model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
     model.load_state_dict(torch.load(path, map_location=device))
     model.eval()
+    print(f"    Modelo cargado desde {path}")
     return model
 
 
 def load_checkpoint(input_dim, output_dim, checkpoint_path):
+    """Carga un checkpoint para continuar el entrenamiento."""
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model = MLP(input_dim=input_dim, output_dim=output_dim).to(device)
     optimizer = torch.optim.Adam(model.parameters())
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    return model, optimizer, checkpoint["epoch"]
+    epoch_inicio = checkpoint["epoch"]
+    print(f"    Checkpoint cargado: epoch {epoch_inicio}")
+    return model, optimizer, epoch_inicio
 {% endif %}
