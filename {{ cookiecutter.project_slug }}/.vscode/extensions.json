@@ -10,6 +10,7 @@
     "vivaxy.vscode-conventional-commits",
     "tamasfe.even-better-toml",
     "yzhang.markdown-all-in-one",
-    "njpwerner.autodocstring"
+    "njpwerner.autodocstring",
+    "charliermarsh.ruff"
   ]
 }
