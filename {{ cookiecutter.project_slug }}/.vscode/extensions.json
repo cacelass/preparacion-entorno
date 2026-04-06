@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "ms-toolsai.jupyter",
+    "ms-vscode.makefile-tools",
+    "mechatroner.rainbow-csv",
+    "mhutchie.git-graph",
+    "vivaxy.vscode-conventional-commits",
+    "tamasfe.even-better-toml",
+    "yzhang.markdown-all-in-one",
+    "njpwerner.autodocstring"
+  ]
+}
