@@ -5,7 +5,7 @@
     "project_author_name": "Nombre del autor",
     "project_author_email": "email@ejemplo.com",
     "project_description": "Descripción breve del proyecto.",
-    "ml_type": ["supervisado", "no_supervisado", "redes_neuronales"],
+    "ml_type": ["supervisado", "no_supervisado", "redes_neuronales", "hibrido"],
     "project_open_source_license": ["No license file", "MIT", "BSD-3-Clause"],
     "python_version": "3.12",
     "project_version": "0.1.0"

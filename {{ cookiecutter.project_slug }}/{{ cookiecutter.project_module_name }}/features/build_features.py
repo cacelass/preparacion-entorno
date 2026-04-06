@@ -3,15 +3,14 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
+from sklearn.decomposition import PCA
 import joblib
 from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
 # ---------------------------------------------------------------------------
-# Configuración de codificación ordinal para variables con orden lógico
+# Configuración de codificación ordinal
 # ---------------------------------------------------------------------------
-# Añade aquí las variables que tengan un orden natural (ej: nivel educativo)
-# Si no tienes ninguna, deja el diccionario vacío: {}
 ORDINAL_MAPPINGS: dict = {
     # Ejemplo:
     # "education": {
@@ -21,57 +20,57 @@ ORDINAL_MAPPINGS: dict = {
     # },
 }
 
-# Columnas a eliminar antes de modelar (alta correlación, fuga de datos, etc.)
 COLS_TO_DROP: list = [
-    # Ejemplos comunes:
-    # "duration",     # fuga de datos: si es 0, el target siempre es 'no'
+    # "duration",     # fuga de datos
     # "nr_employed",  # alta correlación con euribor3m
-    # "emp_var_rate", # alta correlación con euribor3m
-    # "day_of_week",  # sin poder predictivo
 ]
 
 
 def preprocess_data(
     df: pd.DataFrame,
     target_col: str,
-    scaler_type: str = "standard",  # "standard" | "minmax"
+    scaler_type: str = "standard",
     test_size: float = 0.2,
     random_state: int = 42,
+    use_pca=None,
 ):
     """
     Pipeline completo de preprocesado para aprendizaje supervisado.
 
     Pasos:
       1. Elimina duplicados
-      2. Feature engineering personalizable (editar _feature_engineering)
-      3. Aplica codificación ordinal (ORDINAL_MAPPINGS)
+      2. Feature engineering personalizable (_feature_engineering)
+      3. Codificación ordinal (ORDINAL_MAPPINGS)
       4. Elimina columnas no deseadas (COLS_TO_DROP)
-      5. Rellena nulos numéricos con la media, categóricos con la moda
-      6. Codifica variables categóricas restantes con LabelEncoder
-      7. Train/test split con stratify para mantener proporción de clases
-      8. Escala features (StandardScaler o MinMaxScaler)
-      9. Guarda scaler y encoder en artifacts/
+      5. Rellena nulos (media/moda)
+      6. LabelEncoder para categóricas
+      7. Train/test split estratificado
+      8. Escalado (StandardScaler o MinMaxScaler)
+      9. PCA opcional (use_pca)
+      10. Guarda artefactos en artifacts/
 
     Parameters
     ----------
-    scaler_type : "standard" (media=0, var=1) | "minmax" (rango [0,1], mejor con outliers)
+    scaler_type : "standard" | "minmax"
+    use_pca     : None → sin PCA
+                  float (0 < n < 1) → nº componentes por varianza explicada, e.g. 0.95
+                  int  → nº fijo de componentes, e.g. 10
 
     Returns
     -------
-    X_train, X_test, y_train, y_test
+    X_train, X_test, y_train, y_test  (arrays numpy)
     """
-    print(f"--> Preprocesando datos (target='{target_col}', scaler='{scaler_type}')...")
+    print(f"--> Preprocesando datos (target='{target_col}', scaler='{scaler_type}', PCA={use_pca})...")
 
     df = df.copy()
 
-    # 1. Eliminar duplicados
+    # 1. Duplicados
     n_before = len(df)
     df.drop_duplicates(inplace=True)
-    n_dropped = n_before - len(df)
-    if n_dropped:
-        print(f"    Duplicados eliminados: {n_dropped}")
+    if n_before - len(df):
+        print(f"    Duplicados eliminados: {n_before - len(df)}")
 
-    # 2. Feature engineering (editar la función de abajo según el problema)
+    # 2. Feature engineering
     df = _feature_engineering(df)
 
     # 3. Codificación ordinal
@@ -80,63 +79,91 @@ def preprocess_data(
             df[col] = df[col].map(mapping)
             print(f"    Codificación ordinal: {col}")
 
-    # 4. Eliminar columnas no deseadas
+    # 4. Eliminar columnas
     cols_present = [c for c in COLS_TO_DROP if c in df.columns]
     if cols_present:
         df.drop(columns=cols_present, inplace=True)
         print(f"    Columnas eliminadas: {cols_present}")
 
-    # 5. Separar X e y
+    # 5. X / y
     X = df.drop(columns=[target_col])
     y = df[target_col]
 
-    # 6. Nulos numéricos → media; categóricos → moda
+    # 6. Nulos
     num_cols = X.select_dtypes(include=[np.number]).columns
     cat_cols = X.select_dtypes(exclude=[np.number]).columns
     X[num_cols] = X[num_cols].fillna(X[num_cols].mean())
     for col in cat_cols:
         X[col] = X[col].fillna(X[col].mode()[0])
 
-    # 7. LabelEncoder para categóricas restantes
+    # 7. LabelEncoder
     le = LabelEncoder()
     for col in cat_cols:
         X[col] = le.fit_transform(X[col].astype(str))
 
-    # Si el target es categórico, codificarlo también
     if y.dtype == object or str(y.dtype) == "category":
         y = le.fit_transform(y.astype(str))
         joblib.dump(le, ARTIFACTS_DIR / "target_encoder.joblib")
         print("    Target codificado → target_encoder.joblib")
 
-    # 8. Split estratificado (mantiene proporción de clases)
+    # 8. Split estratificado
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=test_size,
-        random_state=random_state,
-        stratify=y,          # ← clave para datasets desbalanceados
+        X, y, test_size=test_size, random_state=random_state, stratify=y,
     )
 
     # 9. Escalado
-    if scaler_type == "minmax":
-        scaler = MinMaxScaler()   # mejor cuando hay outliers fuertes
-    else:
-        scaler = StandardScaler() # por defecto: media=0, varianza=1
-
+    scaler = MinMaxScaler() if scaler_type == "minmax" else StandardScaler()
     X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
-
+    X_test  = scaler.transform(X_test)
     joblib.dump(scaler, ARTIFACTS_DIR / "scaler.joblib")
     print(f"    Scaler guardado → scaler.joblib")
+
+    # 10. PCA opcional
+    if use_pca is not None:
+        X_train, X_test = _apply_pca(X_train, X_test, use_pca)
+
     print(f"    Train: {X_train.shape} | Test: {X_test.shape}")
     print(f"    Proporción clases (train): {pd.Series(y_train).value_counts(normalize=True).to_dict()}")
 
     # Guardar conjuntos procesados
     pd.DataFrame(X_train).to_csv(PROCESSED_DATA_DIR / "X_train.csv", index=False)
-    pd.DataFrame(X_test).to_csv(PROCESSED_DATA_DIR / "X_test.csv", index=False)
+    pd.DataFrame(X_test).to_csv(PROCESSED_DATA_DIR  / "X_test.csv",  index=False)
     pd.Series(y_train).to_csv(PROCESSED_DATA_DIR / "y_train.csv", index=False)
-    pd.Series(y_test).to_csv(PROCESSED_DATA_DIR / "y_test.csv", index=False)
+    pd.Series(y_test).to_csv(PROCESSED_DATA_DIR  / "y_test.csv",  index=False)
 
     return X_train, X_test, y_train, y_test
+
+
+def _apply_pca(X_train, X_test, n_components):
+    """
+    Aplica PCA a train/test y guarda el objeto PCA en artifacts/.
+
+    Parameters
+    ----------
+    n_components : float (varianza) | int (componentes fijos)
+                   Ejemplos: 0.95 → 95% varianza | 10 → 10 componentes
+
+    ¿Cuándo usar PCA antes del clasificador?
+      - Muchas features correladas (|r| > 0.8 en varios pares)
+      - Alta dimensionalidad (>50 features) → riesgo de maldición dimensional
+      - Modelos lentos en alta dimensión (SVM, KNN)
+      - Datos con ruido: PCA elimina las componentes de menor varianza
+
+    ¿Cuándo NO usar PCA?
+      - Cuando la interpretabilidad de features es crítica
+      - Árboles y ensembles (RandomForest, XGBoost): ya gestionan la
+        dimensionalidad internamente; PCA no suele mejorar resultados
+    """
+    pca = PCA(n_components=n_components, random_state=42)
+    X_train_pca = pca.fit_transform(X_train)
+    X_test_pca  = pca.transform(X_test)
+    joblib.dump(pca, ARTIFACTS_DIR / "pca.joblib")
+
+    n_comp = pca.n_components_
+    var_exp = pca.explained_variance_ratio_.sum()
+    print(f"    PCA: {X_train.shape[1]} → {n_comp} componentes "
+          f"({var_exp:.1%} varianza explicada) → pca.joblib")
+    return X_train_pca, X_test_pca
 
 
 def _feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
@@ -145,11 +172,8 @@ def _feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     Edita esta función según las necesidades del problema.
 
     Ejemplos comunes:
-      - Convertir valores centinela en binario:
-            df['was_contacted'] = df['pdays'].apply(lambda x: 0 if x == 999 else 1)
-            df.drop('pdays', axis=1, inplace=True)
-      - Combinar columnas:
-            df['total_loans'] = df['housing'] + df['loan']
+      df['was_contacted'] = df['pdays'].apply(lambda x: 0 if x == 999 else 1)
+      df['total_loans']   = df['housing'] + df['loan']
     """
     # --- Añade tus transformaciones aquí ---
     return df
@@ -158,16 +182,9 @@ def _feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 def process_input(df_new: pd.DataFrame) -> np.ndarray:
     """
     Preprocesa nuevos datos para inferencia usando los artefactos guardados.
-
-    Parameters
-    ----------
-    df_new : DataFrame con las mismas columnas que los datos de entrenamiento
-             (sin la columna target).
-
-    Returns
-    -------
-    np.ndarray listo para model.predict()
+    Aplica: feature_engineering → ordinal → drop → encode → scaler → PCA (si existe).
     """
+    import os
     scaler = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
 
     df_new = df_new.copy()
@@ -181,17 +198,23 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
     if cols_present:
         df_new.drop(columns=cols_present, inplace=True)
 
-    # Codificar categóricas
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
     le = LabelEncoder()
     for col in cat_cols:
         df_new[col] = le.fit_transform(df_new[col].astype(str))
 
-    # Nulos
     num_cols = df_new.select_dtypes(include=[np.number]).columns
     df_new[num_cols] = df_new[num_cols].fillna(df_new[num_cols].mean())
 
-    return scaler.transform(df_new)
+    X = scaler.transform(df_new)
+
+    pca_path = ARTIFACTS_DIR / "pca.joblib"
+    if pca_path.exists():
+        pca = joblib.load(pca_path)
+        X = pca.transform(X)
+
+    return X
+
 
 {% elif cookiecutter.ml_type == 'no_supervisado' %}
 import pandas as pd
@@ -214,14 +237,13 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray escalado listo para clustering
+    np.ndarray escalado listo para clustering / PCA / UMAP
     """
     print("--> Preprocesando datos (no supervisado)...")
     df = df.copy()
 
-    # Eliminar columnas con demasiados nulos
     threshold = 0.5
-    null_pct = df.isnull().mean()
+    null_pct   = df.isnull().mean()
     cols_to_drop = null_pct[null_pct > threshold].index.tolist()
     if cols_to_drop:
         df.drop(columns=cols_to_drop, inplace=True)
@@ -248,11 +270,13 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     )
     return X_scaled
 
+
 {% elif cookiecutter.ml_type == 'redes_neuronales' %}
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.decomposition import PCA
 import joblib
 from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
@@ -262,22 +286,22 @@ def preprocess_data(
     target_col: str,
     test_size: float = 0.2,
     random_state: int = 42,
+    use_pca=None,
 ):
     """
     Pipeline de preprocesado para redes neuronales con PyTorch.
 
-    Pasos:
-      1. Rellena nulos
-      2. Codifica categóricas con LabelEncoder
-      3. Split estratificado
-      4. Escala con StandardScaler
-      5. Guarda artefactos
+    Parameters
+    ----------
+    use_pca : None | float (varianza) | int (componentes)
+              PCA antes de la red reduce ruido y dimensionalidad.
+              Útil si hay muchas features muy correladas.
 
     Returns
     -------
     X_train, X_test, y_train, y_test (DataFrames/Series)
     """
-    print(f"--> Preprocesando datos para red neuronal (target='{target_col}')...")
+    print(f"--> Preprocesando datos para red neuronal (target='{target_col}', PCA={use_pca})...")
     df = df.copy()
 
     X = df.drop(columns=[target_col])
@@ -304,16 +328,31 @@ def preprocess_data(
 
     scaler = StandardScaler()
     X_train_s = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-    X_test_s = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
-
+    X_test_s  = pd.DataFrame(scaler.transform(X_test),  columns=X_test.columns)
     joblib.dump(scaler, ARTIFACTS_DIR / "scaler.joblib")
-    print(f"    Train: {X_train_s.shape} | Test: {X_test_s.shape}")
 
-    return X_train_s, X_test_s, y_train.reset_index(drop=True), y_test.reset_index(drop=True)
+    # PCA opcional
+    if use_pca is not None:
+        pca = PCA(n_components=use_pca, random_state=42)
+        X_tr_arr = pca.fit_transform(X_train_s.values)
+        X_te_arr = pca.transform(X_test_s.values)
+        joblib.dump(pca, ARTIFACTS_DIR / "pca.joblib")
+        n_comp  = pca.n_components_
+        var_exp = pca.explained_variance_ratio_.sum()
+        print(f"    PCA: {X_train_s.shape[1]} → {n_comp} componentes ({var_exp:.1%} varianza)")
+        X_train_s = pd.DataFrame(X_tr_arr, columns=[f"PC{i+1}" for i in range(n_comp)])
+        X_test_s  = pd.DataFrame(X_te_arr, columns=[f"PC{i+1}" for i in range(n_comp)])
+
+    print(f"    Train: {X_train_s.shape} | Test: {X_test_s.shape}")
+    return (
+        X_train_s,
+        X_test_s,
+        y_train.reset_index(drop=True),
+        y_test.reset_index(drop=True),
+    )
 
 
 def process_input(df_new: pd.DataFrame) -> "np.ndarray":
-    import numpy as np
     scaler = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
     df_new = df_new.copy()
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
@@ -322,5 +361,268 @@ def process_input(df_new: pd.DataFrame) -> "np.ndarray":
         df_new[col] = le.fit_transform(df_new[col].astype(str))
     num_cols = df_new.select_dtypes(include=[np.number]).columns
     df_new[num_cols] = df_new[num_cols].fillna(df_new[num_cols].mean())
-    return scaler.transform(df_new)
+    X = scaler.transform(df_new)
+    pca_path = ARTIFACTS_DIR / "pca.joblib"
+    if pca_path.exists():
+        X = joblib.load(pca_path).transform(X)
+    return X
+
+
+{% elif cookiecutter.ml_type == 'hibrido' %}
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from sklearn.ensemble import IsolationForest
+from sklearn.semi_supervised import LabelSpreading
+import joblib
+from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+
+
+COLS_TO_DROP: list = []
+ORDINAL_MAPPINGS: dict = {}
+
+
+def preprocess_data(
+    df: pd.DataFrame,
+    target_col: str,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    strategy: str = "pca_clf",
+    n_clusters: int = 5,
+    labeled_fraction: float = 0.3,
+    pca_variance: float = 0.95,
+):
+    """
+    Pipeline híbrido: preprocesado base + transformación según estrategia.
+
+    Estrategias
+    -----------
+    'pca_clf'         → Escala → PCA → split → listo para clasificador.
+                        Conserva `pca_variance` de la varianza (default 95%).
+
+    'umap_clf'        → Escala → UMAP 2D → split → listo para clasificador.
+                        Reducción no lineal; captura estructuras complejas.
+                        Requiere: pip install umap-learn
+
+    'kmeans_features' → Escala → KMeans(n_clusters) → añade como nuevas features:
+                        · distancia a cada centroide (n_clusters columnas)
+                        · etiqueta del cluster asignado (1 columna)
+                        → split → listo para clasificador.
+                        Útil: el clustering captura grupos latentes del dataset.
+
+    'iso_feature'     → Escala → IsolationForest → añade anomaly_score como
+                        feature extra → split → listo para clasificador.
+                        Útil: el score de anomalía tiene poder predictivo.
+
+    'semi_supervisado'→ Escala → LabelSpreading sobre fracción sin etiqueta
+                        → etiquetas propagadas → split → entrena clasificador.
+                        Útil: solo `labeled_fraction` del dataset tiene labels;
+                        el resto se etiqueta automáticamente.
+
+    Returns
+    -------
+    X_train, X_test, y_train, y_test (arrays numpy)
+    """
+    print(f"--> Preprocesando datos (estrategia='{strategy}')...")
+    df = df.copy()
+
+    # ── Preprocesado base ────────────────────────────────────────────────
+    n_before = len(df)
+    df.drop_duplicates(inplace=True)
+    if n_before - len(df):
+        print(f"    Duplicados eliminados: {n_before - len(df)}")
+
+    for col, mapping in ORDINAL_MAPPINGS.items():
+        if col in df.columns:
+            df[col] = df[col].map(mapping)
+
+    cols_present = [c for c in COLS_TO_DROP if c in df.columns]
+    if cols_present:
+        df.drop(columns=cols_present, inplace=True)
+
+    X = df.drop(columns=[target_col])
+    y = df[target_col]
+
+    num_cols = X.select_dtypes(include=[np.number]).columns
+    cat_cols = X.select_dtypes(exclude=[np.number]).columns
+
+    X[num_cols] = X[num_cols].fillna(X[num_cols].mean())
+    for col in cat_cols:
+        X[col] = X[col].fillna(X[col].mode()[0])
+
+    le = LabelEncoder()
+    for col in cat_cols:
+        X[col] = le.fit_transform(X[col].astype(str))
+
+    if y.dtype == object or str(y.dtype) == "category":
+        y = pd.Series(le.fit_transform(y.astype(str)), name=target_col)
+        joblib.dump(le, ARTIFACTS_DIR / "target_encoder.joblib")
+
+    # Escalar siempre antes de cualquier transformación
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    joblib.dump(scaler, ARTIFACTS_DIR / "scaler.joblib")
+    print(f"    Scaler guardado → scaler.joblib")
+
+    # ── Transformación según estrategia ──────────────────────────────────
+    if strategy == "pca_clf":
+        X_final, y_final = _strategy_pca(X_scaled, y.values, pca_variance)
+
+    elif strategy == "umap_clf":
+        X_final, y_final = _strategy_umap(X_scaled, y.values)
+
+    elif strategy == "kmeans_features":
+        X_final, y_final = _strategy_kmeans_features(X_scaled, y.values, n_clusters, random_state)
+
+    elif strategy == "iso_feature":
+        X_final, y_final = _strategy_iso_feature(X_scaled, y.values)
+
+    elif strategy == "semi_supervisado":
+        X_final, y_final = _strategy_semi_supervised(X_scaled, y.values, labeled_fraction, random_state)
+
+    else:
+        raise ValueError(f"Estrategia desconocida: '{strategy}'. "
+                         f"Opciones: pca_clf | umap_clf | kmeans_features | iso_feature | semi_supervisado")
+
+    # ── Split estratificado ───────────────────────────────────────────────
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_final, y_final, test_size=test_size, random_state=random_state,
+        stratify=y_final,
+    )
+
+    print(f"    Train: {X_train.shape} | Test: {X_test.shape}")
+    pd.DataFrame(X_train).to_csv(PROCESSED_DATA_DIR / "X_train.csv", index=False)
+    pd.DataFrame(X_test).to_csv(PROCESSED_DATA_DIR  / "X_test.csv",  index=False)
+    pd.Series(y_train).to_csv(PROCESSED_DATA_DIR / "y_train.csv", index=False)
+    pd.Series(y_test).to_csv(PROCESSED_DATA_DIR  / "y_test.csv",  index=False)
+
+    return X_train, X_test, y_train, y_test
+
+
+# ── Estrategias privadas ─────────────────────────────────────────────────────
+
+def _strategy_pca(X_scaled, y, pca_variance):
+    """PCA → conserva `pca_variance` de la varianza total."""
+    pca = PCA(n_components=pca_variance, random_state=42)
+    X_pca = pca.fit_transform(X_scaled)
+    joblib.dump(pca, ARTIFACTS_DIR / "pca.joblib")
+    n_comp  = pca.n_components_
+    var_exp = pca.explained_variance_ratio_.sum()
+    print(f"    PCA: {X_scaled.shape[1]} → {n_comp} componentes ({var_exp:.1%} varianza) → pca.joblib")
+    return X_pca, y
+
+
+def _strategy_umap(X_scaled, y, n_components=2):
+    """
+    UMAP: reducción no lineal a `n_components` dimensiones.
+
+    Ventajas sobre PCA:
+      - Captura estructuras no lineales (manifolds)
+      - Mejor separación visual de clusters
+      - Más útil cuando PCA pierde información relevante
+
+    Parámetros clave de UMAP:
+      n_neighbors (15): más alto → estructura global; más bajo → local
+      min_dist (0.1): más alto → puntos más dispersos en el embedding
+    """
+    try:
+        import umap
+    except ImportError:
+        raise ImportError("Instala umap-learn: uv add umap-learn")
+
+    reducer = umap.UMAP(
+        n_components=n_components,
+        n_neighbors=15,
+        min_dist=0.1,
+        random_state=42,
+        verbose=True,
+    )
+    X_umap = reducer.fit_transform(X_scaled)
+    joblib.dump(reducer, ARTIFACTS_DIR / "umap.joblib")
+    print(f"    UMAP: {X_scaled.shape[1]} → {n_components}D → umap.joblib")
+    return X_umap, y
+
+
+def _strategy_kmeans_features(X_scaled, y, n_clusters, random_state):
+    """
+    KMeans como extractor de features.
+
+    Añade al dataset original:
+      · cluster_0 ... cluster_{k-1}: distancia euclidiana a cada centroide
+      · cluster_label: índice del cluster asignado (como feature numérica)
+
+    ¿Por qué funciona?
+      El clustering captura la estructura global del espacio de features.
+      La distancia a cada centroide codifica "qué tan cerca está cada punto
+      de cada grupo", lo que puede ser muy informativo para el clasificador.
+    """
+    km = KMeans(n_clusters=n_clusters, init="k-means++", n_init=10, random_state=random_state)
+    km.fit(X_scaled)
+    joblib.dump(km, ARTIFACTS_DIR / "kmeans_feature.joblib")
+
+    dists  = km.transform(X_scaled)                        # (n, k)
+    labels = km.labels_.reshape(-1, 1).astype(float)       # (n, 1)
+    X_new  = np.hstack([X_scaled, dists, labels])
+
+    print(f"    KMeans({n_clusters}) features: {X_scaled.shape[1]} → {X_new.shape[1]} columnas")
+    print(f"    Distribución clusters: {dict(zip(*np.unique(km.labels_, return_counts=True)))}")
+    return X_new, y
+
+
+def _strategy_iso_feature(X_scaled, y, contamination=0.05):
+    """
+    IsolationForest → añade anomaly_score como feature extra.
+
+    El anomaly score es negativo para outliers (más negativo = más raro).
+    Si los outliers tienen un comportamiento diferente para el target,
+    este score puede mejorar la predicción del clasificador.
+    """
+    iso = IsolationForest(
+        contamination=contamination, n_estimators=200, random_state=42, n_jobs=-1
+    )
+    iso.fit(X_scaled)
+    joblib.dump(iso, ARTIFACTS_DIR / "isolation_forest.joblib")
+
+    scores = iso.decision_function(X_scaled).reshape(-1, 1)  # (n, 1)
+    X_new  = np.hstack([X_scaled, scores])
+
+    n_out  = (iso.predict(X_scaled) == -1).sum()
+    print(f"    IsolationForest: {n_out} outliers ({n_out/len(X_scaled):.1%}) | "
+          f"score añadido como feature → {X_new.shape[1]} columnas")
+    return X_new, y
+
+
+def _strategy_semi_supervised(X_scaled, y, labeled_fraction, random_state):
+    """
+    LabelSpreading: propaga etiquetas desde datos etiquetados al resto.
+
+    Simula un escenario real donde solo tienes labels para una fracción
+    del dataset. El algoritmo propaga las etiquetas por el grafo de similitud.
+
+    ⚠ Esta estrategia modifica y, ya que el y resultante incluye las
+      etiquetas propagadas para las muestras que originalmente eran -1.
+    """
+    rng = np.random.default_rng(random_state)
+    y_semi = y.copy().astype(int)
+
+    # Marcar la fracción no etiquetada con -1 (convención de scikit-learn)
+    n_unlabeled = int(len(y) * (1 - labeled_fraction))
+    unlabeled_idx = rng.choice(len(y), size=n_unlabeled, replace=False)
+    y_semi[unlabeled_idx] = -1
+
+    n_labeled = (y_semi != -1).sum()
+    print(f"    Semi-supervisado: {n_labeled} etiquetados, {n_unlabeled} sin etiquetar")
+
+    ls = LabelSpreading(kernel="rbf", alpha=0.2, max_iter=100, n_jobs=-1)
+    ls.fit(X_scaled, y_semi)
+    y_propagated = ls.transduction_.astype(int)
+    joblib.dump(ls, ARTIFACTS_DIR / "label_spreading.joblib")
+
+    # Cuántas etiquetas se han propagado con éxito
+    changed = (y_propagated != y).sum()
+    print(f"    LabelSpreading: {changed} etiquetas propagadas/corregidas")
+    return X_scaled, y_propagated
 {% endif %}
