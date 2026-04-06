@@ -30,9 +30,10 @@ dev = [
     "sphinx",
 ]
 
-# ML supervisado: clasificación y regresión con scikit-learn y boosting
+# ML supervisado: clasificación + PCA opcional como preprocesado
 supervisado = [
-    "scikit-learn",
+    "scikit-learn",   # modelos, PCA, pipelines, métricas
+    "scipy",          # stats, tests de normalidad, dendrogramas
     "lightgbm",
     "xgboost",
     "statsmodels",
@@ -40,13 +41,13 @@ supervisado = [
     "joblib",
 ]
 
-# ML no supervisado: clustering, reducción de dimensionalidad
+# ML no supervisado: clustering + reducción de dimensionalidad
 no_supervisado = [
-    "scikit-learn",
+    "scikit-learn",   # KMeans, AgglomerativeClustering, PCA, DBSCAN
     "scipy",          # dendrogramas y clustering jerárquico
     "yellowbrick",    # SilhouetteVisualizer
-    "umap-learn",     # reducción de dimensionalidad no lineal
-    "hdbscan",        # clustering basado en densidad
+    "umap-learn",     # reducción de dimensionalidad no lineal (UMAP)
+    "hdbscan",        # clustering basado en densidad jerárquico
     "joblib",
 ]
 
@@ -58,7 +59,24 @@ redes_neuronales = [
     "torchmetrics[visual]",
     "tensorboard",
     "polars",         # carga eficiente de datos con dtypes explícitos
-    "scikit-learn",
+    "scikit-learn",   # PCA, métricas, preprocesado
+    "scipy",
+    "joblib",
+]
+
+# Modelos híbridos: combinan técnicas supervisadas y no supervisadas
+# Casos de uso:
+#   - PCA/UMAP → reducir dimensiones → clasificador
+#   - KMeans → distancias a centroides como features → RF/LogReg
+#   - IsolationForest → score de anomalía como feature → clasificador
+#   - Semi-supervisado: LabelPropagation / LabelSpreading
+hibrido = [
+    "scikit-learn",   # PCA, KMeans, IsolationForest, pipelines, semi-supervisado
+    "scipy",          # estadísticos, tests de normalidad
+    "umap-learn",     # UMAP como alternativa a PCA (no lineal)
+    "lightgbm",       # clasificador final potente
+    "xgboost",        # clasificador final alternativo
+    "imbalanced-learn",
     "joblib",
 ]
 
