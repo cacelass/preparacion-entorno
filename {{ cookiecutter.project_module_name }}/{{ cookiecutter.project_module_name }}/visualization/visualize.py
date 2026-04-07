@@ -6,7 +6,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 plt.rcParams["figure.figsize"] = (12, 7)
@@ -214,7 +214,7 @@ import scipy.cluster.hierarchy as sch
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 
@@ -437,7 +437,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 
@@ -581,7 +581,7 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 
