@@ -1,33 +1,45 @@
-.PHONY: setup install-deps test lint format docs clean clean-models clean-figures clean-all run lab notebook info help
+.PHONY: setup install-deps \
+        data features train predict \
+        test lint format \
+        lab notebook \
+        docs \
+        clean clean-models clean-figures clean-all \
+        run info help
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Variables
 # ─────────────────────────────────────────────────────────────────────────────
-MODULE   = {{ cookiecutter.project_module_name }}
+MODULE   = {{ cookiecutter.project_slug }}
 ML_TYPE  = {{ cookiecutter.ml_type }}
 PYTHON   = python
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  help  →  muestra todos los targets disponibles (target por defecto)
+#  help  →  target por defecto
 # ─────────────────────────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
 
 help:
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "  {{ cookiecutter.project_name }}  ·  ML tipo: $(ML_TYPE)"
+	@echo "  {{ cookiecutter.project_name }}  ·  ML: $(ML_TYPE)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "  Entorno"
 	@echo "    make setup          instala core + dev + extras del tipo ML"
 	@echo "    make install-deps   solo dependencias del tipo ML (sin dev)"
-	@echo "    make info           muestra versiones y paquetes instalados"
+	@echo "    make info           versiones y paquetes instalados"
 	@echo ""
-	@echo "  Desarrollo"
-	@echo "    make run            ejecuta main.py"
-	@echo "    make test           lanza pytest con verbose"
-	@echo "    make lint           ruff check (sin modificar)"
-	@echo "    make format         ruff format (modifica en sitio)"
+	@echo "  Pipeline de datos y modelos"
+	@echo "    make data           descarga/preprocesa datos crudos"
+	@echo "    make features       construye features desde datos procesados"
+	@echo "    make train          entrena el modelo"
+	@echo "    make predict        genera predicciones con el modelo entrenado"
+	@echo "    make pipeline       data → features → train → predict (todo)"
+	@echo ""
+	@echo "  Calidad"
+	@echo "    make test           pytest -v"
+	@echo "    make lint           ruff check (solo lectura, sin modificar)"
+	@echo "    make format         ruff format (aplica cambios en sitio)"
 	@echo ""
 	@echo "  Jupyter"
 	@echo "    make lab            JupyterLab  (puerto 8888)"
@@ -40,17 +52,11 @@ help:
 	@echo "    make clean          cachés y __pycache__"
 	@echo "    make clean-models   borra .joblib y .pt de models/"
 	@echo "    make clean-figures  borra figuras de reports/figures/"
-	@echo "    make clean-all      todo lo anterior junto"
+	@echo "    make clean-all      todo lo anterior"
 	@echo ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  setup  →  instala TODO: core + dev + extra del tipo de ML elegido
-#
-#  Uso:
-#    make setup
-#
-#  Equivalente manual:
-#    uv sync --extra dev --extra {{ cookiecutter.ml_type }}
+#  Entorno
 # ─────────────────────────────────────────────────────────────────────────────
 setup:
 	@echo ""
@@ -59,32 +65,61 @@ setup:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	uv sync --extra dev --extra $(ML_TYPE)
 	@echo ""
-	@echo "  Entorno listo. Activa con:  source .venv/bin/activate"
+	@echo "  Listo. Activa el entorno con:  source .venv/bin/activate"
 	@echo ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  install-deps  →  solo las dependencias del tipo ML (sin dev tools)
-# ─────────────────────────────────────────────────────────────────────────────
 install-deps:
 	uv sync --extra $(ML_TYPE)
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Desarrollo
+#  Pipeline  data → features → train → predict
+#
+#  Cada step llama al script correspondiente dentro del módulo.
+#  Estructura esperada:
+#    $(MODULE)/data/make_dataset.py        → lee data/raw/, escribe data/processed/
+#    $(MODULE)/features/build_features.py  → lee data/processed/, escribe data/interim/
+#    $(MODULE)/models/train_model.py       → lee data/interim/, escribe models/
+#    $(MODULE)/models/predict_model.py     → lee models/ + data/interim/, escribe reports/
+# ─────────────────────────────────────────────────────────────────────────────
+data:
+	@echo "▶  Procesando datos crudos → data/processed/"
+	uv run $(PYTHON) $(MODULE)/data/make_dataset.py
+
+features: data
+	@echo "▶  Construyendo features → data/interim/"
+	uv run $(PYTHON) $(MODULE)/features/build_features.py
+
+train: features
+	@echo "▶  Entrenando modelo → models/"
+	uv run $(PYTHON) $(MODULE)/models/train_model.py
+
+predict: train
+	@echo "▶  Generando predicciones → reports/"
+	uv run $(PYTHON) $(MODULE)/models/predict_model.py
+
+pipeline: predict
+	@echo ""
+	@echo "  Pipeline completo finalizado."
+	@echo ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Ejecución directa
 # ─────────────────────────────────────────────────────────────────────────────
 run:
 	uv run $(PYTHON) main.py
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Calidad de código
+# ─────────────────────────────────────────────────────────────────────────────
 test:
-	uv run pytest tests -v
+	uv run pytest tests/ -v
 
-# lint   → solo comprueba, no modifica nada (útil en CI)
 lint:
-	uv run ruff check $(MODULE) tests
-	uv run ruff format --check $(MODULE) tests
+	uv run ruff check $(MODULE)/ tests/
+	uv run ruff format --check $(MODULE)/ tests/
 
-# format → aplica los cambios en sitio
 format:
-	uv run ruff format $(MODULE) tests
+	uv run ruff format $(MODULE)/ tests/
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Jupyter
@@ -99,7 +134,7 @@ notebook:
 #  Documentación
 # ─────────────────────────────────────────────────────────────────────────────
 docs:
-	uv run sphinx-apidoc -o docs/source/ $(MODULE)
+	uv run sphinx-apidoc -o docs/source/ $(MODULE)/
 	$(MAKE) html -C docs
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -107,22 +142,20 @@ docs:
 # ─────────────────────────────────────────────────────────────────────────────
 clean:
 	rm -rf .pytest_cache docs/build
-	find $(MODULE) tests -type d -name "__pycache__" -exec rm -rf {} +
+	find $(MODULE) tests -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -name "*.pyc" -delete
-	@echo "  Cachés y __pycache__ eliminados"
+	@echo "  Cachés y __pycache__ eliminados."
 
-# Elimina modelos entrenados (joblib sklearn + pesos PyTorch + checkpoints)
 clean-models:
-	rm -f models/*.joblib models/*.pt models/checkpoint-*.pt
-	@echo "  Modelos eliminados"
+	rm -f models/*.joblib models/*.pkl models/*.pt models/checkpoint-*.pt
+	@echo "  Modelos eliminados."
 
-# Elimina figuras generadas por visualize.py
 clean-figures:
-	rm -f reports/figures/*.png reports/figures/*.html
-	@echo "  Figuras eliminadas"
+	rm -f reports/figures/*.png reports/figures/*.svg reports/figures/*.html
+	@echo "  Figuras eliminadas."
 
 clean-all: clean clean-models clean-figures
-	@echo "  Limpieza completa"
+	@echo "  Limpieza completa."
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Info del entorno
@@ -133,8 +166,8 @@ info:
 	@echo "  Proyecto  : {{ cookiecutter.project_name }}"
 	@echo "  Módulo    : $(MODULE)"
 	@echo "  ML tipo   : $(ML_TYPE)"
-	@echo "  Python    : $(shell $(PYTHON) --version)"
+	@echo "  Python    : $(shell uv run python --version 2>/dev/null || python --version)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@uv pip list 2>/dev/null | head -30 || pip list | head -30
+	@uv pip list 2>/dev/null | head -40 || pip list | head -40
 	@echo ""
