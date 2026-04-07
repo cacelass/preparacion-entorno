@@ -59,7 +59,7 @@ wget -qO- https://astral.sh/uv/install.sh | sh
 En el directorio donde quieras crear tu proyecto:
 
 ```bash
-cookiecutter https://github.com/cacelass/preparacion-entorno.git
+cookiecutter https://github.com/cacelass/dskit.git
 ```
 
 Una vez generado el proyecto, configura el entorno:
