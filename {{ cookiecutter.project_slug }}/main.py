@@ -3,11 +3,11 @@ Punto de entrada principal del proyecto.
 Ejecutar: python main.py
 """
 {% if cookiecutter.ml_type == 'supervisado' %}
-from {{ cookiecutter.project_module_name }}.data.make_dataset import load_data
-from {{ cookiecutter.project_module_name }}.features.build_features import preprocess_data
-from {{ cookiecutter.project_module_name }}.models.train_model import train_models
-from {{ cookiecutter.project_module_name }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
-from {{ cookiecutter.project_module_name }}.visualization.visualize import (
+from {{ cookiecutter.project_slug }}.data.make_dataset import load_data
+from {{ cookiecutter.project_slug }}.features.build_features import preprocess_data
+from {{ cookiecutter.project_slug }}.models.train_model import train_models
+from {{ cookiecutter.project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
+from {{ cookiecutter.project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
     plot_class_balance,
@@ -57,7 +57,7 @@ def main():
     )
 
     print('\n6. Importancia de variables...')
-    from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR
+    from {{ cookiecutter.project_slug }}.utils.paths import PROCESSED_DATA_DIR
     import pandas as pd
     try:
         feature_names = pd.read_csv(PROCESSED_DATA_DIR / 'X_train.csv').columns.tolist()
@@ -68,7 +68,7 @@ def main():
     if USE_PCA is not None:
         print('\n7. Varianza explicada por PCA...')
         import joblib
-        from {{ cookiecutter.project_module_name }}.utils.paths import ARTIFACTS_DIR
+        from {{ cookiecutter.project_slug }}.utils.paths import ARTIFACTS_DIR
         try:
             pca = joblib.load(ARTIFACTS_DIR / 'pca.joblib')
             plot_pca_variance(pca)
@@ -85,11 +85,11 @@ if __name__ == '__main__':
     main()
 
 {% elif cookiecutter.ml_type == 'no_supervisado' %}
-from {{ cookiecutter.project_module_name }}.data.make_dataset import load_data
-from {{ cookiecutter.project_module_name }}.features.build_features import preprocess_data
-from {{ cookiecutter.project_module_name }}.models.train_model import train_models, find_optimal_k
-from {{ cookiecutter.project_module_name }}.models.predict_model import evaluate_models, plot_dendrogram
-from {{ cookiecutter.project_module_name }}.visualization.visualize import (
+from {{ cookiecutter.project_slug }}.data.make_dataset import load_data
+from {{ cookiecutter.project_slug }}.features.build_features import preprocess_data
+from {{ cookiecutter.project_slug }}.models.train_model import train_models, find_optimal_k
+from {{ cookiecutter.project_slug }}.models.predict_model import evaluate_models, plot_dendrogram
+from {{ cookiecutter.project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
     plot_elbow_and_silhouette,
@@ -148,16 +148,16 @@ if __name__ == '__main__':
 import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 
-from {{ cookiecutter.project_module_name }}.data.make_dataset import load_data
-from {{ cookiecutter.project_module_name }}.features.build_features import preprocess_data
-from {{ cookiecutter.project_module_name }}.models.train_model import train_models
-from {{ cookiecutter.project_module_name }}.models.predict_model import evaluate_models
-from {{ cookiecutter.project_module_name }}.visualization.visualize import (
+from {{ cookiecutter.project_slug }}.data.make_dataset import load_data
+from {{ cookiecutter.project_slug }}.features.build_features import preprocess_data
+from {{ cookiecutter.project_slug }}.models.train_model import train_models
+from {{ cookiecutter.project_slug }}.models.predict_model import evaluate_models
+from {{ cookiecutter.project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
     plot_pca_variance,
 )
-from {{ cookiecutter.project_module_name }}.utils.paths import RUNS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import RUNS_DIR
 
 DATA_FILE   = 'data/raw/dataset.csv'
 TARGET_COL  = 'target'
@@ -183,7 +183,7 @@ def main():
 
     if USE_PCA is not None:
         import joblib
-        from {{ cookiecutter.project_module_name }}.utils.paths import ARTIFACTS_DIR
+        from {{ cookiecutter.project_slug }}.utils.paths import ARTIFACTS_DIR
         try:
             pca = joblib.load(ARTIFACTS_DIR / 'pca.joblib')
             plot_pca_variance(pca)
@@ -233,11 +233,11 @@ Estrategias disponibles (configura STRATEGY):
                      → propaga etiquetas → entrena clasificador.
                      Útil cuando solo una parte del dataset tiene labels.
 """
-from {{ cookiecutter.project_module_name }}.data.make_dataset import load_data
-from {{ cookiecutter.project_module_name }}.features.build_features import preprocess_data
-from {{ cookiecutter.project_module_name }}.models.train_model import train_models
-from {{ cookiecutter.project_module_name }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
-from {{ cookiecutter.project_module_name }}.visualization.visualize import (
+from {{ cookiecutter.project_slug }}.data.make_dataset import load_data
+from {{ cookiecutter.project_slug }}.features.build_features import preprocess_data
+from {{ cookiecutter.project_slug }}.models.train_model import train_models
+from {{ cookiecutter.project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
+from {{ cookiecutter.project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
     plot_class_balance,
@@ -285,7 +285,7 @@ def main():
     print('\n4. Visualizando espacio reducido...')
     if STRATEGY in ('pca_clf',):
         import joblib
-        from {{ cookiecutter.project_module_name }}.utils.paths import ARTIFACTS_DIR
+        from {{ cookiecutter.project_slug }}.utils.paths import ARTIFACTS_DIR
         try:
             pca = joblib.load(ARTIFACTS_DIR / 'pca.joblib')
             plot_pca_variance(pca)
@@ -304,7 +304,7 @@ def main():
 
     print('\n7. Importancia de variables...')
     import pandas as pd
-    from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR
+    from {{ cookiecutter.project_slug }}.utils.paths import PROCESSED_DATA_DIR
     try:
         feature_names = pd.read_csv(PROCESSED_DATA_DIR / 'X_train.csv').columns.tolist()
     except FileNotFoundError:

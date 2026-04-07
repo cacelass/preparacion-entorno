@@ -23,7 +23,7 @@
 │   ├── 0-1-...-ProcesamientoDatos.ipynb
 │   └── 0-2-...-Ejecucion.ipynb
 ├── reports/figures/    ← gráficos generados
-├── {{ cookiecutter.project_module_name }}/
+├── {{ cookiecutter.project_slug }}/
 │   ├── data/           make_dataset.py
 │   ├── features/       build_features.py
 │   ├── models/         train_model.py · predict_model.py
