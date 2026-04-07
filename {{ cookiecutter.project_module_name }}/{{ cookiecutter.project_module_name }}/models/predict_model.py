@@ -15,7 +15,7 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
 )
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR, MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR
 
 # Umbral de decisión para clasificación binaria.
 # Bajar (e.g., 0.3) aumenta recall de clase minoritaria a costa de más FP.
@@ -141,7 +141,7 @@ import scipy.cluster.hierarchy as sch
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.decomposition import PCA
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR, MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR
 
 
 def evaluate_models(models: dict, X) -> pd.DataFrame:
@@ -265,7 +265,7 @@ from sklearn.metrics import (
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
 )
 
-from {{ cookiecutter.project_module_name }}.utils.paths import FIGURES_DIR, MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
