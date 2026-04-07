@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 
-from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import MODELS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_har
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 
-from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import MODELS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
 
-from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR, RUNS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import MODELS_DIR, RUNS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -558,7 +558,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
 
-from {{ cookiecutter.project_module_name }}.utils.paths import MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import MODELS_DIR
 
 
 # ---------------------------------------------------------------------------
