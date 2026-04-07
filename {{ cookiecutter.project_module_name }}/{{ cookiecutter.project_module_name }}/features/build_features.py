@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.decomposition import PCA
 import joblib
-from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import joblib
-from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
 def preprocess_data(df: pd.DataFrame) -> np.ndarray:
@@ -278,7 +278,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.decomposition import PCA
 import joblib
-from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
 def preprocess_data(
@@ -378,7 +378,7 @@ from sklearn.cluster import KMeans
 from sklearn.ensemble import IsolationForest
 from sklearn.semi_supervised import LabelSpreading
 import joblib
-from {{ cookiecutter.project_module_name }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
 COLS_TO_DROP: list = []
