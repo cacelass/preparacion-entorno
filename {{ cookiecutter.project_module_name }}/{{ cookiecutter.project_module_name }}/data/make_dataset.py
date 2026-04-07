@@ -1,5 +1,5 @@
 import pandas as pd
-from {{ cookiecutter.project_module_name }}.utils.paths import RAW_DATA_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import RAW_DATA_DIR
 
 {% if cookiecutter.ml_type == 'redes_neuronales' %}
 # ---------------------------------------------------------------------------
