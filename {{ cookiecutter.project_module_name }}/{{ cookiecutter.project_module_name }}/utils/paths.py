@@ -1,4 +1,4 @@
-# {{ cookiecutter.project_module_name }}/utils/paths.py
+# {{ cookiecutter.project_slug }}/utils/paths.py
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
