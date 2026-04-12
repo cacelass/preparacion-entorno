@@ -1,0 +1,8 @@
+# ruff.toml — configuración de ruff para el repo dskit (template)
+#
+# Se usa un archivo separado porque el pyproject.toml raíz contiene
+# variables {{ cookiecutter.* }} que ruff no puede parsear como TOML válido.
+
+exclude = [
+    "{{ cookiecutter.project_slug }}",
+]
