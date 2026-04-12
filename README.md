@@ -1,9 +1,11 @@
 # DSKIT
 
-**Template Profesional para Data Analyst & Data Science**
+**Template profesional para Data Analyst y Data Science**
 
-Este repositorio es un **template de proyecto de Data Science**, diseñado para que analistas y científicos de datos puedan iniciar cualquier proyecto de manera organizada y profesional.  
-Incluye una estructura modular para trabajar con **datos, notebooks, features, modelos, visualización y documentación**, permitiendo reproducibilidad y buenas prácticas desde el inicio.
+Plantilla de proyectos de Ciencia de Datos basada en Cookiecutter, diseñada para iniciar cualquier proyecto de forma **organizada, reproducible y profesional**.  
+Está construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo de trabajo de Machine Learning — desde la ingesta de datos hasta el modelo desplegado.
+
+La desarrollé para dejar de repetir siempre el mismo setup. Ahora simplemente lo reutilizo.
 
 ---
 
@@ -19,12 +21,19 @@ Incluye una estructura modular para trabajar con **datos, notebooks, features, m
 
 ## Características principales
 
-- Estructura modular de proyecto **lista para pipelines de Data Science**.
-- Carpeta `notebooks` para desarrollo exploratorio.
-- Scripts separados para **preprocesamiento, features, entrenamiento y predicción**.
-- Documentación con **Sphinx** integrada.
-- Entorno reproducible con **uv** y gestión de dependencias opcionales por tipo de ML.
-- Carpeta `tests` para pruebas unitarias de tus scripts.
+- Estructura modular lista para pipelines completos de Data Science:
+  `data`, `features`, `models`, `utils`, `visualization`
+- Carpeta `notebooks` preconfigurada para análisis exploratorio y prototipado
+- Scripts desacoplados para:
+  - preprocesamiento
+  - ingeniería de características
+  - entrenamiento
+  - inferencia/predicción
+- Gestión de entornos con `uv`, incluyendo grupos de dependencias opcionales según el tipo de proyecto
+- Notebooks preparados para descarga, procesamiento y ejecución de datos
+- Documentación profesional integrada con Sphinx
+- Estructura de tests unitarios con `pytest`
+- `Makefile` con automatización de tareas comunes
 
 ---
 
@@ -137,3 +146,8 @@ source .venv/bin/activate
 ├── pyproject.toml
 └── README.md
 ```
+---
+
+## License
+
+GPL-3.0
