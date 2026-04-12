@@ -16,3 +16,10 @@ packages = ["{{ cookiecutter.project_slug }}"]
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+# Excluir el directorio del template — contiene variables {{ cookiecutter.* }}
+# que ruff no puede parsear como Python/TOML válido
+exclude = [
+    "{{ cookiecutter.project_slug }}",
+]
