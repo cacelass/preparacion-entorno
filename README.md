@@ -3,19 +3,22 @@
 **Template profesional para Data Analyst y Data Science**
 
 Plantilla de proyectos de Ciencia de Datos basada en Cookiecutter, diseñada para iniciar cualquier proyecto de forma **organizada, reproducible y profesional**.  
-Está construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo de trabajo de Machine Learning — desde la ingesta de datos hasta el modelo desplegado.
+Está construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo de trabajo de Machine Learning, desde la ingesta de datos hasta el modelo desplegado.
 
-La desarrollé para dejar de repetir siempre el mismo setup. Ahora simplemente lo reutilizo.
+Diseñada para eliminar la fricción del setup inicial y garantizar consistencia entre proyectos desde el primer commit.
 
 ---
 
 ## Índice
 
-- [Características principales](#características-principales)
-- [Requisitos previos](#requisitos-previos)
-- [Instalación](#instalación)
-- [Uso](#uso)
-- [Estructura del proyecto generado](#estructura-del-proyecto-generado)
+- [DSKIT](#dskit)
+  - [Índice](#índice)
+  - [Características principales](#características-principales)
+  - [Requisitos previos](#requisitos-previos)
+  - [Instalación](#instalación)
+  - [Uso](#uso)
+  - [Estructura del proyecto generado](#estructura-del-proyecto-generado)
+  - [License](#license)
 
 ---
 
