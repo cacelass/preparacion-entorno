@@ -1,13 +1,4 @@
 # .github/workflows/ci.yml
-#
-# CI del REPO TEMPLATE (dskit)
-# Valida que el template genera proyectos sanos para todos los
-# ml_type definidos en cookiecutter.json.
-#
-# Jobs:
-#   1. lint-template      → ruff sobre el propio repo dskit
-#   2. generated-project  → genera con cookiecutter + lint + pytest
-#                           + sphinx, para cada ml_type × python
 
 name: CI
 
@@ -64,7 +55,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # ── uv + Python ─────────────────────────────────────────
       - name: Install uv
         uses: astral-sh/setup-uv@v8.0.0
         with:
@@ -74,7 +64,6 @@ jobs:
       - name: Set up Python ${{ matrix.python }}
         run: uv python install ${{ matrix.python }}
 
-      # ── Generar proyecto ─────────────────────────────────────
       - name: Install cookiecutter
         run: uv tool install cookiecutter
 
@@ -98,12 +87,10 @@ jobs:
           DIR=$(ls /tmp/generated | head -1)
           echo "path=/tmp/generated/$DIR" >> "$GITHUB_OUTPUT"
 
-      # ── Entorno del proyecto generado ───────────────────────
       - name: Install dev + ml deps
         working-directory: ${{ steps.proj.outputs.path }}
-        run: uv sync --frozen false --extra dev --extra ${{ matrix.ml_type }}
+        run: uv sync --extra dev --extra ${{ matrix.ml_type }}
 
-      # ── Calidad de código ────────────────────────────────────
       - name: Ruff — lint
         working-directory: ${{ steps.proj.outputs.path }}
         run: uv run ruff check .
@@ -112,17 +99,14 @@ jobs:
         working-directory: ${{ steps.proj.outputs.path }}
         run: uv run ruff format --check .
 
-      # ── Tests ────────────────────────────────────────────────
       - name: Pytest
         working-directory: ${{ steps.proj.outputs.path }}
         run: uv run pytest tests/ -v --tb=short --no-header
 
-      # ── Sphinx docs ──────────────────────────────────────────
       - name: Build Sphinx docs
         working-directory: ${{ steps.proj.outputs.path }}/docs
         run: uv run make html SPHINXOPTS="-W --keep-going"
 
-      # ── Artefacto HTML ───────────────────────────────────────
       - name: Upload Sphinx HTML
         if: matrix.python == '3.12' && matrix.ml_type == 'supervisado'
         uses: actions/upload-artifact@v4
