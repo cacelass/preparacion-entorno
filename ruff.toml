@@ -1,5 +1,0 @@
-# ruff.toml — configuración de ruff para el repo dskit (template)
-
-exclude = [
-    "[{][{]*",
-]
