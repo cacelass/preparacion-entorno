@@ -1,0 +1,138 @@
+# .github/workflows/ci.yml
+#
+# Ubicación: dskit/.github/workflows/ci.yml
+#
+# Qué valida este CI:
+#   job 1 — lint-template     : ruff sobre el propio repo dskit
+#   job 2 — generated-project : genera un proyecto real con cookiecutter
+#                               y ejecuta lint + pytest + sphinx dentro de él,
+#                               una vez por cada ml_type de cookiecutter.json
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# ─────────────────────────────────────────────────────────────
+# JOB 1 — Lint del propio repo template (rápido, sin generar)
+# ─────────────────────────────────────────────────────────────
+jobs:
+  lint-template:
+    name: Lint template repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install ruff
+        run: uv tool install ruff
+
+      - name: Ruff — lint
+        run: uvx ruff check .
+
+      - name: Ruff — format check
+        run: uvx ruff format --check .
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2 — Genera proyecto y lo testea por cada ml_type
+  # ─────────────────────────────────────────────────────────────
+  generated-project:
+    name: "ml_type=${{ matrix.ml_type }} · py=${{ matrix.python }}"
+    runs-on: ubuntu-latest
+    needs: lint-template
+
+    strategy:
+      fail-fast: false   # cada combinación falla de forma independiente
+      matrix:
+        # Los 4 valores exactos de cookiecutter.json
+        ml_type: [supervisado, no_supervisado, redes_neuronales, hibrido]
+        python:  ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── uv ──────────────────────────────────────────────────
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+
+      # ── Generar proyecto ─────────────────────────────────────
+      - name: Install cookiecutter
+        run: uv tool install cookiecutter
+
+      - name: Generate project from template
+        run: |
+          uvx cookiecutter . \
+            --no-input \
+            --output-dir /tmp/generated \
+            project_name="ci_test" \
+            project_author_name="CI Bot" \
+            project_author_email="ci@example.com" \
+            project_description="Proyecto generado en CI" \
+            ml_type="${{ matrix.ml_type }}" \
+            python_version="${{ matrix.python }}" \
+            project_version="0.1.0" \
+            project_open_source_license="MIT"
+
+      # El slug se deriva del nombre → ci_test
+      - name: Resolve generated project path
+        id: proj
+        run: |
+          DIR=$(ls /tmp/generated | head -1)
+          echo "path=/tmp/generated/$DIR" >> "$GITHUB_OUTPUT"
+
+      # ── Entorno del proyecto generado ───────────────────────
+      # Instala el extra "dev" (ruff, pytest, black, invoke, sphinx…)
+      # más el extra del tipo de ML elegido en esta iteración
+      - name: Install dev + ml deps
+        working-directory: ${{ steps.proj.outputs.path }}
+        run: uv sync --extra dev --extra ${{ matrix.ml_type }}
+
+      # ── Calidad de código ────────────────────────────────────
+      - name: Ruff — lint
+        working-directory: ${{ steps.proj.outputs.path }}
+        run: uv run ruff check .
+
+      - name: Ruff — format check
+        working-directory: ${{ steps.proj.outputs.path }}
+        run: uv run ruff format --check .
+
+      # ── Tests ────────────────────────────────────────────────
+      - name: Pytest
+        working-directory: ${{ steps.proj.outputs.path }}
+        run: uv run pytest tests/ -v --tb=short --no-header
+
+      # ── Sphinx docs ──────────────────────────────────────────
+      # Usa el Makefile que ya incluye el template en docs/
+      - name: Build Sphinx docs
+        working-directory: ${{ steps.proj.outputs.path }}/docs
+        run: uv run make html SPHINXOPTS="-W --keep-going"
+        # -W          → warnings se tratan como errores
+        # --keep-going → lista todos los errores antes de parar
+
+      # ── Artefacto HTML (solo en 3.12 + supervisado) ──────────
+      - name: Upload Sphinx HTML
+        if: matrix.python == '3.12' && matrix.ml_type == 'supervisado'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sphinx-docs
+          path: ${{ steps.proj.outputs.path }}/docs/build/html
+          retention-days: 7
