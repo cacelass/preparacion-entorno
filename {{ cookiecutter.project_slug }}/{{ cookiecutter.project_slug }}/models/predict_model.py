@@ -250,7 +250,8 @@ def load_models(model_names: list = None) -> dict:
 
 {% elif cookiecutter.ml_type == 'redes_neuronales' %}
 """
-predict_model.py — Evaluación de redes neuronales PyTorch.
+predict_model.py — Evaluación y exportación de predicciones (PyTorch).
+Arquitectura activa: {{ cookiecutter.nn_model }}
 """
 import os
 import numpy as np
@@ -265,30 +266,44 @@ from sklearn.metrics import (
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
 )
 
-from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR
+from {{ cookiecutter.project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR, REPORTS_DIR
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def evaluate_models(models, X_test, y_test, num_classes=2, tb_writer=None) -> pd.DataFrame:
-    """Evalúa modelos PyTorch sobre el conjunto de test."""
+    """
+    Evalúa modelos PyTorch sobre el conjunto de test.
+
+    Genera por cada modelo:
+      - Matriz de confusión PNG en reports/figures/
+      - Distribución de probabilidades PNG (solo binario)
+      - CSV con métricas en reports/resultados_{{ cookiecutter.nn_model }}.csv
+      - CSV con predicciones individuales en reports/predicciones_{{ cookiecutter.nn_model }}.csv
+    """
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"\n{'='*60}\n  Evaluación de red neuronal\n{'='*60}")
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"\n{'='*60}\n  Evaluación — {{ cookiecutter.nn_model }}\n{'='*60}")
     results = []
 
     for name, model in models.items():
         print(f"\n--- {name} ---")
         model.eval()
         with torch.no_grad():
-            X_t    = torch.tensor(X_test.values, dtype=torch.float32).to(device)
+            X_t    = torch.tensor(
+                X_test.values if hasattr(X_test, "values") else X_test,
+                dtype=torch.float32,
+            ).to(device)
             logits = model(X_t)
             if num_classes == 1:
                 proba  = torch.sigmoid(logits).cpu().numpy().flatten()
                 y_pred = (proba >= 0.5).astype(int)
+                proba_out = proba
             else:
-                proba  = torch.softmax(logits, dim=1).cpu().numpy()
-                y_pred = np.argmax(proba, axis=1)
+                proba_mat  = torch.softmax(logits, dim=1).cpu().numpy()
+                y_pred     = np.argmax(proba_mat, axis=1)
+                proba_out  = proba_mat
 
         y_true = y_test.values if hasattr(y_test, "values") else np.array(y_test)
 
@@ -307,21 +322,46 @@ def evaluate_models(models, X_test, y_test, num_classes=2, tb_writer=None) -> pd
         if tb_writer:
             tb_writer.add_scalar("Eval/Accuracy",  acc, 0)
             tb_writer.add_scalar("Eval/F1",        f1,  0)
+            tb_writer.add_scalar("Eval/Precision", prec, 0)
+            tb_writer.add_scalar("Eval/Recall",    rec,  0)
 
         _plot_confusion_matrix(y_true, y_pred, name, tb_writer)
 
         if num_classes == 2:
-            _plot_proba_distribution(proba, y_true, name)
+            _plot_proba_distribution(proba_out, y_true, name)
+
+        # ── Exportar predicciones individuales a CSV ──────────────────────
+        _export_predictions(y_true, y_pred, proba_out, name, num_classes)
 
         results.append({
             "Modelo":    name,
-            "Accuracy":  round(acc,  4), "F1":        round(f1,   4),
-            "Precision": round(prec, 4), "Recall":    round(rec,  4),
+            "Accuracy":  round(acc,  4),
+            "F1":        round(f1,   4),
+            "Precision": round(prec, 4),
+            "Recall":    round(rec,  4),
         })
 
-    df_results = pd.DataFrame(results)
-    df_results.to_csv(FIGURES_DIR / "resultados_nn.csv", index=False)
+    df_results = pd.DataFrame(results).sort_values("F1", ascending=False)
+    out_csv = REPORTS_DIR / "resultados_{{ cookiecutter.nn_model }}.csv"
+    df_results.to_csv(out_csv, index=False)
+    print(f"\n  Métricas guardadas → {out_csv}")
     return df_results
+
+
+def _export_predictions(y_true, y_pred, proba, model_name: str, num_classes: int):
+    """Exporta predicciones individuales a CSV."""
+    df = pd.DataFrame({"y_true": y_true, "y_pred": y_pred})
+    if num_classes == 2:
+        p = proba if proba.ndim == 1 else proba[:, 1]
+        df["proba_pos"] = p.round(4)
+    else:
+        for i in range(proba.shape[1]):
+            df[f"proba_cls{i}"] = proba[:, i].round(4)
+    df["correcto"] = (df["y_true"] == df["y_pred"]).astype(int)
+
+    out = REPORTS_DIR / f"predicciones_{model_name}.csv"
+    df.to_csv(out, index=False)
+    print(f"    predicciones guardadas → {out}")
 
 
 def _plot_confusion_matrix(y_true, y_pred, model_name, tb_writer=None):
@@ -356,7 +396,24 @@ def _plot_proba_distribution(proba, y_true, model_name):
     print(f"    proba_dist_{model_name}.png guardado")
 
 
-def predict_new(model, X_new, num_classes=2, threshold=0.5) -> np.ndarray:
+def predict_new(model, X_new, num_classes=2, threshold=0.5,
+                export_csv: bool = False, out_name: str = "predicciones_nuevas") -> np.ndarray:
+    """
+    Genera predicciones sobre datos nuevos (sin etiquetas).
+
+    Parameters
+    ----------
+    model       : modelo PyTorch en modo eval
+    X_new       : array/DataFrame de entrada
+    num_classes : 1 para regresión binaria con sigmoid, >1 para softmax
+    threshold   : umbral de clasificación (solo num_classes == 1)
+    export_csv  : si True, guarda predicciones en reports/out_name.csv
+    out_name    : nombre del archivo CSV de salida (sin extensión)
+
+    Returns
+    -------
+    np.ndarray con las predicciones (clases)
+    """
     model.eval()
     with torch.no_grad():
         if hasattr(X_new, "values"):
@@ -364,7 +421,20 @@ def predict_new(model, X_new, num_classes=2, threshold=0.5) -> np.ndarray:
         X_t    = torch.tensor(X_new, dtype=torch.float32).to(device)
         logits = model(X_t)
         if num_classes == 1:
-            proba = torch.sigmoid(logits).cpu().numpy().flatten()
-            return (proba >= threshold).astype(int)
-        return torch.argmax(logits, dim=1).cpu().numpy()
+            proba  = torch.sigmoid(logits).cpu().numpy().flatten()
+            preds  = (proba >= threshold).astype(int)
+        else:
+            proba  = torch.softmax(logits, dim=1).cpu().numpy()
+            preds  = np.argmax(proba, axis=1)
+
+    if export_csv:
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        df = pd.DataFrame({"y_pred": preds})
+        if num_classes == 2:
+            df["proba_pos"] = (proba if proba.ndim == 1 else proba[:, 1]).round(4)
+        out = REPORTS_DIR / f"{out_name}.csv"
+        df.to_csv(out, index=False)
+        print(f"    Predicciones nuevas guardadas → {out}")
+
+    return preds
 {% endif %}

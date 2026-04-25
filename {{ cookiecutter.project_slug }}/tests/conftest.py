@@ -14,15 +14,15 @@ import pytest
 
 @pytest.fixture
 def sample_df():
-    """DataFrame genérico con 4 columnas numéricas (200 filas)."""
+    """DataFrame genérico con 8 columnas numéricas (200 filas)."""
     np.random.seed(42)
     return pd.DataFrame(
-        np.random.randn(200, 4),
-        columns=["feat_0", "feat_1", "feat_2", "feat_3"],
+        np.random.randn(200, 8),
+        columns=[f"feat_{i}" for i in range(8)],
     )
 
 
-{% if cookiecutter.ml_type in ["supervisado", "hibrido", "redes_neuronales"] %}
+{% if cookiecutter.ml_type in ["supervisado", "hibrido"] %}
 @pytest.fixture
 def df_with_target(sample_df):
     """DataFrame con features numéricas + columna target binaria."""
@@ -32,24 +32,35 @@ def df_with_target(sample_df):
     return df
 {% endif %}
 
-{% if cookiecutter.ml_type == "no_supervisado" %}
-@pytest.fixture
-def df_clustering():
-    """DataFrame con 3 clusters naturales (200 muestras, 4 features)."""
-    from sklearn.datasets import make_blobs
-    X, _ = make_blobs(n_samples=200, centers=3, n_features=4,
-                      cluster_std=0.8, random_state=42)
-    return pd.DataFrame(X, columns=["feat_0", "feat_1", "feat_2", "feat_3"])
-{% endif %}
 
 {% if cookiecutter.ml_type == "redes_neuronales" %}
 @pytest.fixture
-def df_with_target_nn(sample_df):
-    """DataFrame con target para redes neuronales (retorna DataFrames, no arrays)."""
+def df_with_target(sample_df):
+    """
+    DataFrame con features numéricas + target multiclase (3 clases).
+
+    Notas:
+    - 200 filas: suficiente para que BatchNorm1d no se queje con batch_size=16
+    - 8 features: cubre todos los modelos (MLP, CNN1D, LSTM, GRU, Transformer)
+    - 3 clases: verifica que output_dim > 2 funciona en todas las arquitecturas
+    - target balanceado: evita que los tests fallen por class imbalance severo
+    """
     df = sample_df.copy()
     np.random.seed(42)
-    df["target"] = (df["feat_0"] + df["feat_1"] > 0).astype(int)
+    score = df["feat_0"] + df["feat_1"] - df["feat_2"]
+    df["target"] = pd.cut(score, bins=3, labels=[0, 1, 2]).astype(int)
     return df
+{% endif %}
+
+
+{% if cookiecutter.ml_type == "no_supervisado" %}
+@pytest.fixture
+def df_clustering():
+    """DataFrame con 3 clusters naturales (200 muestras, 8 features)."""
+    from sklearn.datasets import make_blobs
+    X, _ = make_blobs(n_samples=200, centers=3, n_features=8,
+                      cluster_std=0.8, random_state=42)
+    return pd.DataFrame(X, columns=[f"feat_{i}" for i in range(8)])
 {% endif %}
 
 
@@ -67,6 +78,7 @@ def patch_paths(monkeypatch, tmp_path):
         "MODELS_DIR":         tmp_path / "models",
         "ARTIFACTS_DIR":      tmp_path / "models" / "artifacts",
         "FIGURES_DIR":        tmp_path / "reports" / "figures",
+        "REPORTS_DIR":        tmp_path / "reports",
         "PROCESSED_DATA_DIR": tmp_path / "data" / "processed",
         "RAW_DATA_DIR":       tmp_path / "data" / "raw",
         "RUNS_DIR":           tmp_path / "runs",

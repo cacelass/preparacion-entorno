@@ -150,7 +150,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from {{ cookiecutter.project_slug }}.data.make_dataset import load_data
 from {{ cookiecutter.project_slug }}.features.build_features import preprocess_data
-from {{ cookiecutter.project_slug }}.models.train_model import train_models
+from {{ cookiecutter.project_slug }}.models.train_model import train_models, MODEL_NAME
 from {{ cookiecutter.project_slug }}.models.predict_model import evaluate_models
 from {{ cookiecutter.project_slug }}.visualization.visualize import (
     plot_distributions,
@@ -159,24 +159,49 @@ from {{ cookiecutter.project_slug }}.visualization.visualize import (
 )
 from {{ cookiecutter.project_slug }}.utils.paths import RUNS_DIR
 
+# ---------------------------------------------------------------------------
+# Configuración
+# ---------------------------------------------------------------------------
 DATA_FILE   = 'data/raw/dataset.csv'
 TARGET_COL  = 'target'
 EPOCHS      = 50
 BATCH_SIZE  = 32
+LR          = 1e-3
 CHECKPOINT  = 10
 
 # PCA opcional antes de la red (útil si hay muchas features correladas)
 USE_PCA     = None   # None | 0.95 | int
 
+# Arquitectura seleccionada en cookiecutter: {{ cookiecutter.nn_model }}
+# Cambiar aquí sólo si se modifica manualmente (no recomendado —
+# regenerar el proyecto con cookiecutter para otro modelo).
+_MODEL_INFO = {
+    "MLP":         "Perceptrón Multicapa — datos tabulares generales.",
+    "CNN1D":       "Red Convolucional 1-D — patrones locales entre features.",
+    "LSTM":        "LSTM — dependencias temporales largas.",
+    "GRU":         "GRU — como LSTM, más ligero y rápido.",
+    "Transformer": "Transformer Encoder — relaciones globales, alta dimensionalidad.",
+}
+
 
 def main():
+    print('=' * 60)
+    print(f'Red neuronal: {MODEL_NAME}')
+    print(f'  {_MODEL_INFO.get(MODEL_NAME, "")}')
+    print('=' * 60)
+
     tb = SummaryWriter(log_dir=str(RUNS_DIR))
     print(f'TensorBoard: tensorboard --logdir {RUNS_DIR}')
 
+    print('\n1. Cargando datos...')
     df = load_data(DATA_FILE)
+    print(f'   Shape: {df.shape}')
+
+    print('\n2. EDA visual...')
     plot_distributions(df, target_col=TARGET_COL)
     plot_correlation_matrix(df)
 
+    print('\n3. Preprocesando...')
     X_train, X_test, y_train, y_test = preprocess_data(
         df, target_col=TARGET_COL, use_pca=USE_PCA,
     )
@@ -192,16 +217,27 @@ def main():
 
     input_dim  = X_train.shape[1]
     output_dim = len(y_train.unique())
+    print(f'   input_dim={input_dim}  output_dim={output_dim}')
 
+    print(f'\n4. Entrenando {MODEL_NAME}...')
     models = train_models(
         X_train, y_train,
         input_dim=input_dim, output_dim=output_dim,
-        epochs=EPOCHS, batch_size=BATCH_SIZE, checkpoint_every=CHECKPOINT,
+        epochs=EPOCHS, batch_size=BATCH_SIZE,
+        lr=LR, checkpoint_every=CHECKPOINT,
     )
 
-    evaluate_models(models, X_test, y_test, num_classes=output_dim, tb_writer=tb)
+    print('\n5. Evaluando...')
+    df_results = evaluate_models(
+        models, X_test, y_test, num_classes=output_dim, tb_writer=tb,
+    )
+
     tb.close()
+    print('\n' + '=' * 60)
     print('Pipeline completado.')
+    if not df_results.empty:
+        best = df_results.iloc[0]
+        print(f'Resultado: Accuracy={best["Accuracy"]:.4f}  F1={best["F1"]:.4f}')
 
 
 if __name__ == '__main__':

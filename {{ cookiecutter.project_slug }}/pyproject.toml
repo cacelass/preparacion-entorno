@@ -28,6 +28,7 @@ dev = [
     "ruff",
     "pytest",
     "sphinx",
+    "snakeviz",
 ]
 
 # ML supervisado: clasificación + PCA opcional como preprocesado
@@ -86,3 +87,17 @@ packages = ["{{ cookiecutter.project_slug }}"]
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"
+markers   = [
+    "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

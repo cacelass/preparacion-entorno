@@ -5,6 +5,10 @@
     "project_author_email": "email@ejemplo.com",
     "project_description": "Descripción breve del proyecto.",
     "ml_type": ["supervisado", "no_supervisado", "redes_neuronales", "hibrido"],
+    "nn_model": ["MLP", "CNN1D", "LSTM", "GRU", "Transformer"],
+    "model_type": ["todos", "RandomForest", "XGBoost", "LightGBM", "LogisticRegression", "KNN", "DecisionTree"],
+    "use_xgboost": ["no", "si"],
+    "use_lightgbm": ["no", "si"],
     "project_open_source_license": ["No license file", "MIT", "BSD-3-Clause"],
     "python_version": "3.12",
     "project_version": "0.1.0"

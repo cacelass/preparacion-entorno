@@ -2,9 +2,9 @@
 
 > {{ cookiecutter.project_description }}
 
-**Tipo de ML:** `{{ cookiecutter.ml_type }}`  
+**Tipo de ML:** `{{ cookiecutter.ml_type }}`{% if cookiecutter.ml_type == "redes_neuronales" %} — arquitectura: `{{ cookiecutter.nn_model }}`{% endif %}  
 **Autor:** {{ cookiecutter.project_author_name }}  
-**Versión:** {{ cookiecutter.project_version }}
+**Versión:** {{ cookiecutter.project_version }}{% if cookiecutter.use_xgboost == "si" %} · XGBoost ✓{% endif %}{% if cookiecutter.use_lightgbm == "si" %} · LightGBM ✓{% endif %}
 
 ---
 

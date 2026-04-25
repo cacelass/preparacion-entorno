@@ -176,89 +176,141 @@ def test_load_models_after_train(patch_paths):
 
 {% if cookiecutter.ml_type == "redes_neuronales" %}
 torch = pytest.importorskip("torch")
-from {{ cookiecutter.project_slug }}.models.train_model import MLP, train_models, load_model
+from {{ cookiecutter.project_slug }}.models.train_model import (
+    MLP, CNN1D, LSTMClassifier, GRUClassifier, TransformerClassifier,
+    _build_model, train_models, load_model, MODEL_NAME,
+)
+
+INPUT_DIM  = 8
+OUTPUT_DIM = 3
+BATCH      = 10
 
 
-def test_mlp_forward_pass():
-    """MLP debe procesar un batch sin errores."""
-    model = MLP(input_dim=8, output_dim=3, hidden_dims=[16, 8])
-    x = torch.randn(10, 8)
-    out = model(x)
-    assert out.shape == (10, 3)
+# ─── Forward pass por arquitectura ─────────────────────────────────────────
+
+def test_mlp_forward():
+    model = MLP(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM, hidden_dims=[16, 8])
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
 
 
-def test_mlp_hidden_dims_custom():
-    """MLP con hidden_dims personalizados debe construirse correctamente."""
-    model = MLP(input_dim=4, output_dim=2, hidden_dims=[32, 16, 8])
-    x = torch.randn(5, 4)
-    out = model(x)
-    assert out.shape == (5, 2)
+def test_cnn1d_forward():
+    model = CNN1D(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
 
 
-def test_mlp_default_hidden_dims():
-    """MLP sin hidden_dims debe usar [128, 64]."""
-    model = MLP(input_dim=4, output_dim=2)
-    x = torch.randn(3, 4)
-    out = model(x)
-    assert out.shape == (3, 2)
+def test_lstm_forward_tabular():
+    """LSTM con datos tabulares (sin dimensión temporal explícita)."""
+    model = LSTMClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM, hidden_dim=16, num_layers=1)
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
 
 
-def test_train_models_saves_weights(df_with_target, patch_paths):
-    """train_models debe guardar MLP.pt en MODELS_DIR."""
-    X_train = df_with_target.drop(columns=["target"])
-    y_train = df_with_target["target"]
-    input_dim  = X_train.shape[1]
-    output_dim = y_train.nunique()
+def test_lstm_forward_sequential():
+    """LSTM con datos secuenciales (batch, seq_len, features)."""
+    model = LSTMClassifier(input_dim=4, output_dim=OUTPUT_DIM, hidden_dim=16, num_layers=1)
+    out   = model(torch.randn(BATCH, 5, 4))   # seq_len=5
+    assert out.shape == (BATCH, OUTPUT_DIM)
 
-    train_models(
-        X_train, y_train,
-        input_dim=input_dim, output_dim=output_dim,
-        epochs=2, batch_size=32, checkpoint_every=0,
+
+def test_gru_forward():
+    model = GRUClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM, hidden_dim=16, num_layers=1)
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
+
+
+def test_transformer_forward():
+    model = TransformerClassifier(
+        input_dim=INPUT_DIM, output_dim=OUTPUT_DIM,
+        d_model=16, nhead=2, num_layers=1, dim_ff=32,
     )
-    assert (patch_paths["MODELS_DIR"] / "MLP.pt").exists()
+    out = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
 
 
-def test_train_models_returns_mlp_key(df_with_target, patch_paths):
-    """train_models debe devolver dict con clave 'MLP'."""
-    X_train = df_with_target.drop(columns=["target"])
-    y_train = df_with_target["target"]
-    result = train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=2, batch_size=32, checkpoint_every=0,
+def test_transformer_nhead_must_divide_d_model():
+    """d_model no divisible por nhead debe lanzar AssertionError."""
+    with pytest.raises(AssertionError):
+        TransformerClassifier(input_dim=INPUT_DIM, output_dim=2, d_model=10, nhead=3)
+
+
+# ─── Fábrica _build_model ──────────────────────────────────────────────────
+
+def test_build_model_returns_correct_class():
+    """_build_model() debe devolver la clase correspondiente a MODEL_NAME."""
+    model = _build_model(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    class_map = {
+        "MLP":         MLP,
+        "CNN1D":       CNN1D,
+        "LSTM":        LSTMClassifier,
+        "GRU":         GRUClassifier,
+        "Transformer": TransformerClassifier,
+    }
+    expected = class_map[MODEL_NAME]
+    assert isinstance(model, expected), (
+        f"Se esperaba {expected.__name__} para nn_model='{MODEL_NAME}', "
+        f"pero se obtuvo {type(model).__name__}"
     )
-    assert "MLP" in result
 
 
-def test_load_model_after_training(df_with_target, patch_paths):
-    """load_model debe cargar los pesos guardados por train_models."""
-    X_train = df_with_target.drop(columns=["target"])
-    y_train = df_with_target["target"]
-    input_dim  = X_train.shape[1]
-    output_dim = y_train.nunique()
+# ─── Entrenamiento y persistencia ──────────────────────────────────────────
 
-    train_models(
-        X_train, y_train,
-        input_dim=input_dim, output_dim=output_dim,
-        epochs=2, batch_size=32, checkpoint_every=0,
-    )
-    model = load_model(input_dim, output_dim, weights_path="MLP.pt")
-    assert isinstance(model, MLP)
-    # Debe estar en modo eval
+@pytest.mark.smoke
+def test_train_saves_weights(df_with_target, patch_paths):
+    """train_models debe guardar {MODEL_NAME}.pt en MODELS_DIR."""
+    X = df_with_target.drop(columns=["target"])
+    y = df_with_target["target"]
+    train_models(X, y, input_dim=X.shape[1], output_dim=y.nunique(),
+                 epochs=2, batch_size=16, checkpoint_every=0)
+    assert (patch_paths["MODELS_DIR"] / f"{MODEL_NAME}.pt").exists()
+
+
+@pytest.mark.smoke
+def test_train_returns_model_name_key(df_with_target, patch_paths):
+    """train_models debe devolver dict con clave MODEL_NAME."""
+    X = df_with_target.drop(columns=["target"])
+    y = df_with_target["target"]
+    result = train_models(X, y, input_dim=X.shape[1], output_dim=y.nunique(),
+                          epochs=2, batch_size=16, checkpoint_every=0)
+    assert MODEL_NAME in result
+
+
+@pytest.mark.smoke
+def test_load_model_eval_mode(df_with_target, patch_paths):
+    """load_model debe cargar pesos y dejar el modelo en modo eval."""
+    X = df_with_target.drop(columns=["target"])
+    y = df_with_target["target"]
+    input_dim, output_dim = X.shape[1], y.nunique()
+    train_models(X, y, input_dim=input_dim, output_dim=output_dim,
+                 epochs=2, batch_size=16, checkpoint_every=0)
+    model = load_model(input_dim, output_dim, weights_path=f"{MODEL_NAME}.pt")
     assert not model.training
 
 
-def test_checkpoint_saved_every_n_epochs(df_with_target, patch_paths):
-    """Si checkpoint_every > 0, debe guardar archivos checkpoint-N.pt."""
-    X_train = df_with_target.drop(columns=["target"])
-    y_train = df_with_target["target"]
-    train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=4, batch_size=32, checkpoint_every=2,
-    )
+@pytest.mark.smoke
+def test_checkpoint_created(df_with_target, patch_paths):
+    """checkpoint_every=2 debe crear al menos un checkpoint-*.pt."""
+    X = df_with_target.drop(columns=["target"])
+    y = df_with_target["target"]
+    train_models(X, y, input_dim=X.shape[1], output_dim=y.nunique(),
+                 epochs=4, batch_size=16, checkpoint_every=2)
     checkpoints = list(patch_paths["MODELS_DIR"].glob("checkpoint-*.pt"))
     assert len(checkpoints) >= 1
+
+
+def test_model_output_has_no_nan(df_with_target, patch_paths):
+    """El forward pass no debe producir NaN en la salida."""
+    X = df_with_target.drop(columns=["target"])
+    y = df_with_target["target"]
+    result = train_models(X, y, input_dim=X.shape[1], output_dim=y.nunique(),
+                          epochs=1, batch_size=16, checkpoint_every=0)
+    model = result[MODEL_NAME]
+    model.eval()
+    with torch.no_grad():
+        x_t = torch.tensor(X.values, dtype=torch.float32)
+        out = model(x_t)
+    assert not torch.isnan(out).any(), "Forward pass produjo NaN"
 {% endif %}
 
 

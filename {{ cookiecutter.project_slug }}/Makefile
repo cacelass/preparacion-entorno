@@ -1,8 +1,9 @@
 .PHONY: setup install-deps \
         data features train predict \
-        test lint format \
-        lab notebook \
+        test smoke lint format \
+        lab notebook tb \
         docs \
+        profile \
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -37,13 +38,20 @@ help:
 	@echo "    make pipeline       data → features → train → predict (todo)"
 	@echo ""
 	@echo "  Calidad"
-	@echo "    make test           pytest -v"
+	@echo "    make test           pytest -v (todos los tests)"
+	@echo "    make smoke          test de humo — verifica que el pipeline arranca"
 	@echo "    make lint           ruff check (solo lectura, sin modificar)"
 	@echo "    make format         ruff format (aplica cambios en sitio)"
 	@echo ""
 	@echo "  Jupyter"
 	@echo "    make lab            JupyterLab  (puerto 8888)"
 	@echo "    make notebook       Jupyter Notebook (puerto 8888)"
+	@echo ""
+	@echo "  Ejecución directa"
+	@echo "    make run            ejecuta main.py"
+	@echo "    make profile        cProfile de main.py → reports/profile.prof"
+	@echo ""
+	@echo "    make tb             lanza TensorBoard (puerto 6006)"{% endif %}
 	@echo ""
 	@echo "  Documentación"
 	@echo "    make docs           sphinx-apidoc + html"
@@ -108,11 +116,20 @@ pipeline: predict
 run:
 	uv run $(PYTHON) main.py
 
+profile:
+	@echo "▶  Profiling main.py → reports/profile.prof"
+	uv run $(PYTHON) -m cProfile -o reports/profile.prof main.py
+	@echo "   Visualiza con: uv run snakeviz reports/profile.prof"
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Calidad de código
 # ─────────────────────────────────────────────────────────────────────────────
 test:
 	uv run pytest tests/ -v
+
+smoke:
+	@echo "▶  Test de humo — pipeline con datos sintéticos"
+	uv run pytest tests/ -v -m smoke --tb=short
 
 lint:
 	uv run ruff check $(MODULE)/ tests/
@@ -129,6 +146,15 @@ lab:
 
 notebook:
 	uv run jupyter notebook --ip=* --port=8888 --no-browser
+
+{% if cookiecutter.ml_type == "redes_neuronales" %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  TensorBoard — monitorización de entrenamiento
+# ─────────────────────────────────────────────────────────────────────────────
+tb:
+	@echo "▶  Lanzando TensorBoard en http://localhost:6006"
+	uv run tensorboard --logdir runs/ --port 6006
+{% endif %}
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Documentación
