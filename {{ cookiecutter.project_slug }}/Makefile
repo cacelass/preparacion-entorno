@@ -51,8 +51,11 @@ help:
 	@echo "    make run            ejecuta main.py"
 	@echo "    make profile        cProfile de main.py → reports/profile.prof"
 	@echo ""
-	@echo "    make tb             lanza TensorBoard (puerto 6006)"{% endif %}
+{% if cookiecutter.ml_type == "redes_neuronales" %}
+	@echo "  Monitorización"
+	@echo "    make tb             lanza TensorBoard (puerto 6006)"
 	@echo ""
+{% endif %}
 	@echo "  Documentación"
 	@echo "    make docs           sphinx-apidoc + html"
 	@echo ""

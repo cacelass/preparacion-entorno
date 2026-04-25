@@ -19,7 +19,7 @@ from {{ cookiecutter.project_slug }}.visualization.visualize import (
 # ---------------------------------------------------------------------------
 # Configuracion
 # ---------------------------------------------------------------------------
-DATA_FILE    = 'data/raw/dataset.csv'
+DATA_FILE    = 'dataset.csv'
 TARGET_COL   = 'target'
 SCALER_TYPE  = 'standard'   # 'standard' | 'minmax'
 TEST_SIZE    = 0.2
@@ -101,7 +101,7 @@ from {{ cookiecutter.project_slug }}.visualization.visualize import (
 # ---------------------------------------------------------------------------
 # Configuracion
 # ---------------------------------------------------------------------------
-DATA_FILE  = 'data/raw/dataset.csv'
+DATA_FILE  = 'dataset.csv'
 N_CLUSTERS = 3   # ajustar tras analizar el codo y el dendrograma
 
 
@@ -162,7 +162,7 @@ from {{ cookiecutter.project_slug }}.utils.paths import RUNS_DIR
 # ---------------------------------------------------------------------------
 # Configuración
 # ---------------------------------------------------------------------------
-DATA_FILE   = 'data/raw/dataset.csv'
+DATA_FILE   = 'dataset.csv'
 TARGET_COL  = 'target'
 EPOCHS      = 50
 BATCH_SIZE  = 32
@@ -285,7 +285,7 @@ from {{ cookiecutter.project_slug }}.visualization.visualize import (
 # ---------------------------------------------------------------------------
 # Configuracion
 # ---------------------------------------------------------------------------
-DATA_FILE  = 'data/raw/dataset.csv'
+DATA_FILE  = 'dataset.csv'
 TARGET_COL = 'target'
 TEST_SIZE  = 0.2
 THRESHOLD  = DECISION_THRESHOLD
