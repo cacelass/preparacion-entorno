@@ -16,14 +16,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 ## [0.3.0] — 2025-04
 
 ### Añadido
-- **Redes neuronales — múltiples arquitecturas** vía `cookiecutter.nn_model`:
+- **Redes neuronales — múltiples arquitecturas** vía `nn_model`:
   - `MLP` — Perceptrón multicapa para datos tabulares
   - `CNN1D` — Red convolucional 1-D para patrones locales entre features
   - `LSTM` — Long Short-Term Memory para dependencias temporales
   - `GRU` — Gated Recurrent Unit, alternativa ligera a LSTM
   - `Transformer` — Encoder con multi-head attention y positional encoding
 - **XGBoost y LightGBM** como opcionales en `supervisado` e `híbrido`
-  (`use_xgboost` / `use_lightgbm` en `cookiecutter.json`)
+  (`use_xgboost` / `use_lightgbm` en `json`)
 - **`hooks/post_gen_project.py`** — instala dependencias automáticamente
   con `uv sync` tras generar el proyecto
 - **`make tb`** — lanza TensorBoard en `localhost:6006` (solo `redes_neuronales`)
@@ -60,7 +60,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 ## [0.1.0] — 2024-11
 
 ### Añadido
-- Estructura inicial de proyecto con cookiecutter
+- Estructura inicial de proyecto con copier
 - Soporte para `supervisado`, `no_supervisado` e `híbrido`
 - Módulos: `make_dataset`, `build_features`, `train_model`, `predict_model`, `visualize`
 - Paths centralizados en `utils/paths.py`

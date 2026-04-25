@@ -1,6 +1,6 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-0.3.0-blue)
+![version](https://img.shields.io/badge/dskit-0.4.0-blue)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
 ![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
@@ -21,7 +21,7 @@ de trabajo, desde la ingesta de datos hasta el modelo evaluado y exportado.
   - [Características](#características)
   - [Requisitos previos](#requisitos-previos)
   - [Instalación rápida](#instalación-rápida)
-  - [Variables de cookiecutter](#variables-de-cookiecutter)
+  - [Variables de copier](#variables-de-copier)
     - [Validaciones automáticas (`pre_gen_project.py`)](#validaciones-automáticas-pre_gen_projectpy)
   - [Uso](#uso)
   - [Estructura generada](#estructura-generada)
@@ -51,7 +51,7 @@ de trabajo, desde la ingesta de datos hasta el modelo evaluado y exportado.
 ## Requisitos previos
 
 ```bash
-pip install cookiecutter uv
+pip install copier uv
 ```
 
 Python >= 3.10 requerido.
@@ -61,10 +61,12 @@ Python >= 3.10 requerido.
 ## Instalación rápida
 
 ```bash
-cookiecutter https://github.com/cacelass/dskit.git
+ccopier copy --trust gh:cacelass/dskit nombre_proyecto
 ```
 
-El hook `post_gen_project.py` ejecuta automáticamente `uv sync` al terminar.
+> Los iconos de microfono en los prompts son parte de la UI de copier y no son configurables.
+
+Copier ejecuta `uv sync` automáticamente tras generar.
 Si falla, hazlo manualmente:
 
 ```bash
@@ -75,7 +77,7 @@ source .venv/bin/activate
 
 ---
 
-## Variables de cookiecutter
+## Variables de copier
 
 | Variable | Valores | Descripción |
 |---|---|---|

@@ -1,0 +1,139 @@
+# copier.yml — dskit template configuration
+# Docs: https://copier.readthedocs.io
+
+# ─── Proyecto ────────────────────────────────────────────────────────────────
+
+project_name:
+  type: str
+  default: Proyecto
+  help: "Nombre del proyecto (espacios y guiones se convierten a _ en el slug)"
+
+project_slug:
+  type: str
+  default: "{{ project_name | lower | replace(' ', '_') | replace('-', '_') }}"
+  help: "Nombre del paquete Python (generado automaticamente, no cambiar)"
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9_]*$')) %}
+    El slug solo puede contener letras minusculas, numeros y _
+    {% endif %}
+
+project_author_name:
+  type: str
+  default: Nombre del autor
+  help: "Nombre del autor"
+
+project_author_email:
+  type: str
+  default: email@ejemplo.com
+  help: "Email del autor"
+  validator: >-
+    {% if '@' not in project_author_email or '.' not in project_author_email.split('@')[-1] %}
+    Introduce un email valido (ej: nombre@dominio.com)
+    {% endif %}
+
+project_description:
+  type: str
+  default: "Descripcion breve del proyecto."
+  help: "Descripcion breve"
+
+# ─── Tipo de ML ──────────────────────────────────────────────────────────────
+
+ml_type:
+  type: str
+  help: "Tipo de ML: supervisado | no_supervisado | redes_neuronales | hibrido"
+  choices:
+    - supervisado
+    - no_supervisado
+    - redes_neuronales
+    - hibrido
+  default: supervisado
+
+# ─── Arquitectura de red neuronal (solo redes_neuronales) ────────────────────
+
+nn_model:
+  type: str
+  help: "Arquitectura: MLP | CNN1D | LSTM | GRU | Transformer"
+  choices:
+    - MLP
+    - CNN1D
+    - LSTM
+    - GRU
+    - Transformer
+  default: MLP
+  when: "{{ ml_type == 'redes_neuronales' }}"
+
+# ─── Modelo activo (solo supervisado e hibrido) ───────────────────────────────
+
+model_type:
+  type: str
+  help: "todos = entrena y compara todos | otro = solo ese modelo"
+  choices:
+    - todos
+    - RandomForest
+    - XGBoost
+    - LightGBM
+    - LogisticRegression
+    - KNN
+    - DecisionTree
+  default: todos
+  when: "{{ ml_type in ['supervisado', 'hibrido'] }}"
+
+# ─── Boosting opcional (solo supervisado e hibrido) ──────────────────────────
+
+use_xgboost:
+  type: bool
+  help: "Añadir XGBoost a _build_models()?"
+  default: false
+  when: "{{ ml_type in ['supervisado', 'hibrido'] }}"
+
+use_lightgbm:
+  type: bool
+  help: "Añadir LightGBM a _build_models()?"
+  default: false
+  when: "{{ ml_type in ['supervisado', 'hibrido'] }}"
+
+# ─── Licencia y versiones ────────────────────────────────────────────────────
+
+project_open_source_license:
+  type: str
+  help: "Licencia del proyecto"
+  choices:
+    - No license file
+    - MIT
+    - BSD-3-Clause
+  default: No license file
+
+python_version:
+  type: str
+  help: "Version de Python"
+  choices:
+    - "3.10"
+    - "3.11"
+    - "3.12"
+    - "3.13"
+  default: "3.12"
+
+project_version:
+  type: str
+  default: "0.1.0"
+  help: "Version inicial del proyecto"
+
+# ─── Tareas post-generacion ──────────────────────────────────────────────────
+
+_tasks:
+  - >-
+    cd {{ project_slug }}
+    && uv sync --extra dev --extra {{ ml_type }}
+    && uv run python -c "import sklearn; print('scikit-learn OK')"
+    {% if ml_type == 'redes_neuronales' %}
+    && uv run python -c "import torch; print('torch', torch.__version__)"
+    {% endif %}
+    {% if use_xgboost %}
+    && uv run python -c "import xgboost; print('xgboost', xgboost.__version__)"
+    {% endif %}
+    {% if use_lightgbm %}
+    && uv run python -c "import lightgbm; print('lightgbm', lightgbm.__version__)"
+    {% endif %}
+
+_subdirectory: template
+_templates_suffix: ""

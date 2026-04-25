@@ -1,25 +1,25 @@
 [project]
-name = "{{ cookiecutter.project_slug }}"
-version = "{{ cookiecutter.project_version }}"
-description = "{{ cookiecutter.project_description }}"
+name = "{{ project_slug }}"
+version = "{{ project_version }}"
+description = "{{ project_description }}"
 authors = [
-  { name = "{{ cookiecutter.project_author_name }}" }
+  { name = "{{ project_author_name }}" }
 ]
 readme = "README.md"
-requires-python = ">= {{ cookiecutter.python_version }}"
-license = {text = "{{ cookiecutter.project_open_source_license if cookiecutter.project_open_source_license != 'No license file' else ''}}"}
+requires-python = ">= {{ python_version }}"
+license = {text = "{{ project_open_source_license if project_open_source_license != 'No license file' else ''}}"}
 dependencies = []
 
 [tool.setuptools]
-packages = ["{{ cookiecutter.project_slug }}"]
+packages = ["{{ project_slug }}"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]
-# Excluir el directorio del template — contiene variables {{ cookiecutter.* }}
+# Excluir el directorio del template — contiene variables {{ * }}
 # que ruff no puede parsear como Python/TOML válido
 exclude = [
-    "{{ cookiecutter.project_slug }}",
+    "{{ project_slug }}",
 ]
