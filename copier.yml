@@ -48,6 +48,25 @@ ml_type:
     - hibrido
   default: supervisado
 
+# ─── Tipo de tarea (clasificacion o regresion) ────────────────────────────────
+
+task_type:
+  type: str
+  help: "clasificacion = clases discretas | regresion = valor continuo"
+  choices:
+    - clasificacion
+    - regresion
+  default: clasificacion
+  when: "{{ ml_type == 'supervisado' or ml_type == 'redes_neuronales' or ml_type == 'hibrido' }}"
+
+# ─── MLflow (tracking de experimentos) ───────────────────────────────────────
+
+use_mlflow:
+  type: bool
+  help: "Integrar MLflow para tracking de experimentos, artifacts y Model Registry?"
+  default: false
+
+
 # ─── Arquitectura de red neuronal (solo redes_neuronales) ────────────────────
 
 nn_model:
@@ -76,7 +95,7 @@ model_type:
     - KNN
     - DecisionTree
   default: todos
-  when: "{{ ml_type in ['supervisado', 'hibrido'] }}"
+  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
 # ─── Boosting opcional (solo supervisado e hibrido) ──────────────────────────
 
@@ -84,13 +103,13 @@ use_xgboost:
   type: bool
   help: "Añadir XGBoost a _build_models()?"
   default: false
-  when: "{{ ml_type in ['supervisado', 'hibrido'] }}"
+  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
 use_lightgbm:
   type: bool
   help: "Añadir LightGBM a _build_models()?"
   default: false
-  when: "{{ ml_type in ['supervisado', 'hibrido'] }}"
+  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
 # ─── Licencia y versiones ────────────────────────────────────────────────────
 
@@ -122,8 +141,7 @@ project_version:
 
 _tasks:
   - >-
-    cd {{ project_slug }}
-    && uv sync --extra dev --extra {{ ml_type }}
+    uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}
     && uv run python -c "import sklearn; print('scikit-learn OK')"
     {% if ml_type == 'redes_neuronales' %}
     && uv run python -c "import torch; print('torch', torch.__version__)"
@@ -134,6 +152,10 @@ _tasks:
     {% if use_lightgbm %}
     && uv run python -c "import lightgbm; print('lightgbm', lightgbm.__version__)"
     {% endif %}
+    {% if use_mlflow %}
+    && uv run python -c "import mlflow; print('mlflow', mlflow.__version__)"
+    {% endif %}
 
 _subdirectory: template
 _templates_suffix: ""
+

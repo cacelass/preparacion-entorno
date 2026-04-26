@@ -1,33 +1,27 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-0.4.0-blue)
+![version](https://img.shields.io/badge/dskit-0.5.0-blue)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
 ![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
 
 **Template profesional para Data Science y AI Engineering**
 
-Plantilla de proyectos basada en Cookiecutter, diseñada para iniciar cualquier
-proyecto de ML de forma **organizada, reproducible y lista para producción**.
-Construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo
-de trabajo, desde la ingesta de datos hasta el modelo evaluado y exportado.
+Plantilla basada en [copier](https://copier.readthedocs.io), diseñada para iniciar proyectos de ML de forma organizada, reproducible y lista para producción. Construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo de trabajo desde la ingesta de datos hasta el modelo evaluado y exportado.
 
 ---
 
 ## Índice
 
-- [DSKIT](#dskit)
-  - [Índice](#índice)
-  - [Características](#características)
-  - [Requisitos previos](#requisitos-previos)
-  - [Instalación rápida](#instalación-rápida)
-  - [Variables de copier](#variables-de-copier)
-    - [Validaciones automáticas (`pre_gen_project.py`)](#validaciones-automáticas-pre_gen_projectpy)
-  - [Uso](#uso)
-  - [Estructura generada](#estructura-generada)
-  - [Makefile](#makefile)
-  - [Changelog](#changelog)
-  - [License](#license)
+- [Características](#características)
+- [Requisitos previos](#requisitos-previos)
+- [Instalación rápida](#instalación-rápida)
+- [Variables](#variables)
+- [Uso](#uso)
+- [Estructura generada](#estructura-generada)
+- [Makefile](#makefile)
+- [Changelog](#changelog)
+- [License](#license)
 
 ---
 
@@ -35,14 +29,15 @@ de trabajo, desde la ingesta de datos hasta el modelo evaluado y exportado.
 
 - **4 tipos de ML** con código y tests listos desde el primer `make run`:
   `supervisado`, `no_supervisado`, `redes_neuronales`, `hibrido`
-- **5 arquitecturas de red neuronal** seleccionables: MLP, CNN1D, LSTM, GRU, Transformer
+- **2 tipos de tarea** (`task_type`): `clasificacion` o `regresion`
+- **5 arquitecturas de red neuronal**: MLP, CNN1D, LSTM, GRU, Transformer
 - **XGBoost y LightGBM** opcionales en supervisado e híbrido
 - **Selector de modelo** (`model_type`): entrena uno o todos
-- **`hooks/`**: validación antes de generar + setup automático del entorno tras generar
+- **MLflow** opcional: tracking de experimentos, artifacts y Model Registry
+- **`uv sync` automático** tras generar el proyecto
 - **`make smoke`**: tests de humo para verificar que el pipeline arranca
-- **`make profile`**: profiling con cProfile + snakeviz integrado
+- **`make profile`**: profiling con cProfile + snakeviz
 - **TensorBoard** integrado en redes neuronales (`make tb`)
-- **Exportación de predicciones a CSV** con probabilidades y columna `correcto`
 - Gestión de entornos con `uv` y grupos de dependencias por tipo de ML
 - Documentación con Sphinx, tests con pytest, linting con ruff
 
@@ -61,57 +56,64 @@ Python >= 3.10 requerido.
 ## Instalación rápida
 
 ```bash
-ccopier copy --trust gh:cacelass/dskit nombre_proyecto
+copier copy --trust gh:cacelass/dskit nombre_proyecto
 ```
 
-> Los iconos de microfono en los prompts son parte de la UI de copier y no son configurables.
-
-Copier ejecuta `uv sync` automáticamente tras generar.
-Si falla, hazlo manualmente:
+O desde una copia local:
 
 ```bash
-cd <nombre_proyecto>
+copier copy --trust ./dskit nombre_proyecto
+```
+
+Copier ejecuta `uv sync` automáticamente tras generar. Si falla, hazlo manualmente:
+
+```bash
+cd nombre_proyecto
 uv sync --extra dev --extra <ml_type>
 source .venv/bin/activate
 ```
 
+> Los iconos de micrófono en los prompts son parte de la UI de copier y no son configurables.
+
 ---
 
-## Variables de copier
+## Variables
 
-| Variable | Valores | Descripción |
-|---|---|---|
-| `project_name` | texto | Nombre del proyecto |
-| `project_author_name` | texto | Nombre del autor |
-| `project_author_email` | email | Email (validado) |
-| `project_description` | texto | Descripción breve |
-| `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | Tipo de ML — determina qué código se genera |
-| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` | Arquitectura de red (solo en `redes_neuronales`) |
-| `model_type` | `todos` · `RandomForest` · `XGBoost` · `LightGBM` · `LogisticRegression` · `KNN` · `DecisionTree` | Modelo a entrenar (solo en `supervisado` e `hibrido`) |
-| `use_xgboost` | `no` · `si` | Añade XGBoost |
-| `use_lightgbm` | `no` · `si` | Añade LightGBM |
-| `python_version` | `3.10` – `3.13` | Versión de Python |
-| `project_version` | `0.1.0` | Versión inicial |
+Copier muestra solo las preguntas relevantes según las respuestas anteriores — las variables condicionales no aparecen si no aplican.
 
-### Validaciones automáticas (`pre_gen_project.py`)
+| Variable | Valores | Condición | Descripción |
+|---|---|---|---|
+| `project_name` | texto | siempre | Nombre del proyecto |
+| `project_author_name` | texto | siempre | Nombre del autor |
+| `project_author_email` | email | siempre | Email (validado) |
+| `project_description` | texto | siempre | Descripción breve |
+| `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | siempre | Determina qué código se genera |
+| `task_type` | `clasificacion` · `regresion` | supervisado, redes_neuronales, hibrido | Tipo de tarea |
+| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` | solo redes_neuronales | Arquitectura de red |
+| `model_type` | `todos` · `RandomForest` · `XGBoost` · `LightGBM` · `LogisticRegression` · `KNN` · `DecisionTree` | solo supervisado e hibrido | Modelo a entrenar |
+| `use_xgboost` | true · false | solo supervisado e hibrido | Añade XGBoost |
+| `use_lightgbm` | true · false | solo supervisado e hibrido | Añade LightGBM |
+| `use_mlflow` | true · false | siempre | Integra MLflow |
+| `python_version` | `3.10` – `3.13` | siempre | Versión de Python |
+| `project_version` | texto | siempre | Versión inicial |
 
-Aborta con mensaje claro si:
-- `ml_type` / `nn_model` / `model_type` no válido
-- `model_type=XGBoost` sin `use_xgboost=si` (y viceversa con LightGBM)
-- `python_version` no soportada, email sin formato válido, slug con caracteres inválidos
+### Validaciones
 
-Advierte sin abortar si variables sin efecto están activadas (ej. `nn_model=LSTM` con `ml_type=supervisado`).
+Copier valida automáticamente antes de generar:
+- Slug solo con `[a-z0-9_]` empezando por letra
+- Email con formato válido
 
 ---
 
 ## Uso
 
 ```bash
-make help       # ver todos los comandos
+make help       # ver todos los comandos disponibles
 make run        # pipeline completo
 make smoke      # tests de humo rápidos
 make profile    # cProfile → reports/profile.prof
-make tb         # TensorBoard (solo redes_neuronales)
+make tb         # TensorBoard localhost:6006 (solo redes_neuronales)
+make mlflow     # MLflow UI localhost:5000 (solo si use_mlflow=true)
 ```
 
 ---
@@ -119,25 +121,26 @@ make tb         # TensorBoard (solo redes_neuronales)
 ## Estructura generada
 
 ```
-<project_slug>/
-├── <project_slug>/
+nombre_proyecto/
+├── <project_slug>/           ← paquete Python
 │   ├── data/make_dataset.py
 │   ├── features/build_features.py
 │   ├── models/
-│   │   ├── train_model.py    ← adaptado al ml_type y nn_model elegidos
-│   │   └── predict_model.py  ← exporta predicciones y métricas a reports/
+│   │   ├── train_model.py    ← adaptado al ml_type, task_type y nn_model
+│   │   └── predict_model.py  ← métricas, figuras y CSVs en reports/
 │   ├── utils/paths.py
 │   └── visualization/visualize.py
 ├── data/{raw,interim,processed,external}/
 ├── models/                   ← pesos .pt / .joblib
 ├── notebooks/
-│   └── 0-2-Ejecucion.ipynb  ← celdas adaptadas al ml_type generado
+│   ├── 0-0-DescargaDatos.ipynb
+│   ├── 0-1-ProcesamientoDatos.ipynb
+│   └── 0-2-Ejecucion.ipynb   ← celdas adaptadas al ml_type generado
 ├── reports/
-│   ├── figures/              ← matrices de confusión, distribuciones
-│   ├── predicciones_*.csv    ← y_true, y_pred, proba_*, correcto
-│   └── resultados_*.csv      ← métricas ordenadas por F1
+│   ├── figures/              ← matrices de confusión, real vs predicho, residuos
+│   └── resultados_*.csv      ← métricas ordenadas por métrica principal
 ├── tests/
-│   ├── conftest.py           ← fixtures y patch_paths automático
+│   ├── conftest.py           ← fixtures adaptadas al task_type
 │   └── test_train_model.py   ← tests por arquitectura + @pytest.mark.smoke
 ├── ayuda/                    ← referencia rápida de comandos y modelos
 ├── .env.example
@@ -152,14 +155,15 @@ make tb         # TensorBoard (solo redes_neuronales)
 
 | Target | Descripción |
 |---|---|
-| `make run` | `main.py` completo |
-| `make data / train / predict` | pasos individuales del pipeline |
+| `make run` | Pipeline completo (`main.py`) |
+| `make data / train / predict` | Pasos individuales |
 | `make test` | pytest completo |
-| `make smoke` | solo `@pytest.mark.smoke` |
-| `make lint / format` | ruff |
+| `make smoke` | Solo `@pytest.mark.smoke` |
+| `make lint / format` | ruff check / ruff format |
 | `make profile` | cProfile → `reports/profile.prof` |
 | `make tb` | TensorBoard localhost:6006 *(redes_neuronales)* |
-| `make clean-all` | cachés + modelos + figuras |
+| `make mlflow` | MLflow UI localhost:5000 *(use_mlflow=true)* |
+| `make clean-all` | Cachés + modelos + figuras |
 
 ---
 

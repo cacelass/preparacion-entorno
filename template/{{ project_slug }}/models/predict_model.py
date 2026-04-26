@@ -1,6 +1,7 @@
 {% if ml_type == 'supervisado' or ml_type == 'hibrido' %}
 """
 predict_model.py — Evaluación de modelos {{ ml_type }}.
+Tarea: {{ task_type }}
 """
 import numpy as np
 import pandas as pd
@@ -9,17 +10,30 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+{% if task_type == "clasificacion" %}
 from sklearn.metrics import (
     accuracy_score, f1_score, precision_score, recall_score,
     roc_auc_score, confusion_matrix, classification_report,
     ConfusionMatrixDisplay,
 )
+{% else %}
+from sklearn.metrics import (
+    mean_squared_error, mean_absolute_error, r2_score,
+    mean_absolute_percentage_error,
+)
+{% endif %}
 
-from {{ project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR
+{% if use_mlflow %}
+import mlflow
+import mlflow.sklearn
+{% endif %}
 
-# Umbral de decisión para clasificación binaria.
-# Bajar (e.g., 0.3) aumenta recall de clase minoritaria a costa de más FP.
+from {{ project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR, REPORTS_DIR
+
+{% if task_type == "clasificacion" %}
+# Umbral de decisión. Bajar (e.g. 0.3) aumenta recall de clase minoritaria.
 DECISION_THRESHOLD: float = 0.5
+{% endif %}
 
 
 def evaluate_models(
@@ -28,29 +42,46 @@ def evaluate_models(
     y_train,
     X_test,
     y_test,
+{% if task_type == "clasificacion" %}
     threshold: float = DECISION_THRESHOLD,
+{% endif %}
 ) -> pd.DataFrame:
     """
     Evalúa todos los modelos sobre train y test.
 
+{% if task_type == "clasificacion" %}
     Métricas: Accuracy, F1 weighted, Precision, Recall, ROC-AUC (binario).
-    Guarda matrices de confusión en figures/ y resultados en CSV.
+    Genera matrices de confusión en figures/.
+{% else %}
+    Métricas: RMSE, MAE, MAPE, R².
+    Genera gráfico real vs predicho y residuos en figures/.
+{% endif %}
 
     Returns
     -------
-    pd.DataFrame ordenado de mayor a menor Acc_test.
+    pd.DataFrame ordenado por métrica principal.
     """
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"\n{'='*60}\n  Evaluación de modelos (umbral={threshold})\n{'='*60}")
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+{% if task_type == "clasificacion" %}
+    print(f"\n{'='*60}\n  Evaluación — clasificacion (umbral={threshold})\n{'='*60}")
+{% else %}
+    print(f"\n{'='*60}\n  Evaluación — regresion\n{'='*60}")
+{% endif %}
+
+{% if use_mlflow %}
+    mlflow.set_experiment("{{ project_slug }}")
+{% endif %}
 
     results = []
     for name, model in models.items():
         print(f"\n--- {name} ---")
 
+{% if task_type == "clasificacion" %}
         if threshold != 0.5 and hasattr(model, "predict_proba"):
-            proba_test  = model.predict_proba(X_test)[:, 1]
-            y_pred_test = (proba_test >= threshold).astype(int)
-            proba_train = model.predict_proba(X_train)[:, 1]
+            proba_test   = model.predict_proba(X_test)[:, 1]
+            y_pred_test  = (proba_test >= threshold).astype(int)
+            proba_train  = model.predict_proba(X_train)[:, 1]
             y_pred_train = (proba_train >= threshold).astype(int)
         else:
             y_pred_test  = model.predict(X_test)
@@ -62,8 +93,7 @@ def evaluate_models(
         f1_test   = f1_score(y_test,  y_pred_test,  average="weighted", zero_division=0)
         prec_test = precision_score(y_test, y_pred_test, average="weighted", zero_division=0)
         rec_test  = recall_score(y_test,  y_pred_test,  average="weighted", zero_division=0)
-
-        roc_auc = None
+        roc_auc   = None
         if hasattr(model, "predict_proba") and len(np.unique(y_test)) == 2:
             roc_auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
 
@@ -74,7 +104,6 @@ def evaluate_models(
             print(f"  ROC-AUC   → {roc_auc:.3f}")
         print()
         print(classification_report(y_test, y_pred_test, zero_division=0))
-
         _plot_confusion_matrix(y_test, y_pred_test, name)
 
         row = {
@@ -85,26 +114,123 @@ def evaluate_models(
         }
         if roc_auc is not None:
             row["ROC_AUC"] = round(roc_auc, 4)
+
+{% if use_mlflow %}
+        with mlflow.start_run(run_name=f"{name}_eval"):
+            mlflow.log_metrics({
+                "acc_train": acc_train, "acc_test": acc_test,
+                "f1_train":  f1_train,  "f1_test":  f1_test,
+                "prec_test": prec_test, "rec_test":  rec_test,
+            })
+            if roc_auc is not None:
+                mlflow.log_metric("roc_auc", roc_auc)
+            mlflow.log_artifact(str(FIGURES_DIR / f"cm_{name}.png"))
+{% endif %}
+
+{% else %}
+        y_pred_test  = model.predict(X_test)
+        y_pred_train = model.predict(X_train)
+
+        rmse_train = mean_squared_error(y_train, y_pred_train) ** 0.5
+        rmse_test  = mean_squared_error(y_test,  y_pred_test)  ** 0.5
+        mae_test   = mean_absolute_error(y_test, y_pred_test)
+        mape_test  = mean_absolute_percentage_error(y_test, y_pred_test)
+        r2_train   = r2_score(y_train, y_pred_train)
+        r2_test    = r2_score(y_test,  y_pred_test)
+
+        print(f"  RMSE → train: {rmse_train:.4f} | test: {rmse_test:.4f}")
+        print(f"  MAE  → {mae_test:.4f}")
+        print(f"  MAPE → {mape_test:.4f}")
+        print(f"  R²   → train: {r2_train:.4f} | test: {r2_test:.4f}")
+
+        _plot_real_vs_pred(y_test, y_pred_test, name)
+        _plot_residuals(y_test, y_pred_test, name)
+
+        row = {
+            "Modelo":     name,
+            "RMSE_train": round(rmse_train, 4), "RMSE_test": round(rmse_test, 4),
+            "MAE_test":   round(mae_test,   4), "MAPE_test": round(mape_test, 4),
+            "R2_train":   round(r2_train,   4), "R2_test":   round(r2_test,   4),
+        }
+
+{% if use_mlflow %}
+        with mlflow.start_run(run_name=f"{name}_eval"):
+            mlflow.log_metrics({
+                "rmse_train": rmse_train, "rmse_test": rmse_test,
+                "mae_test":   mae_test,   "mape_test": mape_test,
+                "r2_train":   r2_train,   "r2_test":   r2_test,
+            })
+            mlflow.log_artifact(str(FIGURES_DIR / f"real_vs_pred_{name}.png"))
+            mlflow.log_artifact(str(FIGURES_DIR / f"residuals_{name}.png"))
+{% endif %}
+
+{% endif %}
         results.append(row)
 
+{% if task_type == "clasificacion" %}
     df_results = pd.DataFrame(results).sort_values("Acc_test", ascending=False)
-    df_results.to_csv(FIGURES_DIR / "resultados_modelos.csv", index=False)
-
-    print(f"\n{'='*60}\n  Resumen (ordenado por Acc_test):\n{'='*60}")
+{% else %}
+    df_results = pd.DataFrame(results).sort_values("RMSE_test", ascending=True)
+{% endif %}
+    out_csv = REPORTS_DIR / "resultados_modelos.csv"
+    df_results.to_csv(out_csv, index=False)
+    print(f"\n{'='*60}\n  Resumen:\n{'='*60}")
     print(df_results.to_string(index=False))
+    print(f"\n  Guardado → {out_csv}")
     return df_results
 
 
+{% if task_type == "clasificacion" %}
 def _plot_confusion_matrix(y_true, y_pred, model_name: str) -> None:
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     cm   = confusion_matrix(y_true, y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     fig, ax = plt.subplots(figsize=(7, 6))
     disp.plot(ax=ax, colorbar=False, cmap="Blues")
-    ax.set_title(f"Matriz de confusión — {model_name}", fontsize=13)
+    ax.set_title(f"Matriz de confusion — {model_name}", fontsize=13)
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / f"cm_{model_name}.png", dpi=150)
     plt.close(fig)
     print(f"    cm_{model_name}.png guardado")
+
+{% else %}
+def _plot_real_vs_pred(y_true, y_pred, model_name: str) -> None:
+    """Scatter real vs predicho con línea de referencia perfecta."""
+    fig, ax = plt.subplots(figsize=(7, 6))
+    ax.scatter(y_true, y_pred, alpha=0.4, s=20, label="muestras")
+    lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+    ax.plot(lims, lims, "r--", lw=1.5, label="prediccion perfecta")
+    ax.set_xlabel("Real")
+    ax.set_ylabel("Predicho")
+    ax.set_title(f"{model_name} — Real vs Predicho")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / f"real_vs_pred_{model_name}.png", dpi=150)
+    plt.close(fig)
+    print(f"    real_vs_pred_{model_name}.png guardado")
+
+
+def _plot_residuals(y_true, y_pred, model_name: str) -> None:
+    """Gráfico de residuos — detecta heterocedasticidad y outliers."""
+    residuals = np.array(y_true) - np.array(y_pred)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    axes[0].scatter(y_pred, residuals, alpha=0.4, s=20)
+    axes[0].axhline(0, color="red", linestyle="--", lw=1.5)
+    axes[0].set_xlabel("Predicho")
+    axes[0].set_ylabel("Residuo")
+    axes[0].set_title("Residuos vs Predicho")
+
+    axes[1].hist(residuals, bins=30, edgecolor="white")
+    axes[1].set_xlabel("Residuo")
+    axes[1].set_title("Distribucion de residuos")
+
+    fig.suptitle(f"{model_name} — Analisis de residuos", fontsize=13)
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / f"residuals_{model_name}.png", dpi=150)
+    plt.close(fig)
+    print(f"    residuals_{model_name}.png guardado")
+{% endif %}
 
 
 def predict_new(model_name: str, X_new) -> np.ndarray:
@@ -115,6 +241,7 @@ def predict_new(model_name: str, X_new) -> np.ndarray:
     return joblib.load(path).predict(X_new)
 
 
+{% if task_type == "clasificacion" %}
 def predict_proba_new(model_name: str, X_new) -> np.ndarray:
     """Carga un modelo y devuelve probabilidades de clase."""
     path = MODELS_DIR / f"{model_name}.joblib"
@@ -124,6 +251,7 @@ def predict_proba_new(model_name: str, X_new) -> np.ndarray:
     if not hasattr(model, "predict_proba"):
         raise ValueError(f"{model_name} no soporta predict_proba")
     return model.predict_proba(X_new)
+{% endif %}
 
 
 {% elif ml_type == 'no_supervisado' %}

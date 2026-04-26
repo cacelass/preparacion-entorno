@@ -7,9 +7,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [Unreleased]
 
-### Por añadir
-- Soporte para regresión (además de clasificación)
-- Integración opcional con MLflow para tracking de experimentos
+---
+
+## [0.4.0] — 2026-04
+
+### Añadido
+- **Soporte para regresión** además de clasificación en `supervisado`, `hibrido` y `redes_neuronales`:
+  - Nueva pregunta `task_type` (`clasificacion` | `regresion`) en el wizard de copier
+  - `train_model.py` genera regressors (`Ridge`, `Lasso`, `LinearRegression`, `RandomForestRegressor`…) según la tarea
+  - `predict_model.py` calcula métricas de regresión (`RMSE`, `MAE`, `MAPE`, `R²`) y genera gráficos `real_vs_pred` y `residuals`
+  - Tests de `test_train_model.py` y `test_predict_model.py` adaptados para ambas tareas vía Jinja2
+- **Integración opcional con MLflow** para tracking de experimentos (`use_mlflow`):
+  - Loguea parámetros, métricas y artefactos automáticamente en `train_model.py` y `predict_model.py`
+  - Soporte para Model Registry en el bloque `supervisado`
+  - Grupo de dependencias `mlflow_tracking` en `pyproject.toml`, instalado con `uv sync --extra mlflow_tracking`
 
 ---
 

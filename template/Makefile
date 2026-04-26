@@ -4,6 +4,7 @@
         lab notebook tb \
         docs \
         profile \
+        mlflow \
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -52,7 +53,10 @@ help:
 	@echo "    make profile        cProfile de main.py → reports/profile.prof"
 	@echo ""
 {% if ml_type == "redes_neuronales" %}
-	@echo "  Monitorización"
+	@echo "  Monitorizacion"
+{% if use_mlflow %}
+	@echo "    make mlflow         MLflow UI en localhost:5000"
+{% endif %}
 	@echo "    make tb             lanza TensorBoard (puerto 6006)"
 	@echo ""
 {% endif %}
@@ -150,6 +154,15 @@ lab:
 notebook:
 	uv run jupyter notebook --ip=* --port=8888 --no-browser
 
+
+{% if use_mlflow %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  MLflow UI
+# ─────────────────────────────────────────────────────────────────────────────
+mlflow:
+	@echo "Lanzando MLflow UI en http://localhost:5000"
+	uv run mlflow ui --port 5000
+{% endif %}
 {% if ml_type == "redes_neuronales" %}
 # ─────────────────────────────────────────────────────────────────────────────
 #  TensorBoard — monitorización de entrenamiento

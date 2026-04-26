@@ -2,6 +2,7 @@
 import numpy as np
 import joblib
 
+{% if task_type == "clasificacion" %}
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -11,12 +12,35 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
+{% else %}
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
+{% endif %}
 
 {% if use_xgboost == "si" %}
+{% if task_type == "clasificacion" %}
 from xgboost import XGBClassifier
+{% else %}
+from xgboost import XGBRegressor
+{% endif %}
 {% endif %}
 {% if use_lightgbm == "si" %}
+{% if task_type == "clasificacion" %}
 from lightgbm import LGBMClassifier
+{% else %}
+from lightgbm import LGBMRegressor
+{% endif %}
+{% endif %}
+
+{% if use_mlflow %}
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 {% endif %}
 
 from {{ project_slug }}.utils.paths import MODELS_DIR
@@ -27,6 +51,231 @@ from {{ project_slug }}.utils.paths import MODELS_DIR
 # ---------------------------------------------------------------------------
 
 def _build_models() -> dict:
+    """
+    Define los modelos a entrenar.
+    Tarea: {{ task_type }}
+
+{% if task_type == "clasificacion" %}
+    KNN                → lazy learner. Requiere features escaladas.
+    LogisticRegression → modelo base binario. Interpretable, probabilidades calibradas.
+    DecisionTree       → caja blanca. Regularizar con max_depth y min_samples_leaf.
+    RandomForest       → ensemble robusto con feature importances.
+    XGBoost (opc.)     → gradient boosting optimizado. Referencia en Kaggle.
+    LightGBM (opc.)    → leaf-wise boosting. Más rápido en datasets grandes.
+{% else %}
+    LinearRegression   → modelo base. Rápido e interpretable.
+    Ridge              → regresión lineal con regularización L2.
+    Lasso              → regularización L1, útil para selección de variables.
+    KNN                → regresión no paramétrica. Sensible a dimensionalidad.
+    RandomForest       → ensemble robusto. feature_importances_ disponible.
+    SVR                → potente en alta dimensión. Lento en datasets grandes.
+    XGBoost (opc.)     → gradient boosting para regresión.
+    LightGBM (opc.)    → leaf-wise boosting para regresión.
+{% endif %}
+    """
+    models = {}
+
+{% if task_type == "clasificacion" %}
+    models["KNN"] = KNeighborsClassifier(n_neighbors=7, weights="distance")
+    models["LogisticRegression"] = LogisticRegression(
+        max_iter=1000, class_weight="balanced", random_state=42,
+    )
+    models["DecisionTree"] = DecisionTreeClassifier(
+        max_depth=7, min_samples_leaf=5, class_weight="balanced", random_state=42,
+    )
+    models["RandomForest"] = RandomForestClassifier(
+        n_estimators=200, max_depth=10, max_features="sqrt",
+        max_samples=0.8, class_weight="balanced", random_state=42, n_jobs=-1,
+    )
+{% else %}
+    models["LinearRegression"] = LinearRegression()
+    models["Ridge"] = Ridge(alpha=1.0)
+    models["Lasso"] = Lasso(alpha=0.1, max_iter=2000)
+    models["KNN"] = KNeighborsRegressor(n_neighbors=7, weights="distance")
+    models["RandomForest"] = RandomForestRegressor(
+        n_estimators=200, max_depth=10, max_features="sqrt",
+        max_samples=0.8, random_state=42, n_jobs=-1,
+    )
+    # models["SVR"] = Pipeline([
+    #     ("scaler", StandardScaler()),
+    #     ("reg", SVR(kernel="rbf", C=1.0, gamma="scale")),
+    # ])
+{% endif %}
+
+{% if use_xgboost == "si" %}
+{% if task_type == "clasificacion" %}
+    models["XGBoost"] = XGBClassifier(
+        n_estimators=300, max_depth=6, learning_rate=0.05,
+        subsample=0.8, colsample_bytree=0.8,
+        reg_alpha=0.1, reg_lambda=1.0,
+        eval_metric="logloss", use_label_encoder=False,
+        random_state=42, n_jobs=-1,
+    )
+{% else %}
+    models["XGBoost"] = XGBRegressor(
+        n_estimators=300, max_depth=6, learning_rate=0.05,
+        subsample=0.8, colsample_bytree=0.8,
+        reg_alpha=0.1, reg_lambda=1.0,
+        eval_metric="rmse",
+        random_state=42, n_jobs=-1,
+    )
+{% endif %}
+{% endif %}
+
+{% if use_lightgbm == "si" %}
+{% if task_type == "clasificacion" %}
+    models["LightGBM"] = LGBMClassifier(
+        n_estimators=300, num_leaves=31, learning_rate=0.05,
+        subsample=0.8, colsample_bytree=0.8, min_child_samples=20,
+        reg_alpha=0.1, reg_lambda=1.0, class_weight="balanced",
+        random_state=42, n_jobs=-1, verbose=-1,
+    )
+{% else %}
+    models["LightGBM"] = LGBMRegressor(
+        n_estimators=300, num_leaves=31, learning_rate=0.05,
+        subsample=0.8, colsample_bytree=0.8, min_child_samples=20,
+        reg_alpha=0.1, reg_lambda=1.0,
+        random_state=42, n_jobs=-1, verbose=-1,
+    )
+{% endif %}
+{% endif %}
+
+    return models
+
+
+def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
+    """Busca el k óptimo para KNN por cross-validation."""
+{% if task_type == "clasificacion" %}
+    scoring = "f1_weighted"
+{% else %}
+    scoring = "neg_root_mean_squared_error"
+{% endif %}
+    scores = {
+        k: cross_val_score(
+            KNeighborsClassifier(n_neighbors=k) if "{{ task_type }}" == "clasificacion"
+            else KNeighborsRegressor(n_neighbors=k),
+            X_train, y_train, cv=5, scoring=scoring,
+        ).mean()
+        for k in k_range
+    }
+    best_k = max(scores, key=scores.get)
+    print(f"    KNN mejor k={best_k} ({scoring}={scores[best_k]:.3f})")
+    return best_k
+
+
+def train_models(
+    X_train,
+    y_train,
+    tune_knn: bool = True,
+    cv_evaluate: bool = True,
+) -> dict:
+    """
+    Entrena modelos de {{ task_type }} y los guarda en models/.
+
+{% if task_type == "clasificacion" %}
+    Métrica CV: F1_weighted (5-fold).
+{% else %}
+    Métrica CV: RMSE negativo (5-fold) — más bajo (menos negativo) es mejor.
+{% endif %}
+{% if use_mlflow %}
+    MLflow: cada modelo se loguea como un run independiente dentro del
+    experimento '{{ project_slug }}'. Los artifacts (.joblib) se registran
+    en el Model Registry bajo el nombre del modelo.
+{% endif %}
+
+    Returns
+    -------
+    dict : {nombre_modelo: modelo_entrenado}
+    """
+    print("--> Entrenando modelos de {{ task_type }}...")
+    models = _build_models()
+
+{% if model_type != "todos" %}
+    selected = "{{ model_type }}"
+    if selected in models:
+        models = {selected: models[selected]}
+    else:
+        print(f"    model_type='{selected}' no encontrado. Entrenando todos.")
+{% endif %}
+
+    if tune_knn and "KNN" in models:
+        best_k = _find_best_k(X_train, y_train)
+{% if task_type == "clasificacion" %}
+        models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
+{% else %}
+        models["KNN"] = KNeighborsRegressor(n_neighbors=best_k, weights="distance")
+{% endif %}
+
+{% if use_mlflow %}
+    mlflow.set_experiment("{{ project_slug }}")
+{% endif %}
+
+    trained = {}
+    for name, model in models.items():
+        print(f"    [{name}] entrenando...")
+
+{% if use_mlflow %}
+        with mlflow.start_run(run_name=name):
+            # ── Parámetros ────────────────────────────────────────────────
+            params = {}
+            if hasattr(model, "get_params"):
+                params = {k: v for k, v in model.get_params().items()
+                          if v is not None and not callable(v)}
+            mlflow.log_params(params)
+            mlflow.log_param("task_type", "{{ task_type }}")
+            mlflow.log_param("model_name", name)
+{% endif %}
+
+        model.fit(X_train, y_train)
+
+        if cv_evaluate:
+{% if task_type == "clasificacion" %}
+            cv_score = cross_val_score(
+                model, X_train, y_train, cv=5, scoring="f1_weighted"
+            ).mean()
+            print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
+{% else %}
+            cv_score = -cross_val_score(
+                model, X_train, y_train, cv=5,
+                scoring="neg_root_mean_squared_error",
+            ).mean()
+            print(f"      RMSE 5-fold CV: {cv_score:.4f}")
+{% endif %}
+
+{% if use_mlflow %}
+            mlflow.log_metric("cv_score", cv_score)
+{% endif %}
+
+        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
+        print(f"      Guardado → {name}.joblib")
+
+{% if use_mlflow %}
+        mlflow.sklearn.log_model(
+            model, artifact_path=name,
+            registered_model_name=f"{{ project_slug }}_{name}",
+        )
+        mlflow.log_artifact(str(MODELS_DIR / f"{name}.joblib"))
+{% endif %}
+
+        trained[name] = model
+
+    print(f"--> {len(trained)} modelos guardados en {MODELS_DIR}")
+    return trained
+
+
+def load_models(model_names: list = None) -> dict:
+    """Carga modelos desde disco."""
+    if model_names is None:
+        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
+    models = {}
+    for name in model_names:
+        path = MODELS_DIR / f"{name}.joblib"
+        if path.exists():
+            models[name] = joblib.load(path)
+            print(f"    Cargado: {name}")
+        else:
+            print(f"    No encontrado: {path}")
+    return models
     """
     Define los modelos a entrenar.
 
@@ -170,108 +419,6 @@ def _build_models() -> dict:
 
     return models
 
-
-def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
-    """
-    Busca el mejor k para KNN por validación cruzada (5-fold, métrica F1_weighted).
-    Devuelve el k con mayor F1 medio, priorizando k más alto en empates.
-    """
-    print("    Buscando mejor k para KNN...")
-    best_k, best_score = 1, 0.0
-    for k in k_range:
-        knn = KNeighborsClassifier(n_neighbors=k, weights="distance")
-        score = cross_val_score(knn, X_train, y_train, cv=5, scoring="f1_weighted").mean()
-        if score >= best_score:   # >= → preferimos k más alto en empates
-            best_k, best_score = k, score
-    print(f"    Mejor k = {best_k}  (F1_weighted CV = {best_score:.3f})")
-    return best_k
-
-
-def train_models(
-    X_train,
-    y_train,
-    tune_knn: bool = True,
-    cv_evaluate: bool = True,
-) -> dict:
-    """
-    Entrena todos los modelos definidos en _build_models() y los guarda en models/.
-
-    Parameters
-    ----------
-    X_train      : features de entrenamiento (array-like)
-    y_train      : etiquetas de entrenamiento (array-like)
-    tune_knn     : si True, optimiza k de KNN por cross-validation antes de entrenar.
-    cv_evaluate  : si True, muestra F1_weighted (5-fold CV) de cada modelo.
-
-    Returns
-    -------
-    dict : {nombre_modelo: modelo_entrenado}
-    """
-    print("--> Entrenando modelos supervisados...")
-    models = _build_models()
-
-    # ── Filtro por model_type ────────────────────────────────────────────────
-    # Si model_type != "todos", entrena solo el modelo seleccionado.
-    # Esto acelera el flujo cuando ya se ha hecho la comparación inicial
-    # y se quiere iterar rápido sobre un único modelo.
-{% if model_type != "todos" %}
-    selected = "{{ model_type }}"
-    if selected in models:
-        models = {selected: models[selected]}
-    else:
-        print(f"    ⚠  model_type='{selected}' no está en _build_models(). "
-              f"Entrenando todos los modelos.")
-{% endif %}
-
-    # Optimización automática de k
-    if tune_knn and "KNN" in models:
-        best_k = _find_best_k(X_train, y_train)
-        models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
-
-    trained = {}
-    for name, model in models.items():
-        print(f"    [{name}] entrenando...")
-        model.fit(X_train, y_train)
-
-        if cv_evaluate:
-            cv_score = cross_val_score(
-                model, X_train, y_train, cv=5, scoring="f1_weighted"
-            ).mean()
-            print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
-
-        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
-        print(f"      Guardado → {name}.joblib")
-        trained[name] = model
-
-    print(f"--> {len(trained)} modelos guardados en {MODELS_DIR}")
-    return trained
-
-
-def load_models(model_names: list = None) -> dict:
-    """
-    Carga modelos desde disco.
-
-    Parameters
-    ----------
-    model_names : lista de nombres sin extensión, e.g. ["RandomForest", "KNN"].
-                  Si None, carga todos los .joblib disponibles en models/.
-
-    Returns
-    -------
-    dict : {nombre_modelo: modelo_cargado}
-    """
-    if model_names is None:
-        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
-
-    models = {}
-    for name in model_names:
-        path = MODELS_DIR / f"{name}.joblib"
-        if path.exists():
-            models[name] = joblib.load(path)
-            print(f"    Cargado: {name}")
-        else:
-            print(f"    ⚠ No encontrado: {path}")
-    return models
 
 
 {% elif ml_type == "no_supervisado" %}

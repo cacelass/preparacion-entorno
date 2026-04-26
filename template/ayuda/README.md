@@ -40,7 +40,34 @@ make tb           # http://localhost:6006
 
 ---
 
-## Tipo de ML: `{{ ml_type }}`{% if ml_type == "redes_neuronales" %} · Arquitectura: `{{ nn_model }}`{% endif %}
+## Tipo de ML: `{{ ml_type }}`{% if ml_type in ['supervisado', 'redes_neuronales', 'hibrido'] %} · Tarea: `{{ task_type }}`{% endif %}{% if use_mlflow %} · MLflow activo{% endif %}
+
+{% if use_mlflow %}
+### MLflow
+
+```bash
+make mlflow        # UI en http://localhost:5000
+```
+
+Cada entrenamiento crea un run en el experimento `{{ project_slug }}`.
+Los modelos se registran en el Model Registry como `{{ project_slug }}_<NombreModelo>`.
+Artifacts: pesos `.joblib` / `.pt` + figuras de evaluacion.
+{% endif %}
+
+{% if task_type == "regresion" %}
+### Metricas de regresion
+
+| Metrica | Descripcion |
+|---|---|
+| RMSE | Error cuadratico medio — penaliza outliers mas que MAE |
+| MAE | Error absoluto medio — mas robusto a outliers |
+| MAPE | Error porcentual medio — util para comparar escalas distintas |
+| R² | Varianza explicada — 1.0 es perfecto, puede ser negativo |
+
+Figuras generadas en `reports/figures/`:
+- `real_vs_pred_<modelo>.png` — scatter real vs predicho
+- `residuals_<modelo>.png` — residuos vs predicho + histograma
+{% endif %}{% if ml_type == "redes_neuronales" %} · Arquitectura: `{{ nn_model }}`{% endif %}
 
 {% if ml_type == "supervisado" %}
 ### Modelos disponibles{% if model_type == "todos" %} (todos){% else %} (activo: `{{ model_type }}`){% endif %}

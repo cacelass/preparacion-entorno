@@ -25,11 +25,19 @@ def sample_df():
 {% if ml_type in ["supervisado", "hibrido"] %}
 @pytest.fixture
 def df_with_target(sample_df):
+{% if task_type == "regresion" %}
+    """DataFrame con features numéricas + target continuo (regresión)."""
+    df = sample_df.copy()
+    np.random.seed(42)
+    df["target"] = df["feat_0"] * 2.5 + df["feat_1"] - df["feat_2"] + np.random.randn(len(df)) * 0.5
+    return df
+{% else %}
     """DataFrame con features numéricas + columna target binaria."""
     df = sample_df.copy()
     np.random.seed(42)
     df["target"] = (df["feat_0"] + df["feat_1"] > 0).astype(int)
     return df
+{% endif %}
 {% endif %}
 
 

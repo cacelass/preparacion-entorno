@@ -31,7 +31,7 @@ dev = [
     "snakeviz",
 ]
 
-# ML supervisado: clasificación + PCA opcional como preprocesado
+# ML supervisado: clasificación + regresión + PCA opcional como preprocesado
 supervisado = [
     "scikit-learn",   # modelos, PCA, pipelines, métricas
     "scipy",          # stats, tests de normalidad, dendrogramas
@@ -41,6 +41,12 @@ supervisado = [
     "imbalanced-learn",
     "joblib",
 ]
+
+{% if use_mlflow %}
+mlflow_tracking = [
+    "mlflow",
+]
+{% endif %}
 
 # ML no supervisado: clustering + reducción de dimensionalidad
 no_supervisado = [
