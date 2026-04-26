@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.decomposition import PCA
 import joblib
+from loguru import logger
 from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
@@ -24,6 +25,11 @@ COLS_TO_DROP: list = [
     # "duration",     # fuga de datos
     # "nr_employed",  # alta correlación con euribor3m
 ]
+
+# Columnas a las que aplicar transformación logarítmica (np.log1p).
+# Útil para features con distribución muy sesgada (skewness > 1).
+# Ejemplo: ["amount", "salary", "tenure_days"]
+LOGCOLS: list = []
 
 
 def preprocess_data(
@@ -72,6 +78,9 @@ def preprocess_data(
 
     # 2. Feature engineering
     df = _feature_engineering(df)
+
+    # 2.5 Transformación logarítmica
+    df = _apply_logcols(df, LOGCOLS)
 
     # 3. Codificación ordinal
     for col, mapping in ORDINAL_MAPPINGS.items():
@@ -179,6 +188,51 @@ def _feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
+    """
+    Aplica transformación logarítmica np.log1p() a las columnas indicadas.
+
+    Úsala con features numéricas de distribución muy sesgada (skewness > 1)
+    para acercarlas a una distribución normal antes del escalado.
+
+    Parameters
+    ----------
+    df   : DataFrame con las columnas a transformar.
+    cols : Lista de nombres de columna. Las columnas que no existan en df
+           se ignoran con un aviso. Ejemplo: LOGCOLS = ["amount", "tenure_days"]
+
+    Notes
+    -----
+    - np.log1p(x) = log(1 + x) → evita log(0) cuando hay ceros.
+    - Para valores negativos, aplica primero un offset: x - x.min() + 1.
+    - Configura LOGCOLS en la sección de constantes de este fichero.
+    """
+    if not cols:
+        return df
+
+    df = df.copy()
+    applied, skipped = [], []
+
+    for col in cols:
+        if col not in df.columns:
+            skipped.append(col)
+            continue
+        if df[col].min() < 0:
+            offset = -df[col].min() + 1
+            df[col] = np.log1p(df[col] + offset)
+            logger.warning(f"logcols | '{col}' tiene valores negativos → offset {offset:.4f} aplicado antes de log1p")
+        else:
+            df[col] = np.log1p(df[col])
+        applied.append(col)
+
+    if applied:
+        logger.info(f"logcols | log1p aplicado → {applied}")
+    if skipped:
+        logger.warning(f"logcols | columnas no encontradas (ignoradas) → {skipped}")
+
+    return df
+
+
 def process_input(df_new: pd.DataFrame) -> np.ndarray:
     """
     Preprocesa nuevos datos para inferencia usando los artefactos guardados.
@@ -221,7 +275,11 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import joblib
+from loguru import logger
 from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+
+# Columnas a las que aplicar transformación logarítmica (np.log1p).
+LOGCOLS: list = []
 
 
 def preprocess_data(df: pd.DataFrame) -> np.ndarray:
@@ -256,6 +314,9 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     for col in cat_cols:
         df[col] = df[col].fillna(df[col].mode()[0])
 
+    # Transformación logarítmica
+    df = _apply_logcols(df, LOGCOLS)
+
     le = LabelEncoder()
     for col in cat_cols:
         df[col] = le.fit_transform(df[col].astype(str))
@@ -271,6 +332,33 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     return X_scaled
 
 
+def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
+    """
+    Aplica transformación logarítmica np.log1p() a las columnas indicadas.
+    Configura LOGCOLS en la sección de constantes de este fichero.
+    """
+    if not cols:
+        return df
+    df = df.copy()
+    applied, skipped = [], []
+    for col in cols:
+        if col not in df.columns:
+            skipped.append(col)
+            continue
+        if df[col].min() < 0:
+            offset = -df[col].min() + 1
+            df[col] = np.log1p(df[col] + offset)
+            logger.warning(f"logcols | '{col}' tiene valores negativos → offset {offset:.4f} aplicado")
+        else:
+            df[col] = np.log1p(df[col])
+        applied.append(col)
+    if applied:
+        logger.info(f"logcols | log1p aplicado → {applied}")
+    if skipped:
+        logger.warning(f"logcols | columnas no encontradas (ignoradas) → {skipped}")
+    return df
+
+
 {% elif ml_type == 'redes_neuronales' %}
 import pandas as pd
 import numpy as np
@@ -278,7 +366,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.decomposition import PCA
 import joblib
+from loguru import logger
 from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
+
+# Columnas a las que aplicar transformación logarítmica (np.log1p).
+LOGCOLS: list = []
 
 
 def preprocess_data(
@@ -313,6 +405,9 @@ def preprocess_data(
     X[num_cols] = X[num_cols].fillna(X[num_cols].mean())
     for col in cat_cols:
         X[col] = X[col].fillna(X[col].mode()[0])
+
+    # Transformación logarítmica
+    X = _apply_logcols(X, LOGCOLS)
 
     le = LabelEncoder()
     for col in cat_cols:
@@ -355,6 +450,7 @@ def preprocess_data(
 def process_input(df_new: pd.DataFrame) -> "np.ndarray":
     scaler = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
     df_new = df_new.copy()
+    df_new = _apply_logcols(df_new, LOGCOLS)
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
     le = LabelEncoder()
     for col in cat_cols:
@@ -368,6 +464,33 @@ def process_input(df_new: pd.DataFrame) -> "np.ndarray":
     return X
 
 
+def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
+    """
+    Aplica transformación logarítmica np.log1p() a las columnas indicadas.
+    Configura LOGCOLS en la sección de constantes de este fichero.
+    """
+    if not cols:
+        return df
+    df = df.copy()
+    applied, skipped = [], []
+    for col in cols:
+        if col not in df.columns:
+            skipped.append(col)
+            continue
+        if df[col].min() < 0:
+            offset = -df[col].min() + 1
+            df[col] = np.log1p(df[col] + offset)
+            logger.warning(f"logcols | '{col}' tiene valores negativos → offset {offset:.4f} aplicado")
+        else:
+            df[col] = np.log1p(df[col])
+        applied.append(col)
+    if applied:
+        logger.info(f"logcols | log1p aplicado → {applied}")
+    if skipped:
+        logger.warning(f"logcols | columnas no encontradas (ignoradas) → {skipped}")
+    return df
+
+
 {% elif ml_type == 'hibrido' %}
 import pandas as pd
 import numpy as np
@@ -378,11 +501,13 @@ from sklearn.cluster import KMeans
 from sklearn.ensemble import IsolationForest
 from sklearn.semi_supervised import LabelSpreading
 import joblib
+from loguru import logger
 from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 
 COLS_TO_DROP: list = []
 ORDINAL_MAPPINGS: dict = {}
+LOGCOLS: list = []
 
 
 def preprocess_data(
@@ -452,6 +577,9 @@ def preprocess_data(
     X[num_cols] = X[num_cols].fillna(X[num_cols].mean())
     for col in cat_cols:
         X[col] = X[col].fillna(X[col].mode()[0])
+
+    # Transformación logarítmica
+    X = _apply_logcols(X, LOGCOLS)
 
     le = LabelEncoder()
     for col in cat_cols:
@@ -625,4 +753,31 @@ def _strategy_semi_supervised(X_scaled, y, labeled_fraction, random_state):
     changed = (y_propagated != y).sum()
     print(f"    LabelSpreading: {changed} etiquetas propagadas/corregidas")
     return X_scaled, y_propagated
+
+
+def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
+    """
+    Aplica transformación logarítmica np.log1p() a las columnas indicadas.
+    Configura LOGCOLS en la sección de constantes de este fichero.
+    """
+    if not cols:
+        return df
+    df = df.copy()
+    applied, skipped = [], []
+    for col in cols:
+        if col not in df.columns:
+            skipped.append(col)
+            continue
+        if df[col].min() < 0:
+            offset = -df[col].min() + 1
+            df[col] = np.log1p(df[col] + offset)
+            logger.warning(f"logcols | '{col}' tiene valores negativos → offset {offset:.4f} aplicado")
+        else:
+            df[col] = np.log1p(df[col])
+        applied.append(col)
+    if applied:
+        logger.info(f"logcols | log1p aplicado → {applied}")
+    if skipped:
+        logger.warning(f"logcols | columnas no encontradas (ignoradas) → {skipped}")
+    return df
 {% endif %}

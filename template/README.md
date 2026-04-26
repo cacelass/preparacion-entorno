@@ -1,5 +1,14 @@
 # {{ project_name }}
 
+![Python](https://img.shields.io/badge/Python-{{ python_version }}+-blue?logo=python&logoColor=white)
+{% if ml_type == 'supervisado' %}![ML Type](https://img.shields.io/badge/ML-Supervised%20{{ task_type | capitalize }}-orange)
+{% elif ml_type == 'no_supervisado' %}![ML Type](https://img.shields.io/badge/ML-Unsupervised%20Clustering-orange)
+{% elif ml_type == 'redes_neuronales' %}![ML Type](https://img.shields.io/badge/ML-Neural%20Networks%20{{ nn_model }}-orange)
+{% elif ml_type == 'hibrido' %}![ML Type](https://img.shields.io/badge/ML-Hybrid-orange)
+{% endif %}{% if use_mlflow %}![Tracking](https://img.shields.io/badge/Experiment%20Tracking-MLflow-blue?logo=mlflow)
+{% endif %}![Version](https://img.shields.io/badge/Version-{{ project_version }}-green)
+![Author](https://img.shields.io/badge/Author-{{ project_author_name | replace(" ", "%20") | replace("-", "--") }}-blueviolet)
+
 > {{ project_description }}
 
 **Tipo de ML:** `{{ ml_type }}`{% if ml_type == "redes_neuronales" %} — arquitectura: `{{ nn_model }}`{% endif %}  

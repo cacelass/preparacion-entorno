@@ -9,15 +9,26 @@ readme = "README.md"
 requires-python = ">= {{ python_version }}"
 license = { text = "{{ project_open_source_license if project_open_source_license != 'No license file' else '' }}" }
 dependencies = [
+    # ── Datos y computación ───────────────────────────────────────────────
     "numpy",
     "pandas",
+    "scipy",           # stats, tests de normalidad, clustering jerárquico
+    # ── ML core (usadas en todos los ml_type) ────────────────────────────
+    "scikit-learn",    # modelos, PCA, pipelines, métricas, preprocesado
+    "joblib",          # serialización de modelos y paralelismo
+    # ── Visualización ────────────────────────────────────────────────────
     "matplotlib",
     "seaborn",
     "plotly",
+    "missingno",
+    # ── Notebooks ────────────────────────────────────────────────────────
     "jupyter",
     "jupyterlab",
+    # ── Utilidades ───────────────────────────────────────────────────────
     "python-dotenv",
-    "missingno",
+    "loguru",          # logging estructurado
+    "rich",            # output de consola con color y tablas
+    "tqdm",            # barras de progreso
 ]
 
 [project.optional-dependencies]
@@ -31,15 +42,12 @@ dev = [
     "snakeviz",
 ]
 
-# ML supervisado: clasificación + regresión + PCA opcional como preprocesado
+# ML supervisado: clasificación + regresión
 supervisado = [
-    "scikit-learn",   # modelos, PCA, pipelines, métricas
-    "scipy",          # stats, tests de normalidad, dendrogramas
     "lightgbm",
     "xgboost",
     "statsmodels",
     "imbalanced-learn",
-    "joblib",
 ]
 
 {% if use_mlflow %}
@@ -50,15 +58,12 @@ mlflow_tracking = [
 
 # ML no supervisado: clustering + reducción de dimensionalidad
 no_supervisado = [
-    "scikit-learn",   # KMeans, AgglomerativeClustering, PCA, DBSCAN
-    "scipy",          # dendrogramas y clustering jerárquico
     "yellowbrick",    # SilhouetteVisualizer
     "umap-learn",     # reducción de dimensionalidad no lineal (UMAP)
     "hdbscan",        # clustering basado en densidad jerárquico
-    "joblib",
 ]
 
-# Redes neuronales: deep learning con PyTorch + Polars
+# Redes neuronales: deep learning con PyTorch
 redes_neuronales = [
     "torch",
     "torchvision",
@@ -66,25 +71,14 @@ redes_neuronales = [
     "torchmetrics[visual]",
     "tensorboard",
     "polars",         # carga eficiente de datos con dtypes explícitos
-    "scikit-learn",   # PCA, métricas, preprocesado
-    "scipy",
-    "joblib",
 ]
 
 # Modelos híbridos: combinan técnicas supervisadas y no supervisadas
-# Casos de uso:
-#   - PCA/UMAP → reducir dimensiones → clasificador
-#   - KMeans → distancias a centroides como features → RF/LogReg
-#   - IsolationForest → score de anomalía como feature → clasificador
-#   - Semi-supervisado: LabelPropagation / LabelSpreading
 hibrido = [
-    "scikit-learn",   # PCA, KMeans, IsolationForest, pipelines, semi-supervisado
-    "scipy",          # estadísticos, tests de normalidad
     "umap-learn",     # UMAP como alternativa a PCA (no lineal)
     "lightgbm",       # clasificador final potente
     "xgboost",        # clasificador final alternativo
     "imbalanced-learn",
-    "joblib",
 ]
 
 [tool.setuptools]
