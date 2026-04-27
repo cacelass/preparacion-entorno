@@ -11,6 +11,14 @@
     "tamasfe.even-better-toml",
     "yzhang.markdown-all-in-one",
     "njpwerner.autodocstring",
-    "charliermarsh.ruff"
+    "charliermarsh.ruff",
+    "esbenp.prettier-vscode",
+    "formulahendry.auto-rename-tag",
+    "dbaeumer.vscode-eslint",
+    "christian-kohler.path-intellisense",
+    "eamodio.gitlens",
+    "usernamehw.errorlens",
+    "redhat.vscode-yaml",
+    "randomfractalsinc.vscode-data-preview"
   ]
 }
