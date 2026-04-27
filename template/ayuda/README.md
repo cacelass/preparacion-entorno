@@ -78,8 +78,8 @@ Figuras generadas en `reports/figures/`:
 | LogisticRegression | Clasificación binaria, interpretable, probabilidades calibradas |
 | DecisionTree | Caja blanca, útil para explicabilidad |
 | RandomForest | Robusto, feature importance, buen por defecto |
-{% if use_xgboost == "si" %}| XGBoost | Gradient boosting optimizado. Referencia en Kaggle |{% endif %}
-{% if use_lightgbm == "si" %}| LightGBM | Leaf-wise boosting. Más rápido que XGBoost en datos grandes |{% endif %}
+{% if use_xgboost or model_type == "XGBoost" %}| XGBoost | Gradient boosting optimizado. Referencia en Kaggle |{% endif %}
+{% if use_lightgbm or model_type == "LightGBM" %}| LightGBM | Leaf-wise boosting. Más rápido que XGBoost en datos grandes |{% endif %}
 
 Cambiar el modelo activo: edita `model_type` en `json` y regenera,
 o descomenta/comenta modelos directamente en `_build_models()` de `train_model.py`.

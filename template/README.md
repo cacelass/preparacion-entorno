@@ -13,7 +13,7 @@
 
 **Tipo de ML:** `{{ ml_type }}`{% if ml_type == "redes_neuronales" %} — arquitectura: `{{ nn_model }}`{% endif %}  
 **Autor:** {{ project_author_name }}  
-**Versión:** {{ project_version }}{% if use_xgboost == "si" %} · XGBoost ✓{% endif %}{% if use_lightgbm == "si" %} · LightGBM ✓{% endif %}
+**Versión:** {{ project_version }}{% if use_xgboost %} · XGBoost ✓{% endif %}{% if use_lightgbm %} · LightGBM ✓{% endif %}
 
 ---
 

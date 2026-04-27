@@ -29,14 +29,14 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import cross_val_score
 {% endif %}
 
-{% if use_xgboost == "si" %}
+{% if use_xgboost or model_type == "XGBoost" %}
 {% if task_type == "clasificacion" %}
 from xgboost import XGBClassifier
 {% else %}
 from xgboost import XGBRegressor
 {% endif %}
 {% endif %}
-{% if use_lightgbm == "si" %}
+{% if use_lightgbm or model_type == "LightGBM" %}
 {% if task_type == "clasificacion" %}
 from lightgbm import LGBMClassifier
 {% else %}
@@ -75,10 +75,10 @@ def _build_models() -> dict:
 {% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto con feature importances.
 {% endif %}
-{% if use_xgboost == "si" %}
+{% if use_xgboost or model_type == "XGBoost" %}
     XGBoost            → gradient boosting optimizado. Referencia en Kaggle.
 {% endif %}
-{% if use_lightgbm == "si" %}
+{% if use_lightgbm or model_type == "LightGBM" %}
     LightGBM           → leaf-wise boosting. Más rápido en datasets grandes.
 {% endif %}
 {% else %}
@@ -93,10 +93,10 @@ def _build_models() -> dict:
 {% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto. feature_importances_ disponible.
 {% endif %}
-{% if use_xgboost == "si" %}
+{% if use_xgboost or model_type == "XGBoost" %}
     XGBoost            → gradient boosting para regresión.
 {% endif %}
-{% if use_lightgbm == "si" %}
+{% if use_lightgbm or model_type == "LightGBM" %}
     LightGBM           → leaf-wise boosting para regresión.
 {% endif %}
 {% endif %}
@@ -140,7 +140,7 @@ def _build_models() -> dict:
 {% endif %}
 {% endif %}
 
-{% if use_xgboost == "si" %}
+{% if use_xgboost or model_type == "XGBoost" %}
 {% if task_type == "clasificacion" %}
     models["XGBoost"] = XGBClassifier(
         n_estimators=300, max_depth=6, learning_rate=0.05,
@@ -160,7 +160,7 @@ def _build_models() -> dict:
 {% endif %}
 {% endif %}
 
-{% if use_lightgbm == "si" %}
+{% if use_lightgbm or model_type == "LightGBM" %}
 {% if task_type == "clasificacion" %}
     models["LightGBM"] = LGBMClassifier(
         n_estimators=300, num_leaves=31, learning_rate=0.05,
@@ -946,10 +946,10 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
 
-{% if use_xgboost == "si" %}
+{% if use_xgboost or model_type == "XGBoost" %}
 from xgboost import XGBClassifier
 {% endif %}
-{% if use_lightgbm == "si" %}
+{% if use_lightgbm or model_type == "LightGBM" %}
 from lightgbm import LGBMClassifier
 {% endif %}
 
@@ -1013,7 +1013,7 @@ def _build_models(strategy: str) -> dict:
             random_state=42,
         )
 
-{% if use_xgboost == "si" %}
+{% if use_xgboost or model_type == "XGBoost" %}
     # XGBoost: robusto ante outliers, regularización nativa, muy competitivo
     # en espacios reducidos (pca/umap) y con features de distancia (kmeans).
     base["XGBoost"] = XGBClassifier(
@@ -1031,7 +1031,7 @@ def _build_models(strategy: str) -> dict:
     )
 {% endif %}
 
-{% if use_lightgbm == "si" %}
+{% if use_lightgbm or model_type == "LightGBM" %}
     # LightGBM: leaf-wise, más rápido que XGBoost con datasets grandes.
     # Especialmente bueno cuando hay features categóricas o alta cardinalidad.
     base["LightGBM"] = LGBMClassifier(
