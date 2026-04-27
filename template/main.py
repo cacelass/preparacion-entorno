@@ -7,6 +7,9 @@ from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models
 from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
+{% if task_type == "clasificacion" %}
+from {{ project_slug }}.models.predict_model import test_model
+{% endif %}
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -30,7 +33,7 @@ THRESHOLD    = DECISION_THRESHOLD
 USE_PCA      = None   # ← ajusta: None | 0.95 | 10
 
 
-def main():
+def run_full_pipeline() -> None:
     print('=' * 60)
     print('1. Cargando datos...')
     df = load_data(DATA_FILE)
@@ -81,6 +84,18 @@ def main():
     print(f'Mejor modelo: {best.to_dict()}')
 
 
+def main():
+    print('=' * 60)
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    if accion == '0':
+        run_full_pipeline()
+    elif accion == '1':
+        test_model()
+    else:
+        print('Opción no válida. Ejecutando pipeline completo por defecto.')
+        run_full_pipeline()
+
+
 if __name__ == '__main__':
     main()
 
@@ -88,7 +103,7 @@ if __name__ == '__main__':
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models, find_optimal_k
-from {{ project_slug }}.models.predict_model import evaluate_models, plot_dendrogram
+from {{ project_slug }}.models.predict_model import evaluate_models, plot_dendrogram, test_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -105,7 +120,7 @@ DATA_FILE  = 'dataset.csv'
 N_CLUSTERS = 3   # ajustar tras analizar el codo y el dendrograma
 
 
-def main():
+def run_full_pipeline() -> None:
     print('=' * 60)
     print('1. Cargando datos...')
     df = load_data(DATA_FILE)
@@ -141,6 +156,18 @@ def main():
     print('\nPipeline completado.')
 
 
+def main():
+    print('=' * 60)
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    if accion == '0':
+        run_full_pipeline()
+    elif accion == '1':
+        test_model()
+    else:
+        print('Opción no válida. Ejecutando pipeline completo por defecto.')
+        run_full_pipeline()
+
+
 if __name__ == '__main__':
     main()
 
@@ -151,7 +178,7 @@ from torch.utils.tensorboard import SummaryWriter
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models, MODEL_NAME
-from {{ project_slug }}.models.predict_model import evaluate_models
+from {{ project_slug }}.models.predict_model import evaluate_models, test_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -184,7 +211,7 @@ _MODEL_INFO = {
 }
 
 
-def main():
+def run_full_pipeline() -> None:
     print('=' * 60)
     print(f'Red neuronal: {MODEL_NAME}')
     print(f'  {_MODEL_INFO.get(MODEL_NAME, "")}')
@@ -240,6 +267,18 @@ def main():
         print(f'Resultado: Accuracy={best["Accuracy"]:.4f}  F1={best["F1"]:.4f}')
 
 
+def main():
+    print('=' * 60)
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    if accion == '0':
+        run_full_pipeline()
+    elif accion == '1':
+        test_model()
+    else:
+        print('Opción no válida. Ejecutando pipeline completo por defecto.')
+        run_full_pipeline()
+
+
 if __name__ == '__main__':
     main()
 
@@ -272,7 +311,7 @@ Estrategias disponibles (configura STRATEGY):
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models
-from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
+from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD, test_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -296,7 +335,7 @@ N_CLUSTERS = 5                   # para kmeans_features
 LABELED_FRACTION = 0.3           # para semi_supervisado
 
 
-def main():
+def run_full_pipeline() -> None:
     print('=' * 60)
     print(f'Pipeline híbrido — estrategia: {STRATEGY}')
     print('=' * 60)
@@ -349,6 +388,20 @@ def main():
 
     print('\n' + '=' * 60)
     print('Pipeline completado.')
+    best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
+    print(f'Mejor modelo: {best.to_dict()}')
+
+
+def main():
+    print('=' * 60)
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    if accion == '0':
+        run_full_pipeline()
+    elif accion == '1':
+        test_model()
+    else:
+        print('Opción no válida. Ejecutando pipeline completo por defecto.')
+        run_full_pipeline()
     best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
     print(f'Mejor modelo: {best.to_dict()}')
 

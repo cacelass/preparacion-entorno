@@ -40,21 +40,30 @@ def test_build_models_returns_dict():
 def test_build_models_expected_keys():
     models = _build_models()
 {% if task_type == "clasificacion" %}
+{% if model_type == "todos" %}
     for key in ["KNN", "RandomForest", "LogisticRegression"]:
         assert key in models, f"Falta modelo: {key}"
 {% else %}
+    assert "{{ model_type }}" in models
+{% endif %}
+{% else %}
+{% if model_type == "todos" %}
     for key in ["LinearRegression", "Ridge", "Lasso", "KNN", "RandomForest"]:
         assert key in models, f"Falta modelo: {key}"
+{% else %}
+    assert "{{ model_type }}" in models
+{% endif %}
 {% endif %}
 
 
+{% if model_type == "todos" or model_type == "KNN" %}
 def test_find_best_k_returns_int_in_range():
     X, y = _make_Xy()
     best_k = _find_best_k(X, y, k_range=range(1, 6))
     assert isinstance(best_k, int)
     assert 1 <= best_k <= 5
 
-
+{% endif %}
 def test_train_models_returns_trained_dict(patch_paths):
     X, y = _make_Xy()
     trained = train_models(X, y, tune_knn=False, cv_evaluate=False)
@@ -82,13 +91,14 @@ def test_load_models_loads_saved(patch_paths):
         assert hasattr(model, "predict")
 
 
+{% if model_type == "todos" or model_type == "RandomForest" %}
 def test_load_models_specific_names(patch_paths):
     X, y = _make_Xy()
     train_models(X, y, tune_knn=False, cv_evaluate=False)
     loaded = load_models(["RandomForest"])
     assert "RandomForest" in loaded
 
-
+{% endif %}
 def test_load_models_missing_returns_empty(patch_paths):
     """Si no hay modelos guardados, load_models() debe devolver dict vacío."""
     loaded = load_models(["ModeloInexistente"])
@@ -172,6 +182,7 @@ def test_train_models_labels_attribute(patch_paths):
         assert len(model.labels_) == len(X)
 
 
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
 def test_train_kmeans_pipeline(patch_paths):
     from sklearn.datasets import make_classification
     X, y = make_classification(
@@ -181,7 +192,7 @@ def test_train_kmeans_pipeline(patch_paths):
     assert hasattr(pipeline, "predict")
     assert (patch_paths["MODELS_DIR"] / "KMeansPipeline.joblib").exists()
 
-
+{% endif %}
 def test_load_models_after_train(patch_paths):
     X = _make_X()
     fitted  = train_models(X, n_clusters=3)

@@ -1,6 +1,6 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-0.5.0-blue)
+![version](https://img.shields.io/badge/dskit-1.1.1-blue)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
 ![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
@@ -13,15 +13,18 @@ Plantilla basada en [copier](https://copier.readthedocs.io), diseñada para inic
 
 ## Índice
 
-- [Características](#características)
-- [Requisitos previos](#requisitos-previos)
-- [Instalación rápida](#instalación-rápida)
-- [Variables](#variables)
-- [Uso](#uso)
-- [Estructura generada](#estructura-generada)
-- [Makefile](#makefile)
-- [Changelog](#changelog)
-- [License](#license)
+- [DSKIT](#dskit)
+  - [Índice](#índice)
+  - [Características](#características)
+  - [Requisitos previos](#requisitos-previos)
+  - [Instalación rápida](#instalación-rápida)
+  - [Variables](#variables)
+    - [Validaciones](#validaciones)
+  - [Uso](#uso)
+  - [Estructura generada](#estructura-generada)
+  - [Makefile](#makefile)
+  - [Changelog](#changelog)
+  - [License](#license)
 
 ---
 

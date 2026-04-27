@@ -106,19 +106,34 @@ def preprocess_data(
         X[col] = X[col].fillna(X[col].mode()[0])
 
     # 7. LabelEncoder
+    encoders = {}  # guardamos un encoder por columna categórica para reproducibilidad
     le = LabelEncoder()
     for col in cat_cols:
-        X[col] = le.fit_transform(X[col].astype(str))
+        le_col = LabelEncoder()
+        X[col] = le_col.fit_transform(X[col].astype(str))
+        encoders[col] = le_col
 
     if y.dtype == object or str(y.dtype) == "category":
-        y = le.fit_transform(y.astype(str))
-        joblib.dump(le, ARTIFACTS_DIR / "target_encoder.joblib")
+        le_target = LabelEncoder()
+        y = le_target.fit_transform(y.astype(str))
+        encoders["__target__"] = le_target
+        joblib.dump(le_target, ARTIFACTS_DIR / "target_encoder.joblib")
         print("    Target codificado → target_encoder.joblib")
+
+    # Guardar todos los encoders en un único joblib (reproducibilidad inferencia)
+    joblib.dump(encoders, ARTIFACTS_DIR / "encoders.joblib")
+    if encoders:
+        cols_encoded = [c for c in encoders if c != "__target__"]
+        print(f"    Encoders guardados → encoders.joblib  ({cols_encoded})")
 
     # 8. Split estratificado
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y,
     )
+
+    # Guardar nombres de features originales (antes de PCA) para test_model()
+    joblib.dump(list(X.columns), ARTIFACTS_DIR / "feature_names.joblib")
+    print(f"    feature_names.joblib guardado ({len(X.columns)} features)")
 
     # 9. Escalado
     scaler = MinMaxScaler() if scaler_type == "minmax" else StandardScaler()
@@ -126,6 +141,11 @@ def preprocess_data(
     X_test  = scaler.transform(X_test)
     joblib.dump(scaler, ARTIFACTS_DIR / "scaler.joblib")
     print(f"    Scaler guardado → scaler.joblib")
+
+    # threshold.joblib se genera DESPUÉS del entrenamiento, no aquí.
+    # Descomenta find_best_threshold en predict_model.py (solo binaria) y
+    # guárdalo al final de train_model.py:
+    #   joblib.dump(best_threshold, ARTIFACTS_DIR / "threshold.joblib")
 
     # 10. PCA opcional
     if use_pca is not None:
@@ -236,13 +256,19 @@ def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
 def process_input(df_new: pd.DataFrame) -> np.ndarray:
     """
     Preprocesa nuevos datos para inferencia usando los artefactos guardados.
-    Aplica: feature_engineering → ordinal → drop → encode → scaler → PCA (si existe).
+    Aplica: feature_engineering → ordinal → drop → encode (encoders.joblib)
+            → scaler → PCA (si existe).
+
+    Los encoders.joblib garantizan que el mapping de categorías sea idéntico
+    al del entrenamiento, evitando silenciosos errores de codificación.
     """
     import os
-    scaler = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
+    scaler   = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
+    encoders = joblib.load(ARTIFACTS_DIR / "encoders.joblib") if (ARTIFACTS_DIR / "encoders.joblib").exists() else {}
 
     df_new = df_new.copy()
     df_new = _feature_engineering(df_new)
+    df_new = _apply_logcols(df_new, LOGCOLS)
 
     for col, mapping in ORDINAL_MAPPINGS.items():
         if col in df_new.columns:
@@ -253,9 +279,15 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
         df_new.drop(columns=cols_present, inplace=True)
 
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
-    le = LabelEncoder()
     for col in cat_cols:
-        df_new[col] = le.fit_transform(df_new[col].astype(str))
+        if col in encoders:
+            # Usar el mismo encoder del entrenamiento → mismo mapping de clases
+            le = encoders[col]
+            df_new[col] = le.transform(df_new[col].astype(str))
+        else:
+            # Fallback: re-fit (puede diferir del entrenamiento si hay categorías nuevas)
+            le = LabelEncoder()
+            df_new[col] = le.fit_transform(df_new[col].astype(str))
 
     num_cols = df_new.select_dtypes(include=[np.number]).columns
     df_new[num_cols] = df_new[num_cols].fillna(df_new[num_cols].mean())
@@ -318,8 +350,16 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     df = _apply_logcols(df, LOGCOLS)
 
     le = LabelEncoder()
+    encoders = {}
     for col in cat_cols:
-        df[col] = le.fit_transform(df[col].astype(str))
+        le_col = LabelEncoder()
+        df[col] = le_col.fit_transform(df[col].astype(str))
+        encoders[col] = le_col
+
+    # Guardar nombres de features y encoders para test_model()
+    joblib.dump(list(df.columns), ARTIFACTS_DIR / "feature_names.joblib")
+    joblib.dump(encoders, ARTIFACTS_DIR / "encoders.joblib")
+    print(f"    feature_names.joblib guardado ({len(df.columns)} features)")
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df)
@@ -409,13 +449,26 @@ def preprocess_data(
     # Transformación logarítmica
     X = _apply_logcols(X, LOGCOLS)
 
-    le = LabelEncoder()
+    encoders = {}
     for col in cat_cols:
-        X[col] = le.fit_transform(X[col].astype(str))
+        le_col = LabelEncoder()
+        X[col] = le_col.fit_transform(X[col].astype(str))
+        encoders[col] = le_col
 
     if y.dtype == object or str(y.dtype) == "category":
-        y = pd.Series(le.fit_transform(y.astype(str)), name=target_col)
-        joblib.dump(le, ARTIFACTS_DIR / "target_encoder.joblib")
+        le_target = LabelEncoder()
+        y = pd.Series(le_target.fit_transform(y.astype(str)), name=target_col)
+        encoders["__target__"] = le_target
+        joblib.dump(le_target, ARTIFACTS_DIR / "target_encoder.joblib")
+
+    joblib.dump(encoders, ARTIFACTS_DIR / "encoders.joblib")
+    if encoders:
+        cols_encoded = [c for c in encoders if c != "__target__"]
+        print(f"    Encoders guardados → encoders.joblib  ({cols_encoded})")
+
+    # Guardar nombres de features originales (antes de PCA) para test_model()
+    joblib.dump(list(X.columns), ARTIFACTS_DIR / "feature_names.joblib")
+    print(f"    feature_names.joblib guardado ({len(X.columns)} features)")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
@@ -448,13 +501,24 @@ def preprocess_data(
 
 
 def process_input(df_new: pd.DataFrame) -> "np.ndarray":
-    scaler = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
+    """
+    Preprocesa nuevos datos para inferencia usando los artefactos guardados.
+    Aplica: logcols → encode (encoders.joblib) → scaler → PCA (si existe).
+    """
+    scaler   = joblib.load(ARTIFACTS_DIR / "scaler.joblib")
+    encoders = joblib.load(ARTIFACTS_DIR / "encoders.joblib") if (ARTIFACTS_DIR / "encoders.joblib").exists() else {}
+
     df_new = df_new.copy()
     df_new = _apply_logcols(df_new, LOGCOLS)
+
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
-    le = LabelEncoder()
     for col in cat_cols:
-        df_new[col] = le.fit_transform(df_new[col].astype(str))
+        if col in encoders:
+            df_new[col] = encoders[col].transform(df_new[col].astype(str))
+        else:
+            le = LabelEncoder()
+            df_new[col] = le.fit_transform(df_new[col].astype(str))
+
     num_cols = df_new.select_dtypes(include=[np.number]).columns
     df_new[num_cols] = df_new[num_cols].fillna(df_new[num_cols].mean())
     X = scaler.transform(df_new)
@@ -581,13 +645,22 @@ def preprocess_data(
     # Transformación logarítmica
     X = _apply_logcols(X, LOGCOLS)
 
-    le = LabelEncoder()
+    encoders = {}
     for col in cat_cols:
-        X[col] = le.fit_transform(X[col].astype(str))
+        le_col = LabelEncoder()
+        X[col] = le_col.fit_transform(X[col].astype(str))
+        encoders[col] = le_col
 
     if y.dtype == object or str(y.dtype) == "category":
-        y = pd.Series(le.fit_transform(y.astype(str)), name=target_col)
-        joblib.dump(le, ARTIFACTS_DIR / "target_encoder.joblib")
+        le_target = LabelEncoder()
+        y = pd.Series(le_target.fit_transform(y.astype(str)), name=target_col)
+        encoders["__target__"] = le_target
+        joblib.dump(le_target, ARTIFACTS_DIR / "target_encoder.joblib")
+
+    joblib.dump(encoders, ARTIFACTS_DIR / "encoders.joblib")
+    if encoders:
+        cols_encoded = [c for c in encoders if c != "__target__"]
+        print(f"    Encoders guardados → encoders.joblib  ({cols_encoded})")
 
     # Escalar siempre antes de cualquier transformación
     scaler = StandardScaler()
@@ -616,6 +689,10 @@ def preprocess_data(
                          f"Opciones: pca_clf | umap_clf | kmeans_features | iso_feature | semi_supervisado")
 
     # ── Split estratificado ───────────────────────────────────────────────
+    # Guardar nombres de features originales (antes de PCA/UMAP) para test_model()
+    joblib.dump(list(X.columns), ARTIFACTS_DIR / "feature_names.joblib")
+    print(f"    feature_names.joblib guardado ({len(X.columns)} features)")
+
     X_train, X_test, y_train, y_test = train_test_split(
         X_final, y_final, test_size=test_size, random_state=random_state,
         stratify=y_final,

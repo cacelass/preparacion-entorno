@@ -251,6 +251,148 @@ def predict_proba_new(model_name: str, X_new) -> np.ndarray:
     if not hasattr(model, "predict_proba"):
         raise ValueError(f"{model_name} no soporta predict_proba")
     return model.predict_proba(X_new)
+
+
+# ---------------------------------------------------------------------------
+# Búsqueda automática de umbral óptimo por F1
+# ---------------------------------------------------------------------------
+# ACTIVAR solo en clasificación BINARIA (dos clases).
+# Si tu problema es multiclase, mantén esta función comentada y usa
+# DECISION_THRESHOLD = 0.5 (o ajústalo manualmente).
+#
+# Uso típico en train_model.py, tras entrenar el mejor modelo:
+#
+#   from sklearn.metrics import precision_recall_curve
+#   import numpy as np
+#   from {{ project_slug }}.models.predict_model import find_best_threshold
+#   from {{ project_slug }}.utils.paths import ARTIFACTS_DIR
+#   import joblib
+#
+#   proba_val = best_model.predict_proba(X_val)[:, 1]
+#   threshold, f1 = find_best_threshold(y_val, proba_val)
+#   print(f"Umbral óptimo: {threshold:.4f}  |  F1: {f1:.4f}")
+#   joblib.dump(threshold, ARTIFACTS_DIR / "threshold.joblib")
+#
+# En main.py, carga el umbral antes de evaluar:
+#
+#   threshold = joblib.load(ARTIFACTS_DIR / "threshold.joblib")
+#   evaluate_models(models, X_train, y_train, X_test, y_test, threshold=threshold)
+#
+# def find_best_threshold(y_true, y_proba):
+#     """
+#     Calcula el umbral de decisión que maximiza el F1-score binario.
+#
+#     Parameters
+#     ----------
+#     y_true  : array-like con etiquetas reales (0/1)
+#     y_proba : array-like con probabilidades de clase positiva
+#
+#     Returns
+#     -------
+#     best_threshold : float — umbral que maximiza F1
+#     best_f1        : float — F1 en ese umbral
+#     """
+#     from sklearn.metrics import precision_recall_curve
+#     precision, recall, thresholds = precision_recall_curve(y_true, y_proba)
+#     # f1_scores tiene longitud N; thresholds tiene longitud N-1 → recortamos
+#     f1_scores = (2 * precision * recall) / (precision + recall + 1e-9)
+#     best_idx       = np.nanargmax(f1_scores[:-1])
+#     best_threshold = thresholds[best_idx]
+#     best_f1        = f1_scores[best_idx]
+#     return best_threshold, best_f1
+
+
+# ---------------------------------------------------------------------------
+# Modo prueba: carga artefactos y evalúa sobre datos nuevos introducidos
+# por el usuario en tiempo de ejecución.
+# ---------------------------------------------------------------------------
+def test_model() -> None:
+    """
+    Modo interactivo de prueba del modelo entrenado.
+
+    Flujo:
+      1. Lista los modelos disponibles en models/ y pide elegir uno.
+      2. Carga el modelo y los artefactos de preprocesado (scaler, PCA,
+         encoders, threshold) guardados durante el entrenamiento.
+      3. Pide al usuario los valores de cada feature por consola.
+      4. Preprocesa la entrada con process_input() de build_features.
+      5. Imprime la predicción (y probabilidad si está disponible).
+
+    Requisitos previos:
+      - Haber ejecutado run_full_pipeline() al menos una vez para que
+        existan los joblibs en artifacts/ y los modelos en models/.
+    """
+    from {{ project_slug }}.features.build_features import process_input
+    from {{ project_slug }}.utils.paths import ARTIFACTS_DIR, PROCESSED_DATA_DIR
+    import pandas as pd
+
+    # ── 1. Elegir modelo ────────────────────────────────────────────────
+    available = sorted(MODELS_DIR.glob("*.joblib"))
+    if not available:
+        print("No hay modelos entrenados en models/. Ejecuta primero la opción 0.")
+        return
+
+    print("\nModelos disponibles:")
+    for i, p in enumerate(available):
+        print(f"  [{i}] {p.stem}")
+    try:
+        idx = int(input("Elige modelo (número): "))
+        model = joblib.load(available[idx])
+        model_name = available[idx].stem
+    except (ValueError, IndexError):
+        print("Selección inválida.")
+        return
+
+    # ── 2. Cargar nombres de features ──────────────────────────────────
+    feat_path = ARTIFACTS_DIR / "feature_names.joblib"
+    if feat_path.exists():
+        feature_names = joblib.load(feat_path)
+    else:
+        x_train_path = PROCESSED_DATA_DIR / "X_train.csv"
+        if x_train_path.exists():
+            feature_names = pd.read_csv(x_train_path).columns.tolist()
+        else:
+            print("No se encontró feature_names.joblib ni X_train.csv. Ejecuta primero run_full_pipeline().")
+            return
+
+    # ── 3. Pedir valores al usuario ────────────────────────────────────
+    print(f"\nIntroduce los valores para el modelo '{model_name}':")
+    print("  (deja en blanco para usar 0 como valor por defecto)\n")
+    row = {}
+    for feat in feature_names:
+        raw = input(f"  {feat}: ").strip()
+        try:
+            row[feat] = float(raw) if raw else 0.0
+        except ValueError:
+            row[feat] = raw if raw else 0.0
+
+    df_input = pd.DataFrame([row])
+
+    # ── 4. Preprocesar ─────────────────────────────────────────────────
+    try:
+        X_new = process_input(df_input)
+    except Exception as e:
+        print(f"\nError en preprocesado: {e}")
+        return
+
+    # ── 5. Cargar umbral (si existe) ───────────────────────────────────
+    threshold_path = ARTIFACTS_DIR / "threshold.joblib"
+    threshold = joblib.load(threshold_path) if threshold_path.exists() else 0.5
+
+    # ── 6. Predecir ────────────────────────────────────────────────────
+    print(f"\n{'='*50}")
+    if hasattr(model, "predict_proba"):
+        proba = model.predict_proba(X_new)[0]
+        pred  = int(proba[1] >= threshold)
+        print(f"  Modelo     : {model_name}")
+        print(f"  Umbral     : {threshold:.4f}")
+        print(f"  Predicción : {pred}")
+        print(f"  Probabilidades: {dict(enumerate(proba.round(4).tolist()))}")
+    else:
+        pred = model.predict(X_new)[0]
+        print(f"  Modelo     : {model_name}")
+        print(f"  Predicción : {pred}")
+    print(f"{'='*50}\n")
 {% endif %}
 
 
@@ -374,6 +516,105 @@ def load_models(model_names: list = None) -> dict:
         else:
             print(f"    ⚠ No encontrado: {path}")
     return models
+
+
+# ---------------------------------------------------------------------------
+# Modo prueba: asigna cluster a una muestra nueva introducida por el usuario.
+# ---------------------------------------------------------------------------
+def test_model() -> None:
+    """
+    Modo interactivo de prueba para modelos de clustering.
+
+    Flujo:
+      1. Lista los modelos disponibles en models/ y pide elegir uno.
+      2. Carga el scaler guardado durante el entrenamiento.
+      3. Pide al usuario los valores de cada feature por consola.
+      4. Escala la entrada y predice el cluster asignado.
+      5. Imprime el cluster y, si el modelo es KMeans, las distancias
+         a cada centroide para dar contexto de confianza.
+
+    Requisitos previos:
+      - Haber ejecutado run_full_pipeline() al menos una vez para que
+        existan los joblibs en artifacts/ y los modelos en models/.
+    """
+    from {{ project_slug }}.utils.paths import ARTIFACTS_DIR, PROCESSED_DATA_DIR
+    import pandas as pd
+
+    # ── 1. Elegir modelo ────────────────────────────────────────────────
+    available = sorted(MODELS_DIR.glob("*.joblib"))
+    if not available:
+        print("No hay modelos entrenados en models/. Ejecuta primero la opción 0.")
+        return
+
+    print("\nModelos disponibles:")
+    for i, p in enumerate(available):
+        print(f"  [{i}] {p.stem}")
+    try:
+        idx = int(input("Elige modelo (número): "))
+        model = joblib.load(available[idx])
+        model_name = available[idx].stem
+    except (ValueError, IndexError):
+        print("Selección inválida.")
+        return
+
+    # ── 2. Cargar scaler y nombres de features ──────────────────────────
+    scaler_path = ARTIFACTS_DIR / "scaler.joblib"
+    if not scaler_path.exists():
+        print("No se encontró scaler.joblib. Ejecuta primero run_full_pipeline().")
+        return
+    scaler   = joblib.load(scaler_path)
+    encoders = joblib.load(ARTIFACTS_DIR / "encoders.joblib") if (ARTIFACTS_DIR / "encoders.joblib").exists() else {}
+
+    feat_path = ARTIFACTS_DIR / "feature_names.joblib"
+    if feat_path.exists():
+        feature_names = joblib.load(feat_path)
+    else:
+        feature_names = [f"feature_{i}" for i in range(scaler.n_features_in_)]
+
+    # ── 3. Pedir valores al usuario ────────────────────────────────────
+    print(f"\nIntroduce los valores para '{model_name}':")
+    print("  (deja en blanco para usar 0 como valor por defecto)\n")
+    row = {}
+    for feat in feature_names:
+        raw = input(f"  {feat}: ").strip()
+        try:
+            row[feat] = float(raw) if raw else 0.0
+        except ValueError:
+            row[feat] = 0.0
+
+    X_new_df = pd.DataFrame([row])
+
+    # Aplicar encoders del entrenamiento a columnas categóricas
+    for col, le_col in encoders.items():
+        if col in X_new_df.columns:
+            try:
+                X_new_df[col] = le_col.transform(X_new_df[col].astype(str))
+            except ValueError:
+                X_new_df[col] = 0
+
+    X_new = scaler.transform(X_new_df)
+
+    # ── 4. Predecir cluster ────────────────────────────────────────────
+    if hasattr(model, "predict"):
+        cluster = model.predict(X_new)[0]
+    elif hasattr(model, "labels_"):
+        # Modelos sin predict (e.g. AgglomerativeClustering): asignar por centroide más cercano
+        centers = np.array([model.labels_])  # fallback básico
+        cluster = int(np.argmin(np.linalg.norm(X_new - centers, axis=1)))
+    else:
+        print("El modelo no soporta predicción sobre muestras nuevas.")
+        return
+
+    print(f"\n{'='*50}")
+    print(f"  Modelo  : {model_name}")
+    print(f"  Cluster : {cluster}")
+    if hasattr(model, "transform"):
+        dists = model.transform(X_new)[0]
+        print(f"  Distancias a centroides:")
+        for i, d in enumerate(dists):
+            marker = " ←" if i == cluster else ""
+            print(f"    Cluster {i}: {d:.4f}{marker}")
+    print(f"{'='*50}\n")
 
 
 {% elif ml_type == 'redes_neuronales' %}
@@ -565,4 +806,166 @@ def predict_new(model, X_new, num_classes=2, threshold=0.5,
         print(f"    Predicciones nuevas guardadas → {out}")
 
     return preds
+
+
+# ---------------------------------------------------------------------------
+# Búsqueda automática de umbral óptimo por F1 (solo clasificación BINARIA)
+# ---------------------------------------------------------------------------
+# ACTIVAR únicamente si num_classes == 2 (salida con sigmoid).
+# Para multiclase (softmax) mantén comentado y usa threshold=0.5 implícito.
+#
+# Uso típico tras el entrenamiento (en train_model.py o al final del pipeline):
+#
+#   from {{ project_slug }}.models.predict_model import find_best_threshold
+#   from {{ project_slug }}.utils.paths import ARTIFACTS_DIR
+#   import joblib, torch
+#
+#   model.eval()
+#   with torch.no_grad():
+#       logits = model(X_val_tensor)
+#       proba_val = torch.sigmoid(logits).cpu().numpy().flatten()
+#   threshold, f1 = find_best_threshold(y_val, proba_val)
+#   print(f"Umbral óptimo: {threshold:.4f}  |  F1: {f1:.4f}")
+#   joblib.dump(threshold, ARTIFACTS_DIR / "threshold.joblib")
+#
+# En evaluate_models se cargará automáticamente si existe threshold.joblib.
+#
+# def find_best_threshold(y_true, y_proba):
+#     """
+#     Calcula el umbral de decisión que maximiza el F1-score binario.
+#
+#     Parameters
+#     ----------
+#     y_true  : array-like con etiquetas reales (0/1)
+#     y_proba : array-like con probabilidades de clase positiva (sigmoid)
+#
+#     Returns
+#     -------
+#     best_threshold : float — umbral que maximiza F1
+#     best_f1        : float — F1 en ese umbral
+#     """
+#     from sklearn.metrics import precision_recall_curve
+#     precision, recall, thresholds = precision_recall_curve(y_true, y_proba)
+#     # f1_scores tiene longitud N; thresholds tiene longitud N-1 → recortamos
+#     f1_scores = (2 * precision * recall) / (precision + recall + 1e-9)
+#     best_idx       = np.nanargmax(f1_scores[:-1])
+#     best_threshold = thresholds[best_idx]
+#     best_f1        = f1_scores[best_idx]
+#     return best_threshold, best_f1
+
+
+# ---------------------------------------------------------------------------
+# Modo prueba: carga el modelo PyTorch y predice sobre entrada del usuario.
+# ---------------------------------------------------------------------------
+def test_model() -> None:
+    """
+    Modo interactivo de prueba del modelo de red neuronal entrenado.
+
+    Flujo:
+      1. Carga el checkpoint más reciente de models/ (archivo .pt o .pth).
+         Si no existe, intenta con los joblibs por compatibilidad.
+      2. Carga scaler y PCA (si existe) de artifacts/.
+      3. Pide al usuario los valores de cada feature por consola.
+      4. Preprocesa con process_input() de build_features.
+      5. Pasa por la red y muestra la predicción + probabilidades.
+
+    Requisitos previos:
+      - Haber ejecutado run_full_pipeline() al menos una vez.
+      - El modelo debe estar guardado como .pt/.pth en models/.
+    """
+    from {{ project_slug }}.features.build_features import process_input
+    from {{ project_slug }}.utils.paths import ARTIFACTS_DIR, PROCESSED_DATA_DIR
+    import pandas as pd
+
+    # ── 1. Buscar checkpoint ────────────────────────────────────────────
+    checkpoints = sorted(MODELS_DIR.glob("*.pt")) + sorted(MODELS_DIR.glob("*.pth"))
+    if not checkpoints:
+        print("No se encontraron checkpoints (.pt/.pth) en models/. Ejecuta primero la opción 0.")
+        return
+
+    print("\nCheckpoints disponibles:")
+    for i, p in enumerate(checkpoints):
+        print(f"  [{i}] {p.name}")
+    try:
+        idx = int(input("Elige checkpoint (número): "))
+        ckpt_path = checkpoints[idx]
+    except (ValueError, IndexError):
+        print("Selección inválida.")
+        return
+
+    ckpt = torch.load(ckpt_path, map_location=device)
+    # Soporte para dict {'model_state_dict': ...} o state_dict directo
+    if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
+        print(f"  Epoch guardada: {ckpt.get('epoch', '?')}  |  Loss: {ckpt.get('loss', '?')}")
+        state_dict = ckpt["model_state_dict"]
+    else:
+        state_dict = ckpt
+
+    # ── 2. Cargar nombres de features ──────────────────────────────────
+    x_train_path = PROCESSED_DATA_DIR / "X_train.csv"
+    if x_train_path.exists():
+        feature_names = pd.read_csv(x_train_path).columns.tolist()
+    else:
+        scaler_path = ARTIFACTS_DIR / "scaler.joblib"
+        if scaler_path.exists():
+            import joblib as _jl
+            n_feats = _jl.load(scaler_path).n_features_in_
+            feature_names = [f"feature_{i}" for i in range(n_feats)]
+        else:
+            print("No se encontró X_train.csv ni scaler.joblib. Ejecuta primero run_full_pipeline().")
+            return
+
+    # ── 3. Pedir valores al usuario ────────────────────────────────────
+    print(f"\nIntroduce los valores para '{ckpt_path.stem}':")
+    print("  (deja en blanco para usar 0 como valor por defecto)\n")
+    row = {}
+    for feat in feature_names:
+        raw = input(f"  {feat}: ").strip()
+        try:
+            row[feat] = float(raw) if raw else 0.0
+        except ValueError:
+            row[feat] = raw if raw else 0.0
+
+    df_input = pd.DataFrame([row])
+
+    # ── 4. Preprocesar ─────────────────────────────────────────────────
+    try:
+        X_new = process_input(df_input)
+    except Exception as e:
+        print(f"\nError en preprocesado: {e}")
+        return
+
+    # ── 5. Inferencia ──────────────────────────────────────────────────
+    # Necesitamos el modelo instanciado — importamos desde train_model
+    try:
+        from {{ project_slug }}.models.train_model import build_model
+        num_classes = len(set(pd.read_csv(PROCESSED_DATA_DIR / "y_train.csv").iloc[:, 0]))
+        model = build_model(input_dim=X_new.shape[1], output_dim=num_classes).to(device)
+        model.load_state_dict(state_dict)
+    except Exception as e:
+        print(f"\nNo se pudo reconstruir el modelo: {e}")
+        print("Asegúrate de que train_model.py expone una función build_model(input_dim, output_dim).")
+        return
+
+    threshold_path = ARTIFACTS_DIR / "threshold.joblib"
+    import joblib as _jl
+    threshold = _jl.load(threshold_path) if threshold_path.exists() else 0.5
+
+    preds = predict_new(model, X_new, num_classes=num_classes, threshold=threshold)
+
+    print(f"\n{'='*50}")
+    print(f"  Checkpoint : {ckpt_path.name}")
+    print(f"  Predicción : {preds[0]}")
+    model.eval()
+    with torch.no_grad():
+        X_t = torch.tensor(X_new, dtype=torch.float32).to(device)
+        logits = model(X_t)
+        if num_classes == 2:
+            proba = torch.sigmoid(logits).cpu().numpy().flatten()
+            print(f"  Umbral     : {threshold:.4f}")
+            print(f"  P(clase 1) : {proba[0]:.4f}")
+        else:
+            proba = torch.softmax(logits, dim=1).cpu().numpy()[0]
+            print(f"  Probabilidades: {dict(enumerate(proba.round(4).tolist()))}")
+    print(f"{'='*50}\n")
 {% endif %}

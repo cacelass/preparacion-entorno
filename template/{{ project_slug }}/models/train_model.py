@@ -3,22 +3,29 @@ import numpy as np
 import joblib
 
 {% if task_type == "clasificacion" %}
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+{% if model_type == "todos" or model_type == "RandomForest" %}
+from sklearn.ensemble import RandomForestClassifier
+{% endif %}
+{% if model_type == "todos" or model_type == "LogisticRegression" %}
 from sklearn.linear_model import LogisticRegression
+{% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
 from sklearn.tree import DecisionTreeClassifier
+{% endif %}
+{% if model_type == "todos" or model_type == "KNN" %}
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+{% endif %}
 from sklearn.model_selection import cross_val_score
 {% else %}
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+{% if model_type == "todos" %}
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
+{% endif %}
+{% if model_type == "todos" or model_type == "RandomForest" %}
+from sklearn.ensemble import RandomForestRegressor
+{% endif %}
+{% if model_type == "todos" or model_type == "KNN" %}
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.svm import SVR
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+{% endif %}
 from sklearn.model_selection import cross_val_score
 {% endif %}
 
@@ -56,50 +63,81 @@ def _build_models() -> dict:
     Tarea: {{ task_type }}
 
 {% if task_type == "clasificacion" %}
+{% if model_type == "todos" or model_type == "KNN" %}
     KNN                → lazy learner. Requiere features escaladas.
+{% endif %}
+{% if model_type == "todos" or model_type == "LogisticRegression" %}
     LogisticRegression → modelo base binario. Interpretable, probabilidades calibradas.
+{% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
     DecisionTree       → caja blanca. Regularizar con max_depth y min_samples_leaf.
+{% endif %}
+{% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto con feature importances.
-    XGBoost (opc.)     → gradient boosting optimizado. Referencia en Kaggle.
-    LightGBM (opc.)    → leaf-wise boosting. Más rápido en datasets grandes.
+{% endif %}
+{% if use_xgboost == "si" %}
+    XGBoost            → gradient boosting optimizado. Referencia en Kaggle.
+{% endif %}
+{% if use_lightgbm == "si" %}
+    LightGBM           → leaf-wise boosting. Más rápido en datasets grandes.
+{% endif %}
 {% else %}
+{% if model_type == "todos" %}
     LinearRegression   → modelo base. Rápido e interpretable.
     Ridge              → regresión lineal con regularización L2.
     Lasso              → regularización L1, útil para selección de variables.
+{% endif %}
+{% if model_type == "todos" or model_type == "KNN" %}
     KNN                → regresión no paramétrica. Sensible a dimensionalidad.
+{% endif %}
+{% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto. feature_importances_ disponible.
-    SVR                → potente en alta dimensión. Lento en datasets grandes.
-    XGBoost (opc.)     → gradient boosting para regresión.
-    LightGBM (opc.)    → leaf-wise boosting para regresión.
+{% endif %}
+{% if use_xgboost == "si" %}
+    XGBoost            → gradient boosting para regresión.
+{% endif %}
+{% if use_lightgbm == "si" %}
+    LightGBM           → leaf-wise boosting para regresión.
+{% endif %}
 {% endif %}
     """
     models = {}
 
 {% if task_type == "clasificacion" %}
+{% if model_type == "todos" or model_type == "KNN" %}
     models["KNN"] = KNeighborsClassifier(n_neighbors=7, weights="distance")
+{% endif %}
+{% if model_type == "todos" or model_type == "LogisticRegression" %}
     models["LogisticRegression"] = LogisticRegression(
         max_iter=1000, class_weight="balanced", random_state=42,
     )
+{% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
     models["DecisionTree"] = DecisionTreeClassifier(
         max_depth=7, min_samples_leaf=5, class_weight="balanced", random_state=42,
     )
+{% endif %}
+{% if model_type == "todos" or model_type == "RandomForest" %}
     models["RandomForest"] = RandomForestClassifier(
         n_estimators=200, max_depth=10, max_features="sqrt",
         max_samples=0.8, class_weight="balanced", random_state=42, n_jobs=-1,
     )
+{% endif %}
 {% else %}
+{% if model_type == "todos" %}
     models["LinearRegression"] = LinearRegression()
     models["Ridge"] = Ridge(alpha=1.0)
     models["Lasso"] = Lasso(alpha=0.1, max_iter=2000)
+{% endif %}
+{% if model_type == "todos" or model_type == "KNN" %}
     models["KNN"] = KNeighborsRegressor(n_neighbors=7, weights="distance")
+{% endif %}
+{% if model_type == "todos" or model_type == "RandomForest" %}
     models["RandomForest"] = RandomForestRegressor(
         n_estimators=200, max_depth=10, max_features="sqrt",
         max_samples=0.8, random_state=42, n_jobs=-1,
     )
-    # models["SVR"] = Pipeline([
-    #     ("scaler", StandardScaler()),
-    #     ("reg", SVR(kernel="rbf", C=1.0, gamma="scale")),
-    # ])
+{% endif %}
 {% endif %}
 
 {% if use_xgboost == "si" %}
@@ -143,6 +181,8 @@ def _build_models() -> dict:
     return models
 
 
+{% if model_type == "todos" or model_type == "KNN" %}
+
 def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
     """Busca el k óptimo para KNN por cross-validation."""
 {% if task_type == "clasificacion" %}
@@ -162,6 +202,7 @@ def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
     print(f"    KNN mejor k={best_k} ({scoring}={scores[best_k]:.3f})")
     return best_k
 
+{% endif %}
 
 def train_models(
     X_train,
@@ -190,14 +231,7 @@ def train_models(
     print("--> Entrenando modelos de {{ task_type }}...")
     models = _build_models()
 
-{% if model_type != "todos" %}
-    selected = "{{ model_type }}"
-    if selected in models:
-        models = {selected: models[selected]}
-    else:
-        print(f"    model_type='{selected}' no encontrado. Entrenando todos.")
-{% endif %}
-
+{% if model_type == "todos" or model_type == "KNN" %}
     if tune_knn and "KNN" in models:
         best_k = _find_best_k(X_train, y_train)
 {% if task_type == "clasificacion" %}
@@ -206,6 +240,7 @@ def train_models(
         models["KNN"] = KNeighborsRegressor(n_neighbors=best_k, weights="distance")
 {% endif %}
 
+{% endif %}
 {% if use_mlflow %}
     mlflow.set_experiment("{{ project_slug }}")
 {% endif %}
@@ -276,157 +311,21 @@ def load_models(model_names: list = None) -> dict:
         else:
             print(f"    No encontrado: {path}")
     return models
-    """
-    Define los modelos a entrenar.
-
-    KNN            → lazy learner, sin suposiciones sobre los datos.
-                     Requiere features escaladas. Sensible a k y a dimensiones altas.
-
-    LogisticReg    → modelo base en clasificación binaria. Rápido, interpretable
-                     y genera probabilidades calibradas.
-
-    DecisionTree   → caja blanca, fácil de interpretar. Propenso a overfitting
-                     → regularizar con max_depth, min_samples_leaf.
-
-    RandomForest   → ensemble de árboles. Robusto y buen rendimiento por defecto.
-                     Permite calcular importancia de variables (feature_importances_).
-
-    GradBoost      → mayor precisión que RF en muchos casos, pero más lento
-                     y más sensible a hiperparámetros.
-
-    SVM (RBF)      → potente en espacios de alta dimensión. Lento en datasets grandes.
-                     El pipeline incluye StandardScaler propio.
-
-    XGBoost        → gradient boosting optimizado. Muy rápido con histogramas,
-                     soporte nativo de valores nulos, regularización L1/L2.
-                     Referencia en tabular ML (Kaggle).
-
-    LightGBM       → gradient boosting basado en hojas (leaf-wise). Más rápido que
-                     XGBoost en datos grandes. Excelente con features categóricas
-                     nativas. Menor consumo de memoria.
-
-    Pipelines con PCA integrado:
-      PCA_LogReg   → PCA(95%) → LogReg. Útil con muchas features correladas.
-      PCA_SVM      → PCA(95%) → SVM RBF. Acelera SVM enormemente en alta dim.
-
-    ¿Cuándo incluir los pipelines PCA?
-      - Muchas features muy correladas entre sí (|r| > 0.8)
-      - Alta dimensionalidad (>50 features)
-      - SVM o KNN muy lentos sin reducción previa
-      - Quieres comparar directamente si PCA mejora o no el rendimiento
-    """
-    models = {
-        # --- KNN: el valor de n_neighbors se optimiza automáticamente en train_models() ---
-        "KNN": KNeighborsClassifier(n_neighbors=7, weights="distance"),
-
-        # --- Regresión Logística: modelo base rápido e interpretable ---
-        "LogisticRegression": LogisticRegression(
-            max_iter=1000,
-            class_weight="balanced",
-            random_state=42,
-        ),
-
-        # --- Árbol de Decisión: ajustar max_depth para evitar overfitting ---
-        "DecisionTree": DecisionTreeClassifier(
-            max_depth=7,
-            min_samples_leaf=5,
-            class_weight="balanced",
-            random_state=42,
-        ),
-
-        # --- Random Forest: robusto, con importancia de variables ---
-        "RandomForest": RandomForestClassifier(
-            n_estimators=200,
-            max_depth=10,
-            max_features="sqrt",   # sqrt(n_features) por árbol
-            max_samples=0.8,       # bootstrap sample del 80%
-            class_weight="balanced",
-            random_state=42,
-            n_jobs=-1,
-        ),
-
-        # --- Gradient Boosting: alta precisión, mayor coste computacional ---
-        # "GradientBoosting": GradientBoostingClassifier(
-        #     n_estimators=200, max_depth=5, learning_rate=0.05, random_state=42
-        # ),
-
-        # --- SVM RBF: muy eficaz en dimensiones altas ---
-        # El pipeline escala internamente; no necesita X ya escalado.
-        # "SVM": Pipeline([
-        #     ("scaler", StandardScaler()),
-        #     ("clf", SVC(
-        #         kernel="rbf", C=1.0, gamma="scale",
-        #         class_weight="balanced", probability=True, random_state=42,
-        #     )),
-        # ]),
-
-        # --- Pipeline PCA + Regresión Logística ---
-        # "PCA_LogReg": Pipeline([
-        #     ("pca", PCA(n_components=0.95, random_state=42)),
-        #     ("clf", LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42)),
-        # ]),
-
-        # --- Pipeline PCA + SVM RBF ---
-        # SVM es O(n²~n³); PCA lo acelera mucho. probability=True para ROC-AUC.
-        # "PCA_SVM": Pipeline([
-        #     ("pca", PCA(n_components=0.95, random_state=42)),
-        #     ("clf", SVC(kernel="rbf", C=1.0, gamma="scale",
-        #                 class_weight="balanced", probability=True, random_state=42)),
-        # ]),
-    }
-
-{% if use_xgboost == "si" %}
-    # --- XGBoost: gradient boosting con regularización nativa ---
-    # scale_pos_weight: ratio clases negativas/positivas (para desbalanceo)
-    # use_label_encoder=False evita deprecation warnings en versiones antiguas
-    models["XGBoost"] = XGBClassifier(
-        n_estimators=300,
-        max_depth=6,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        gamma=0,                    # min loss reduction para hacer split
-        reg_alpha=0.1,              # L1 regularización
-        reg_lambda=1.0,             # L2 regularización
-        eval_metric="logloss",
-        use_label_encoder=False,
-        random_state=42,
-        n_jobs=-1,
-        # scale_pos_weight=neg/pos,  # descomentar si clases muy desbalanceadas
-    )
-{% endif %}
-
-{% if use_lightgbm == "si" %}
-    # --- LightGBM: leaf-wise boosting, muy eficiente en memoria ---
-    # num_leaves: controla complejidad del árbol (aumentar con cuidado → overfitting)
-    # min_child_samples: mínimo de muestras por hoja (regularización)
-    models["LightGBM"] = LGBMClassifier(
-        n_estimators=300,
-        max_depth=-1,               # -1 = sin límite (controlar con num_leaves)
-        num_leaves=31,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_samples=20,
-        reg_alpha=0.1,
-        reg_lambda=1.0,
-        class_weight="balanced",
-        random_state=42,
-        n_jobs=-1,
-        verbose=-1,                 # silencia output de entrenamiento
-    )
-{% endif %}
-
-    return models
-
 
 
 {% elif ml_type == "no_supervisado" %}
 import joblib
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN, MiniBatchKMeans
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
+from sklearn.cluster import KMeans
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "AgglomerativeClustering" %}
+from sklearn.cluster import AgglomerativeClustering
+{% endif %}
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
+{% endif %}
 
 from {{ project_slug }}.utils.paths import MODELS_DIR
 
@@ -438,45 +337,35 @@ from {{ project_slug }}.utils.paths import MODELS_DIR
 def _build_models(n_clusters: int = 3) -> dict:
     """
     Define los modelos de clustering a ajustar.
-
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
     KMeans            → rápido y escalable. Asume clusters esféricos.
                         Inicialización k-means++ reduce el riesgo de mínimos locales.
-
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "AgglomerativeClustering" %}
     AgglomerativeClustering → clustering jerárquico aglomerativo (bottom-up).
-                               No requiere reinicializaciones. Permite usar un dendrograma
-                               para elegir k antes de ajustar.
-                               linkage: 'ward' (minimiza varianza intraclúster, mejor general),
-                               'complete', 'average', 'single'.
-
-    MiniBatchKMeans   → versión acelerada de KMeans para datasets grandes.
-                        Usa mini-lotes; ligeramente peor calidad, mucho más rápido.
-
-    DBSCAN            → basado en densidad; detecta clusters de cualquier forma
-                        y es robusto a outliers. No necesita especificar k,
-                        pero requiere ajustar eps y min_samples.
+                               linkage: 'ward' minimiza varianza intraclúster.
+{% endif %}
     """
-    return {
-        "KMeans": KMeans(
-            n_clusters=n_clusters,
-            init="k-means++",   # mejor inicialización que random
-            n_init=10,
-            max_iter=300,
-            random_state=42,
-        ),
-
-        "AgglomerativeClustering": AgglomerativeClustering(
-            n_clusters=n_clusters,
-            linkage="ward",     # 'ward' | 'complete' | 'average' | 'single'
-        ),
-
-        # "MiniBatchKMeans": MiniBatchKMeans(
-        #     n_clusters=n_clusters, n_init=10, random_state=42
-        # ),
-
-        # "DBSCAN": DBSCAN(eps=0.5, min_samples=5),
-    }
+    models = {}
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
+    models["KMeans"] = KMeans(
+        n_clusters=n_clusters,
+        init="k-means++",
+        n_init=10,
+        max_iter=300,
+        random_state=42,
+    )
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "AgglomerativeClustering" %}
+    models["AgglomerativeClustering"] = AgglomerativeClustering(
+        n_clusters=n_clusters,
+        linkage="ward",
+    )
+{% endif %}
+    return models
 
 
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
 def find_optimal_k(X, k_range=range(2, 11)) -> dict:
     """
     Calcula el método del codo (inercia), el Silhouette Score,
@@ -521,6 +410,7 @@ def find_optimal_k(X, k_range=range(2, 11)) -> dict:
         "ch_scores":   ch_scores,
     }
 
+{% endif %}
 
 def train_models(X, n_clusters: int = 3) -> dict:
     """
@@ -562,6 +452,7 @@ def train_models(X, n_clusters: int = 3) -> dict:
     return fitted
 
 
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
 def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
     """
     Pipeline KMeans → LogisticRegression.
@@ -588,6 +479,7 @@ def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
     print("    Guardado → KMeansPipeline.joblib")
     return pipeline
 
+{% endif %}
 
 def load_models(model_names: list = None) -> dict:
     """
@@ -920,6 +812,14 @@ def _build_model(input_dim: int, output_dim: int) -> nn.Module:
 MODEL_NAME = "{{ nn_model }}"
 
 
+def build_model(input_dim: int, output_dim: int) -> "nn.Module":
+    """
+    API pública para construir el modelo. Delega en _build_model.
+    Necesaria para reconstruir la arquitectura en test_model() de predict_model.py.
+    """
+    return _build_model(input_dim=input_dim, output_dim=output_dim)
+
+
 # ---------------------------------------------------------------------------
 # Entrenamiento
 # ---------------------------------------------------------------------------
@@ -1153,6 +1053,7 @@ def _build_models(strategy: str) -> dict:
     return base
 
 
+{% if model_type == "todos" or model_type == "KNN" %}
 def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
     """
     Busca el mejor k para KNN por validación cruzada (5-fold, métrica F1_weighted).
@@ -1168,6 +1069,7 @@ def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
     print(f"    Mejor k = {best_k}  (F1_weighted CV = {best_score:.3f})")
     return best_k
 
+{% endif %}
 
 def train_models(
     X_train,
@@ -1196,11 +1098,12 @@ def train_models(
     print(f"--> Entrenando modelos híbridos (estrategia='{strategy}')...")
     models = _build_models(strategy)
 
+{% if model_type == "todos" or model_type == "KNN" %}
     if tune_knn and "KNN" in models:
         best_k = _find_best_k(X_train, y_train)
         models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
 
-    trained = {}
+{% endif %}    trained = {}
     for name, model in models.items():
         print(f"    [{name}] entrenando...")
         model.fit(X_train, y_train)

@@ -97,6 +97,16 @@ model_type:
   default: todos
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
+cluster_model:
+  type: str
+  help: "todos = ajusta todos los modelos de clustering | otro = solo ese"
+  choices:
+    - todos
+    - KMeans
+    - AgglomerativeClustering
+  default: todos
+  when: "{{ ml_type == 'no_supervisado' }}"
+
 # ─── Boosting opcional (solo supervisado e hibrido) ──────────────────────────
 
 use_xgboost:
@@ -158,4 +168,3 @@ _tasks:
 
 _subdirectory: template
 _templates_suffix: ""
-
