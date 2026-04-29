@@ -63,3 +63,29 @@ target/
 
 # ipynb checkpoints
 .ipynb_checkpoints
+
+# Data
+data/raw/
+data/interim/
+data/processed/
+
+# MLflow
+mlruns/
+mlflow.db
+
+# Models y artefactos
+models/
+*.joblib
+
+# Entorno virtual
+.venv/
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Secretos
+.env
+*.env
