@@ -112,7 +112,7 @@ cluster_model:
   default: todos
   when: "{{ ml_type == 'no_supervisado' }}"
 
-# ─── Explicabilidad ──────────────────────────────────────────────────────────
+# --- Explicabilidad ---
 
 use_shap:
   type: bool
