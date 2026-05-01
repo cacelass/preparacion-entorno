@@ -1,7 +1,7 @@
 # copier.yml — dskit template configuration
 # Docs: https://copier.readthedocs.io
 
-# ─── Configuración global ────────────────────────────────────────────────────
+# --- Configuracion global ---
 # Genera .copier-answers.yml en el proyecto destino.
 # Permite actualizar el proyecto en el futuro con: copier update
 _answers_file: .copier-answers.yml
