@@ -6,8 +6,7 @@
 # Permite actualizar el proyecto en el futuro con: copier update
 _answers_file: .copier-answers.yml
 
-# ─── Proyecto ────────────────────────────────────────────────────────────────
-
+# --- Proyecto ---
 project_name:
   type: str
   default: Proyecto
@@ -41,8 +40,7 @@ project_description:
   default: "Descripcion breve del proyecto."
   help: "Descripcion breve"
 
-# ─── Tipo de ML ──────────────────────────────────────────────────────────────
-
+# --- Tipo de ML ---
 ml_type:
   type: str
   help: "Tipo de ML: supervisado | no_supervisado | redes_neuronales | hibrido"
@@ -53,8 +51,7 @@ ml_type:
     - hibrido
   default: supervisado
 
-# ─── Tipo de tarea (clasificacion o regresion) ────────────────────────────────
-
+# --- Tipo de tarea (clasificacion o regresion) ---
 task_type:
   type: str
   help: "clasificacion = clases discretas | regresion = valor continuo"
@@ -64,16 +61,14 @@ task_type:
   default: clasificacion
   when: "{{ ml_type == 'supervisado' or ml_type == 'redes_neuronales' or ml_type == 'hibrido' }}"
 
-# ─── MLflow (tracking de experimentos) ───────────────────────────────────────
-
+# --- MLflow (tracking de experimentos) ---
 use_mlflow:
   type: bool
   help: "Integrar MLflow para tracking de experimentos, artifacts y Model Registry?"
   default: false
 
 
-# ─── Arquitectura de red neuronal (solo redes_neuronales) ────────────────────
-
+# --- Arquitectura de red neuronal (solo redes_neuronales) ---
 nn_model:
   type: str
   help: "Arquitectura: MLP | CNN1D | LSTM | GRU | Transformer"
@@ -86,8 +81,7 @@ nn_model:
   default: MLP
   when: "{{ ml_type == 'redes_neuronales' }}"
 
-# ─── Modelo activo (solo supervisado e hibrido) ───────────────────────────────
-
+# --- Modelo activo (solo supervisado e hibrido) ---
 model_type:
   type: str
   help: "todos = entrena y compara todos | otro = solo ese modelo"
@@ -120,8 +114,7 @@ use_shap:
   default: false
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
-# ─── Boosting opcional (solo supervisado e hibrido) ──────────────────────────
-
+# --- Boosting opcional (solo supervisado e hibrido) ---
 use_xgboost:
   type: bool
   help: "Añadir XGBoost a _build_models()?"
@@ -134,8 +127,7 @@ use_lightgbm:
   default: false
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
-# ─── Licencia y versiones ────────────────────────────────────────────────────
-
+# --- Licencia y versiones ---
 project_open_source_license:
   type: str
   help: "Licencia del proyecto"
@@ -160,8 +152,7 @@ project_version:
   default: "0.1.0"
   help: "Version inicial del proyecto"
 
-# ─── Tareas post-generacion ──────────────────────────────────────────────────
-
+# --- Tareas post-generacion ---
 _tasks:
   - >-
     uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}
