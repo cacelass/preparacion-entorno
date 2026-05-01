@@ -5,8 +5,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [1.1.3] — 2026-05-01
 
+### Corregido
+- Sustituidos todos los caracteres Unicode (`─`) en comentarios de `copier.yml`
+  por ASCII puro — causaban que copier ignorara silenciosamente las preguntas
+  adyacentes (`use_shap`, `_answers_file`)
+- `_answers_file: .copier-answers.yml` ya funciona correctamente y se genera
+  en cada proyecto, habilitando `copier update`
+  
 ---
 
 ## [1.1.2] — 2026-04-27
