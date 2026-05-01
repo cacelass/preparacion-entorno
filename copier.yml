@@ -1,6 +1,11 @@
 # copier.yml — dskit template configuration
 # Docs: https://copier.readthedocs.io
 
+# ─── Configuración global ────────────────────────────────────────────────────
+# Genera .copier-answers.yml en el proyecto destino.
+# Permite actualizar el proyecto en el futuro con: copier update
+_answers_file: .copier-answers.yml
+
 # ─── Proyecto ────────────────────────────────────────────────────────────────
 
 project_name:
@@ -106,6 +111,14 @@ cluster_model:
     - AgglomerativeClustering
   default: todos
   when: "{{ ml_type == 'no_supervisado' }}"
+
+# ─── Explicabilidad ──────────────────────────────────────────────────────────
+
+use_shap:
+  type: bool
+  help: "Añadir SHAP (explicabilidad de modelos)? Genera bar + beeswarm por modelo."
+  default: false
+  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
 # ─── Boosting opcional (solo supervisado e hibrido) ──────────────────────────
 

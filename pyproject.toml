@@ -7,19 +7,103 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">= {{ python_version }}"
-license = {text = "{{ project_open_source_license if project_open_source_license != 'No license file' else ''}}"}
-dependencies = []
+license = { text = "{{ project_open_source_license if project_open_source_license != 'No license file' else '' }}" }
+dependencies = [
+    # ── Datos y computación ───────────────────────────────────────────────
+    "numpy",
+    "pandas",
+    "scipy",           # stats, tests de normalidad, clustering jerárquico
+    # ── ML core (usadas en todos los ml_type) ────────────────────────────
+    "scikit-learn",    # modelos, PCA, pipelines, métricas, preprocesado
+    "joblib",          # serialización de modelos y paralelismo
+    # ── Visualización ────────────────────────────────────────────────────
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "missingno",
+    # ── Notebooks ────────────────────────────────────────────────────────
+    "jupyter",
+    "jupyterlab",
+    # ── Utilidades ───────────────────────────────────────────────────────
+    "python-dotenv",
+    "loguru",          # logging estructurado
+    "rich",            # output de consola con color y tablas
+    "tqdm",            # barras de progreso
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "invoke",
+    "nbdime",
+    "ruff",
+    "pytest",
+    "sphinx",
+    "snakeviz",
+]
+
+# ML supervisado: clasificación + regresión
+supervisado = [
+    "lightgbm",
+    "xgboost",
+    "statsmodels",
+    "imbalanced-learn",
+{% if use_shap %}
+    "shap",
+{% endif %}
+]
+
+{% if use_mlflow %}
+mlflow_tracking = [
+    "mlflow",
+]
+{% endif %}
+
+# ML no supervisado: clustering + reducción de dimensionalidad
+no_supervisado = [
+    "yellowbrick",    # SilhouetteVisualizer
+    "umap-learn",     # reducción de dimensionalidad no lineal (UMAP)
+    "hdbscan",        # clustering basado en densidad jerárquico
+]
+
+# Redes neuronales: deep learning con PyTorch
+redes_neuronales = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "torchmetrics[visual]",
+    "tensorboard",
+    "polars",         # carga eficiente de datos con dtypes explícitos
+]
+
+# Modelos híbridos: combinan técnicas supervisadas y no supervisadas
+hibrido = [
+    "umap-learn",     # UMAP como alternativa a PCA (no lineal)
+    "lightgbm",       # clasificador final potente
+    "xgboost",        # clasificador final alternativo
+    "imbalanced-learn",
+{% if use_shap %}
+    "shap",
+{% endif %}
+]
 
 [tool.setuptools]
 packages = ["{{ project_slug }}"]
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"
+markers   = [
+    "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
+]
 
 [tool.ruff]
-# Excluir el directorio del template — contiene variables {{ * }}
-# que ruff no puede parsear como Python/TOML válido
-exclude = [
-    "{{ project_slug }}",
-]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

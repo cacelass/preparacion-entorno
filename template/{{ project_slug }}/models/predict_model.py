@@ -233,6 +233,153 @@ def _plot_residuals(y_true, y_pred, model_name: str) -> None:
 {% endif %}
 
 
+{% if use_shap %}
+import shap
+
+def explain_models(
+    models: dict,
+    X_train,
+    feature_names: list = None,
+    max_display: int = 15,
+    kernel_background: int = 50,
+    kernel_max_samples: int = 100,
+) -> None:
+    """
+    Genera explicaciones SHAP para cada modelo entrenado.
+
+    Por cada modelo produce dos gráficas en reports/figures/:
+      - shap_bar_{nombre}.png   → importancia global media (resumen ejecutivo)
+      - shap_beeswarm_{nombre}.png → distribución + dirección del impacto
+
+    Selección de explainer por tipo de modelo:
+      TreeExplainer   → RandomForest, DecisionTree, XGBoost, LightGBM  (exacto, rápido)
+      LinearExplainer → LogisticRegression, Ridge, Lasso                (exacto, rápido)
+      KernelExplainer → KNN y otros sin soporte nativo                  (aprox., lento)
+
+    Parameters
+    ----------
+    models            : dict nombre→modelo (salida de train_models)
+    X_train           : datos de entrenamiento ya preprocesados
+    feature_names     : lista de nombres de features (opcional)
+    max_display       : nº máximo de features a mostrar en las gráficas
+    kernel_background : nº de muestras de fondo para KernelExplainer
+    kernel_max_samples: nº máximo de filas a explicar con KernelExplainer
+    """
+    import warnings
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    if hasattr(X_train, "values"):
+        X_arr = X_train.values
+        feat_names = feature_names or list(X_train.columns)
+    else:
+        X_arr = X_train
+        feat_names = feature_names or [f"feature_{i}" for i in range(X_arr.shape[1])]
+
+    print(f"\n{'='*60}\n  SHAP — Explicabilidad de modelos\n{'='*60}")
+
+    for name, model in models.items():
+        print(f"\n--- {name} ---")
+        try:
+            shap_values, X_explain = _compute_shap(
+                model, X_arr, feat_names,
+                kernel_background=kernel_background,
+                kernel_max_samples=kernel_max_samples,
+            )
+        except Exception as exc:
+            print(f"    ⚠ SHAP no disponible para {name}: {exc}")
+            continue
+
+        _shap_bar(shap_values, X_explain, feat_names, name, max_display)
+        _shap_beeswarm(shap_values, X_explain, feat_names, name, max_display)
+
+    print(f"\n  Gráficas SHAP guardadas en {FIGURES_DIR}")
+
+
+def _compute_shap(model, X_arr, feat_names, kernel_background, kernel_max_samples):
+    """Selecciona el explainer adecuado y devuelve (shap_values, X_explain)."""
+    module = type(model).__module__
+
+    is_tree = (
+        hasattr(model, "estimators_")       # RandomForest
+        or hasattr(model, "tree_")          # DecisionTree
+        or "xgboost" in module
+        or "lightgbm" in module
+    )
+    is_linear = hasattr(model, "coef_")     # LogisticRegression, Ridge, Lasso
+
+    if is_tree:
+        explainer  = shap.TreeExplainer(model)
+        shap_vals  = explainer.shap_values(X_arr)
+        X_explain  = X_arr
+
+    elif is_linear:
+        explainer  = shap.LinearExplainer(model, X_arr)
+        shap_vals  = explainer.shap_values(X_arr)
+        X_explain  = X_arr
+
+    else:
+        # KNN y otros → KernelExplainer (lento)
+        n_bg = min(kernel_background, len(X_arr))
+        bg   = shap.sample(X_arr, n_bg)
+        fn   = model.predict_proba if hasattr(model, "predict_proba") else model.predict
+        explainer  = shap.KernelExplainer(fn, bg)
+        n_exp      = min(kernel_max_samples, len(X_arr))
+        X_explain  = X_arr[:n_exp]
+        print(f"    KernelExplainer: {n_bg} muestras fondo, "
+              f"{n_exp} muestras a explicar (puede tardar...)")
+        shap_vals = explainer.shap_values(X_explain)
+
+    # RandomForest y multiclase devuelven lista — tomamos clase positiva (binario)
+    # o la media absoluta entre clases (multiclase)
+    if isinstance(shap_vals, list):
+        if len(shap_vals) == 2:
+            shap_vals = shap_vals[1]            # clase positiva binaria
+        else:
+            import numpy as _np
+            shap_vals = _np.abs(_np.stack(shap_vals)).mean(axis=0)  # media multiclase
+
+    return shap_vals, X_explain
+
+
+def _shap_bar(shap_values, X_explain, feat_names, model_name, max_display):
+    """Barra de importancia global media (|SHAP|)."""
+    fig, ax = plt.subplots(figsize=(9, max(4, min(max_display, len(feat_names)) * 0.4 + 1)))
+    shap.summary_plot(
+        shap_values, X_explain,
+        feature_names=feat_names,
+        plot_type="bar",
+        max_display=max_display,
+        show=False,
+        plot_size=None,
+    )
+    plt.title(f"SHAP — Importancia global ({model_name})", fontsize=12, pad=10)
+    plt.tight_layout()
+    path = FIGURES_DIR / f"shap_bar_{model_name}.png"
+    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"    shap_bar_{model_name}.png guardado")
+
+
+def _shap_beeswarm(shap_values, X_explain, feat_names, model_name, max_display):
+    """Beeswarm: distribución de valores SHAP por feature (dirección + magnitud)."""
+    fig, ax = plt.subplots(figsize=(10, max(4, min(max_display, len(feat_names)) * 0.4 + 1)))
+    shap.summary_plot(
+        shap_values, X_explain,
+        feature_names=feat_names,
+        plot_type="dot",        # beeswarm
+        max_display=max_display,
+        show=False,
+        plot_size=None,
+    )
+    plt.title(f"SHAP — Beeswarm ({model_name})", fontsize=12, pad=10)
+    plt.tight_layout()
+    path = FIGURES_DIR / f"shap_beeswarm_{model_name}.png"
+    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"    shap_beeswarm_{model_name}.png guardado")
+
+{% endif %}
+
 def predict_new(model_name: str, X_new) -> np.ndarray:
     """Carga un modelo y predice sobre nuevas muestras (ya preprocesadas)."""
     path = MODELS_DIR / f"{model_name}.joblib"

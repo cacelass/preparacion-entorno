@@ -1,91 +1,137 @@
-# Byte-compiled / optimized / DLL files
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
+*.pyd
 
-# Distribution / packaging
-.Python
+# --- Entornos virtuales ---
+.venv/
+venv/
 env/
+.env
+ENV/
+
+# --- Distribucion / packaging ---
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
 *.egg-info/
-.installed.cfg
 *.egg
+.eggs/
+develop-eggs/
+sdist/
+wheels/
+.installed.cfg
+MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# --- uv ---
+uv.lock
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints
 
-# Unit test / coverage reports
-htmlcov/
+# --- Tests / coverage ---
 .tox/
 .coverage
 .coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*,cover
+.cache/
 .hypothesis/
+htmlcov/
+coverage.xml
+nosetests.xml
+pytest_cache/
+.pytest_cache/
 
-# Translations
-*.mo
-*.pot
+# --- Datos - ignorar archivos, conservar estructura de carpetas ---
+data/**/*.csv
+data/**/*.tsv
+data/**/*.json
+data/**/*.jsonl
+data/**/*.parquet
+data/**/*.feather
+data/**/*.pkl
+data/**/*.pickle
+data/**/*.h5
+data/**/*.hdf5
+data/**/*.xlsx
+data/**/*.xls
+data/**/*.zip
+data/**/*.tar.gz
+data/**/*.gz
+data/**/*.db
+data/**/*.sqlite
+data/**/*.sqlite3
+!data/**/.gitkeep
 
-# Django stuff:
-*.log
+# --- Reportes / figuras generadas ---
+reports/figures/*.png
+reports/figures/*.pdf
+reports/figures/*.svg
+reports/**/*.csv
+*.html
+!docs/**/*.html
 
-# Sphinx documentation
-docs/_build/
+# --- Modelos entrenados ---
+models/**/*.joblib
+models/**/*.pkl
+models/**/*.pt
+models/**/*.pth
+models/**/*.onnx
+!models/**/.gitkeep
 
-# PyBuilder
-target/
-
-# pyenv python configuration file
-.python-version
-
-# ipynb checkpoints
-.ipynb_checkpoints
-
-# Data
-data/raw/
-data/interim/
-data/processed/
+# --- Artefactos ML ---
+artifacts/**/*.joblib
+artifacts/**/*.pkl
+!artifacts/**/.gitkeep
 
 # MLflow
 mlruns/
-mlflow.db
+mlartifacts/
 
-# Models y artefactos
-models/
-*.joblib
+# TensorBoard
+runs/
 
-# Entorno virtual
-.venv/
+# --- Copier ---
+!.copier-answers.yml
 
-# VS Code
-.vscode/
+# --- IDEs ---
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+*.sublime-project
+*.sublime-workspace
 
-# Jupyter
-.ipynb_checkpoints/
+# --- Sistema operativo ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
 
-# Secretos
+# --- Logs ---
+*.log
+logs/
+
+# --- Secretos / credenciales ---
 .env
-*.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Sphinx ---
+docs/_build/
+
+# --- Misc ---
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.python-version
