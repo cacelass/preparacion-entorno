@@ -1,24 +1,23 @@
 {
   "recommendations": [
+    // ── Python ────────────────────────────────────────────────────────────
     "ms-python.python",
     "ms-python.vscode-pylance",
     "ms-python.debugpy",
     "ms-toolsai.jupyter",
-    "ms-vscode.makefile-tools",
+    "charliermarsh.ruff",
+    "njpwerner.autodocstring",
+    // ── Git (sin GitLens — usar el SCM nativo + estas) ────────────────────
+    "mhutchie.git-graph",             // árbol de commits visual, limpio
+    "donjayamanne.githistory",        // historial por archivo y línea
+    "GitHub.vscode-pull-request-github", // PRs y issues directo en VSCode
+    "vivaxy.vscode-conventional-commits", // commits semánticos (Ctrl+Shift+G C)
+    // ── Datos y archivos ──────────────────────────────────────────────────
     "mechatroner.rainbow-csv",
-    "mhutchie.git-graph",
-    "vivaxy.vscode-conventional-commits",
     "tamasfe.even-better-toml",
     "yzhang.markdown-all-in-one",
-    "njpwerner.autodocstring",
-    "charliermarsh.ruff",
-    "esbenp.prettier-vscode",
-    "formulahendry.auto-rename-tag",
-    "dbaeumer.vscode-eslint",
-    "christian-kohler.path-intellisense",
-    "eamodio.gitlens",
-    "usernamehw.errorlens",
-    "redhat.vscode-yaml",
-    "randomfractalsinc.vscode-data-preview"
+    // ── Utilidades ────────────────────────────────────────────────────────
+    "ms-vscode.makefile-tools",
+    "usernamehw.errorlens"            // errores inline sin abrir Problems
   ]
 }

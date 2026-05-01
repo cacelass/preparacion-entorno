@@ -59,17 +59,30 @@ def run_full_pipeline() -> None:
         models, X_train, y_train, X_test, y_test, threshold=THRESHOLD
     )
 
-    print('\n6. Importancia de variables...')
     from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR
     import pandas as pd
     try:
         feature_names = pd.read_csv(PROCESSED_DATA_DIR / 'X_train.csv').columns.tolist()
     except FileNotFoundError:
         feature_names = [f'feature_{i}' for i in range(X_train.shape[1])]
+
+{% if use_shap %}
+    print('\n6. SHAP — explicabilidad de modelos...')
+    from {{ project_slug }}.models.predict_model import explain_models
+    explain_models(models, X_train, feature_names=feature_names)
+
+    print('\n7. Importancia de variables...')
+{% else %}
+    print('\n6. Importancia de variables...')
+{% endif %}
     plot_feature_importance(models, feature_names)
 
     if USE_PCA is not None:
+{% if use_shap %}
+        print('\n8. Varianza explicada por PCA...')
+{% else %}
         print('\n7. Varianza explicada por PCA...')
+{% endif %}
         import joblib
         from {{ project_slug }}.utils.paths import ARTIFACTS_DIR
         try:
@@ -377,13 +390,22 @@ def run_full_pipeline() -> None:
         models, X_train, y_train, X_test, y_test, threshold=THRESHOLD
     )
 
-    print('\n7. Importancia de variables...')
     import pandas as pd
     from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR
     try:
         feature_names = pd.read_csv(PROCESSED_DATA_DIR / 'X_train.csv').columns.tolist()
     except FileNotFoundError:
         feature_names = [f'feature_{i}' for i in range(X_train.shape[1])]
+
+{% if use_shap %}
+    print('\n7. SHAP — explicabilidad de modelos...')
+    from {{ project_slug }}.models.predict_model import explain_models
+    explain_models(models, X_train, feature_names=feature_names)
+
+    print('\n8. Importancia de variables...')
+{% else %}
+    print('\n7. Importancia de variables...')
+{% endif %}
     plot_feature_importance(models, feature_names)
 
     print('\n' + '=' * 60)
