@@ -179,6 +179,12 @@ Ver [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## Documentación completa
+
+Ver la [Wiki del proyecto](https://github.com/cacelass/dskit/wiki) para guías detalladas, referencia de variables, troubleshooting y changelog.
+
+---
+
 ## License
 
 GPL-3.0
