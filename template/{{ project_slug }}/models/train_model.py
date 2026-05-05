@@ -523,13 +523,27 @@ from {{ project_slug }}.utils.paths import MODELS_DIR, RUNS_DIR
 # Detección de dispositivo (CPU / CUDA)
 # ---------------------------------------------------------------------------
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 print(f"Dispositivo: {device}")
 if device.type == "cuda":
     print(f"  GPU: {torch.cuda.get_device_name(0)}")
-    print(f"  VRAM: {round(torch.cuda.memory_allocated(0)/1024**3, 1)} GB")
+    print(f"  VRAM allocated: {round(torch.cuda.memory_allocated(0)/1024**3, 1)} GB")
+    print(f"  VRAM reserved:  {round(torch.cuda.memory_reserved(0)/1024**3,  1)} GB")
     torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True   # acelera convoluciones en Ampere+
+elif device.type == "mps":
+    print("  Apple Silicon GPU (MPS)")
+
+# Semillas para reproducibilidad
+_SEED = 42
+torch.manual_seed(_SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(_SEED)
 
 
 # ---------------------------------------------------------------------------
@@ -832,24 +846,30 @@ def train_models(
     batch_size: int = 32,
     lr: float = 1e-3,
     checkpoint_every: int = 10,
+    val_split: float = 0.1,
+    patience: int = 0,
 ) -> dict:
     """
     Entrena la red neuronal seleccionada ({{ nn_model }}) con PyTorch.
 
     Características:
-    - CUDA automático si está disponible
-    - TensorBoard: loss por época en runs/
+    - CUDA / MPS automático si está disponible
+    - TensorBoard: Loss/train y Loss/val por época en runs/
     - Checkpoints periódicos en models/checkpoint-{epoch}.pt
     - Guardado final de pesos en models/{{ nn_model }}.pt
+    - Early stopping opcional (patience > 0)
 
     Parameters
     ----------
     input_dim        : número de features de entrada
     output_dim       : número de clases de salida
-    epochs           : épocas de entrenamiento
+    epochs           : épocas máximas de entrenamiento
     batch_size       : tamaño de mini-lote
-    lr               : learning rate para Adam
+    lr               : learning rate para AdamW
     checkpoint_every : cada cuántas épocas guardar checkpoint (0 = desactivado)
+    val_split        : fracción de X_train reservada para validación (default 0.1)
+    patience         : paradas anticipadas si val_loss no mejora N épocas
+                       consecutivas. 0 = desactivado.
 
     Returns
     -------
@@ -857,41 +877,68 @@ def train_models(
     """
     print(f"--> Entrenando red neuronal: {{ nn_model }}...")
 
-    X_t    = torch.tensor(X_train.values if hasattr(X_train, "values") else X_train,
-                          dtype=torch.float32)
-    y_t    = torch.tensor(y_train.values if hasattr(y_train, "values") else y_train,
-                          dtype=torch.long)
-    loader = DataLoader(TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True)
+    X_arr = X_train.values if hasattr(X_train, "values") else X_train
+    y_arr = y_train.values if hasattr(y_train, "values") else y_train
+
+    # Validation split
+    n_val   = max(1, int(len(X_arr) * val_split))
+    X_tr, X_val = X_arr[:-n_val], X_arr[-n_val:]
+    y_tr, y_val = y_arr[:-n_val], y_arr[-n_val:]
+
+    X_t    = torch.tensor(X_tr, dtype=torch.float32)
+    y_t    = torch.tensor(y_tr, dtype=torch.long)
+    X_v    = torch.tensor(X_val, dtype=torch.float32)
+    y_v    = torch.tensor(y_val, dtype=torch.long)
+    loader     = DataLoader(TensorDataset(X_t, y_t), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(TensorDataset(X_v, y_v), batch_size=batch_size, shuffle=False)
 
     model     = _build_model(input_dim=input_dim, output_dim=output_dim).to(device)
-    # model   = torch.compile(model)   # PyTorch ≥ 2.0: descomentar para mayor velocidad
+    # model   = torch.compile(model)   # PyTorch >= 2.0: descomentar para mayor velocidad
     print(f"    Parámetros: {sum(p.numel() for p in model.parameters()):,}")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     criterion = nn.CrossEntropyLoss()  # cambiar a MSELoss para regresión
     tb        = SummaryWriter(log_dir=str(RUNS_DIR))
-    print(f"    TensorBoard → tensorboard --logdir {RUNS_DIR}")
+    print(f"    TensorBoard: tensorboard --logdir {RUNS_DIR}")
+    if patience > 0:
+        print(f"    Early stopping activo (patience={patience})")
 
-    model.train()
+    best_val_loss    = float("inf")
+    patience_counter = 0
+
     for epoch in range(epochs):
+        # ── Entrenamiento ────────────────────────────────────────────────
+        model.train()
         total_loss = 0.0
         for X_b, y_b in loader:
             X_b, y_b = X_b.to(device), y_b.to(device)
             optimizer.zero_grad()
             loss = criterion(model(X_b), y_b)
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # evita exploding gradients
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             total_loss += loss.item()
 
         scheduler.step()
         avg_loss = total_loss / len(loader)
-        tb.add_scalar("Loss/train", avg_loss, epoch)
-        tb.add_scalar("LR", scheduler.get_last_lr()[0], epoch)
+
+        # ── Validación ───────────────────────────────────────────────────
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for X_b, y_b in val_loader:
+                X_b, y_b = X_b.to(device), y_b.to(device)
+                val_loss += criterion(model(X_b), y_b).item()
+        avg_val_loss = val_loss / len(val_loader)
+
+        tb.add_scalar("Loss/train", avg_loss,     epoch)
+        tb.add_scalar("Loss/val",   avg_val_loss, epoch)
+        tb.add_scalar("LR",         scheduler.get_last_lr()[0], epoch)
 
         if (epoch + 1) % 10 == 0:
-            print(f"    Epoch {epoch+1}/{epochs} — Loss: {avg_loss:.4f}  "
+            print(f"    Epoch {epoch+1}/{epochs} — "
+                  f"train: {avg_loss:.4f}  val: {avg_val_loss:.4f}  "
                   f"LR: {scheduler.get_last_lr()[0]:.2e}")
 
         if checkpoint_every > 0 and (epoch + 1) % checkpoint_every == 0:
@@ -901,6 +948,24 @@ def train_models(
                 "optimizer_state_dict": optimizer.state_dict(),
                 "loss":                 avg_loss,
             }, MODELS_DIR / f"checkpoint-{epoch+1}.pt")
+
+        # ── Early stopping ───────────────────────────────────────────────
+        if patience > 0:
+            if avg_val_loss < best_val_loss:
+                best_val_loss    = avg_val_loss
+                patience_counter = 0
+                torch.save(model.state_dict(), MODELS_DIR / f"{MODEL_NAME}_best.pt")
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f"    Early stopping en epoch {epoch+1} "
+                          f"(val_loss no mejora desde hace {patience} epochs)")
+                    # Restaurar los mejores pesos
+                    model.load_state_dict(torch.load(
+                        MODELS_DIR / f"{MODEL_NAME}_best.pt",
+                        map_location=device, weights_only=True,
+                    ))
+                    break
 
     tb.close()
     out_path = MODELS_DIR / f"{MODEL_NAME}.pt"
@@ -915,7 +980,7 @@ def load_model(input_dim: int, output_dim: int, weights_path: str = None):
         weights_path = f"{MODEL_NAME}.pt"
     path  = MODELS_DIR / weights_path if not str(weights_path).startswith("/") else weights_path
     model = _build_model(input_dim=input_dim, output_dim=output_dim).to(device)
-    model.load_state_dict(torch.load(path, map_location=device))
+    model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
     model.eval()
     print(f"    Modelo cargado desde {path}")
     return model
@@ -923,7 +988,7 @@ def load_model(input_dim: int, output_dim: int, weights_path: str = None):
 
 def load_checkpoint(input_dim: int, output_dim: int, checkpoint_path: str):
     """Carga un checkpoint para continuar el entrenamiento."""
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model      = _build_model(input_dim=input_dim, output_dim=output_dim).to(device)
     optimizer  = torch.optim.AdamW(model.parameters())
     model.load_state_dict(checkpoint["model_state_dict"])

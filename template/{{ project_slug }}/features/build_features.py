@@ -107,7 +107,6 @@ def preprocess_data(
 
     # 7. LabelEncoder
     encoders = {}  # guardamos un encoder por columna categórica para reproducibilidad
-    le = LabelEncoder()
     for col in cat_cols:
         le_col = LabelEncoder()
         X[col] = le_col.fit_transform(X[col].astype(str))
@@ -115,7 +114,11 @@ def preprocess_data(
 
     if y.dtype == object or str(y.dtype) == "category":
         le_target = LabelEncoder()
-        y = le_target.fit_transform(y.astype(str))
+        y = pd.Series(
+            le_target.fit_transform(y.astype(str)),
+            index=y.index,
+            name=target_col,
+        )
         encoders["__target__"] = le_target
         joblib.dump(le_target, ARTIFACTS_DIR / "target_encoder.joblib")
         print("    Target codificado → target_encoder.joblib")
@@ -152,7 +155,7 @@ def preprocess_data(
         X_train, X_test = _apply_pca(X_train, X_test, use_pca)
 
     print(f"    Train: {X_train.shape} | Test: {X_test.shape}")
-    print(f"    Proporción clases (train): {pd.Series(y_train).value_counts(normalize=True).to_dict()}")
+    print(f"    Proporción clases (train): {y_train.value_counts(normalize=True).to_dict()}")
 
     # Guardar conjuntos procesados
     pd.DataFrame(X_train).to_csv(PROCESSED_DATA_DIR / "X_train.csv", index=False)
