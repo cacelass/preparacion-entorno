@@ -208,6 +208,10 @@ EPOCHS      = 50
 BATCH_SIZE  = 32
 LR          = 1e-3
 CHECKPOINT  = 10
+# Fracción de train reservada para validación (visible en TensorBoard como Loss/val)
+VAL_SPLIT   = 0.1
+# Early stopping: parar si val_loss no mejora en N épocas consecutivas. 0 = desactivado.
+PATIENCE    = 0
 
 # PCA opcional antes de la red (útil si hay muchas features correladas)
 USE_PCA     = None   # None | 0.95 | int
@@ -265,6 +269,7 @@ def run_full_pipeline() -> None:
         input_dim=input_dim, output_dim=output_dim,
         epochs=EPOCHS, batch_size=BATCH_SIZE,
         lr=LR, checkpoint_every=CHECKPOINT,
+        val_split=VAL_SPLIT, patience=PATIENCE,
     )
 
     print('\n5. Evaluando...')

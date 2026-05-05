@@ -5,6 +5,32 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.2.0] — 2026-05-05
+
+### Añadido
+- `redes_neuronales` — **early stopping** con `PATIENCE` configurable en `main.py`.
+  Cuando `PATIENCE > 0`, el entrenamiento se detiene si `val_loss` no mejora durante
+  N épocas consecutivas y restaura automáticamente los mejores pesos (`*_best.pt`).
+- `redes_neuronales` — **validation split** en el loop de entrenamiento (`VAL_SPLIT = 0.1`).
+  Separa una fracción de `X_train` para validación y registra `Loss/val` en TensorBoard
+  junto a `Loss/train`, permitiendo detectar overfitting visualmente.
+- `redes_neuronales` — semilla global de PyTorch (`torch.manual_seed` +
+  `torch.cuda.manual_seed_all`) para resultados reproducibles entre ejecuciones.
+- `redes_neuronales` — `torch.cuda.memory_reserved()` mostrado junto a
+  `memory_allocated()` en el log de inicio (útil para diagnosticar fragmentación de VRAM).
+
+### Corregido
+- `redes_neuronales` — `torch.backends.cudnn.allow_tf32 = True` estaba en el bloque
+  MPS por error; movido al bloque CUDA donde corresponde (cuDNN es exclusivo de CUDA).
+- `supervisado` — `y` tras `LabelEncoder.fit_transform` ahora se devuelve como
+  `pd.Series` preservando índice y nombre, evitando `AttributeError: 'numpy.ndarray'
+  object has no attribute 'value_counts'` en notebooks.
+- `supervisado` — eliminada variable `le = LabelEncoder()` creada pero nunca usada.
+- `redes_neuronales` — `torch.load(..., weights_only=True/False)` explícito para
+  silenciar el `FutureWarning` de PyTorch 2.x.
+
+---
+
 ## [1.1.3] — 2026-05-01
 
 ### Corregido
