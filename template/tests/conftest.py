@@ -56,7 +56,7 @@ def df_with_target(sample_df):
     df = sample_df.copy()
     np.random.seed(42)
     score = df["feat_0"] + df["feat_1"] - df["feat_2"]
-    df["target"] = pd.cut(score, bins=3, labels=[0, 1, 2]).astype(int)
+    df["target"] = pd.cut(score, bins=3, labels=[0, 1, 2]).astype("Int64").fillna(0).astype(int)
     return df
 {% endif %}
 

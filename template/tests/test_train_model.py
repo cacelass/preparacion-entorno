@@ -225,6 +225,79 @@ def test_cnn1d_forward():
     model = CNN1D(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
     out   = model(torch.randn(BATCH, INPUT_DIM))
     assert out.shape == (BATCH, OUTPUT_DIM)
+
+
+def test_lstm_forward():
+    model = LSTMClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
+
+
+def test_gru_forward():
+    model = GRUClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
+
+
+def test_transformer_forward():
+    model = TransformerClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    out   = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
+
+
+def test_build_model_returns_correct_architecture():
+    model = _build_model(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    assert hasattr(model, "forward")
+    out = model(torch.randn(BATCH, INPUT_DIM))
+    assert out.shape == (BATCH, OUTPUT_DIM)
+
+
+def _make_nn_splits():
+    import pandas as pd
+    from sklearn.model_selection import train_test_split
+    np.random.seed(42)
+    X = pd.DataFrame(np.random.randn(80, INPUT_DIM),
+                     columns=[f"f{i}" for i in range(INPUT_DIM)])
+    y = pd.Series((X["f0"] + X["f1"] > 0).astype(int), name="target")
+    return train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+def test_train_models_returns_dict(patch_paths):
+    X_train, _, y_train, _ = _make_nn_splits()
+    trained = train_models(
+        X_train, y_train,
+        input_dim=X_train.shape[1],
+        output_dim=int(y_train.nunique()),
+        epochs=2, batch_size=16, checkpoint_every=0,
+    )
+    assert isinstance(trained, dict)
+    assert MODEL_NAME in trained
+
+
+def test_train_models_saves_pt(patch_paths):
+    X_train, _, y_train, _ = _make_nn_splits()
+    train_models(
+        X_train, y_train,
+        input_dim=X_train.shape[1],
+        output_dim=int(y_train.nunique()),
+        epochs=2, batch_size=16, checkpoint_every=0,
+    )
+    assert (patch_paths["MODELS_DIR"] / f"{MODEL_NAME}_final.pt").exists()
+
+
+def test_load_model_after_train(patch_paths):
+    X_train, _, y_train, _ = _make_nn_splits()
+    train_models(
+        X_train, y_train,
+        input_dim=X_train.shape[1],
+        output_dim=int(y_train.nunique()),
+        epochs=2, batch_size=16, checkpoint_every=0,
+    )
+    model = load_model(
+        input_dim=X_train.shape[1],
+        output_dim=int(y_train.nunique()),
+    )
+    assert hasattr(model, "forward")
 {% endif %}
 
 
