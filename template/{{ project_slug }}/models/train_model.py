@@ -26,6 +26,9 @@ from sklearn.ensemble import RandomForestRegressor
 {% if model_type == "todos" or model_type == "KNN" %}
 from sklearn.neighbors import KNeighborsRegressor
 {% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
+from sklearn.tree import DecisionTreeRegressor
+{% endif %}
 from sklearn.model_selection import cross_val_score
 {% endif %}
 
@@ -132,6 +135,11 @@ def _build_models() -> dict:
 {% if model_type == "todos" or model_type == "KNN" %}
     models["KNN"] = KNeighborsRegressor(n_neighbors=7, weights="distance")
 {% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
+    models["DecisionTree"] = DecisionTreeRegressor(
+        max_depth=7, min_samples_leaf=5, random_state=42,
+    )
+{% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
     models["RandomForest"] = RandomForestRegressor(
         n_estimators=200, max_depth=10, max_features="sqrt",
@@ -146,7 +154,7 @@ def _build_models() -> dict:
         n_estimators=300, max_depth=6, learning_rate=0.05,
         subsample=0.8, colsample_bytree=0.8,
         reg_alpha=0.1, reg_lambda=1.0,
-        eval_metric="logloss", use_label_encoder=False,
+        eval_metric="logloss",
         random_state=42, n_jobs=-1,
     )
 {% else %}
@@ -1090,7 +1098,6 @@ def _build_models(strategy: str) -> dict:
         reg_alpha=0.1,
         reg_lambda=1.0,
         eval_metric="logloss",
-        use_label_encoder=False,
         random_state=42,
         n_jobs=-1,
     )
@@ -1168,7 +1175,8 @@ def train_models(
         best_k = _find_best_k(X_train, y_train)
         models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
 
-{% endif %}    trained = {}
+{% endif %}
+    trained = {}
     for name, model in models.items():
         print(f"    [{name}] entrenando...")
         model.fit(X_train, y_train)

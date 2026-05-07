@@ -785,7 +785,12 @@ from sklearn.metrics import (
 from {{ project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR, REPORTS_DIR
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 
 
 def evaluate_models(models, X_test, y_test, num_classes=2, tb_writer=None) -> pd.DataFrame:
@@ -1040,7 +1045,7 @@ def test_model() -> None:
         print("Selección inválida.")
         return
 
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     # Soporte para dict {'model_state_dict': ...} o state_dict directo
     if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
         print(f"  Epoch guardada: {ckpt.get('epoch', '?')}  |  Loss: {ckpt.get('loss', '?')}")
