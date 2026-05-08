@@ -106,6 +106,12 @@ cluster_model:
   default: todos
   when: "{{ ml_type == 'no_supervisado' }}"
 
+# --- API REST (FastAPI) ---
+use_api:
+  type: bool
+  help: "Generar API REST con FastAPI para servir el modelo entrenado? (make serve)"
+  default: false
+
 # --- Explicabilidad ---
 
 use_shap:
@@ -155,7 +161,7 @@ project_version:
 # --- Tareas post-generacion ---
 _tasks:
   - >-
-    uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}
+    uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if use_api %} --extra api{% endif %}
     && uv run python -c "import sklearn; print('scikit-learn OK')"
     {% if ml_type == 'redes_neuronales' %}
     && uv run python -c "import torch; print('torch', torch.__version__)"
@@ -168,6 +174,9 @@ _tasks:
     {% endif %}
     {% if use_mlflow %}
     && uv run python -c "import mlflow; print('mlflow', mlflow.__version__)"
+    {% endif %}
+    {% if not use_api %}
+    && rm -rf api tests/test_api.py
     {% endif %}
 
 _subdirectory: template
