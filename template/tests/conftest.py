@@ -56,7 +56,7 @@ def df_with_target(sample_df):
     df = sample_df.copy()
     np.random.seed(42)
     score = df["feat_0"] + df["feat_1"] - df["feat_2"]
-    df["target"] = pd.cut(score, bins=3, labels=[0, 1, 2]).astype(int)
+    df["target"] = pd.cut(score, bins=3, labels=[0, 1, 2]).astype("Int64").fillna(0).astype(int)
     return df
 {% endif %}
 
@@ -89,7 +89,9 @@ def patch_paths(monkeypatch, tmp_path):
         "REPORTS_DIR":        tmp_path / "reports",
         "PROCESSED_DATA_DIR": tmp_path / "data" / "processed",
         "RAW_DATA_DIR":       tmp_path / "data" / "raw",
+{% if ml_type == 'redes_neuronales' %}
         "RUNS_DIR":           tmp_path / "runs",
+{% endif %}
     }
     for d in dirs.values():
         d.mkdir(parents=True, exist_ok=True)

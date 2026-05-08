@@ -222,6 +222,9 @@ plt.style.use("ggplot")
 def plot_distributions(df: pd.DataFrame) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     num_cols = df.select_dtypes(include=[np.number]).columns
+    if len(num_cols) == 0:
+        print("    plot_distributions: no hay columnas numéricas, se omite.")
+        return
     fig, axes = plt.subplots(len(num_cols), 2, figsize=(14, 4 * len(num_cols)))
     if len(num_cols) == 1:
         axes = [axes]

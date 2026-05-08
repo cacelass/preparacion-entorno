@@ -204,7 +204,7 @@ def test_evaluate_models_saves_csv(patch_paths):
     X = _make_X()
     fitted = train_models(X, n_clusters=3)
     evaluate_models(fitted, X)
-    assert (patch_paths["FIGURES_DIR"] / "resultados_clustering.csv").exists()
+    assert (patch_paths["REPORTS_DIR"] / "resultados_clustering.csv").exists()
 
 
 def test_plot_dendrogram_saves_png(patch_paths):
@@ -227,8 +227,8 @@ def _make_splits(n=200, n_feat=4):
     X = pd.DataFrame(np.random.randn(n, n_feat),
                      columns=[f"feat_{i}" for i in range(n_feat)])
     y = pd.Series((X["feat_0"] + X["feat_1"] > 0).astype(int), name="target")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    scaler = __import__("sklearn.preprocessing", fromlist=["StandardScaler"]).StandardScaler()
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    scaler = StandardScaler()
     X_train_s = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
     X_test_s  = pd.DataFrame(scaler.transform(X_test),      columns=X_test.columns)
     return X_train_s, X_test_s, y_train.reset_index(drop=True), y_test.reset_index(drop=True)

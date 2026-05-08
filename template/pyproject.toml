@@ -33,11 +33,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
     "invoke",
     "nbdime",
     "ruff",
     "pytest",
+    "pytest-cov",
     "sphinx",
     "snakeviz",
 ]
@@ -48,6 +48,9 @@ supervisado = [
     "xgboost",
     "statsmodels",
     "imbalanced-learn",
+{% if use_shap %}
+    "shap",
+{% endif %}
 ]
 
 {% if use_mlflow %}

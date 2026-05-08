@@ -55,9 +55,15 @@ def run_full_pipeline() -> None:
     models = train_models(X_train, y_train, tune_knn=True, cv_evaluate=True)
 
     print('\n5. Evaluando...')
+{% if task_type == "clasificacion" %}
     df_results = evaluate_models(
         models, X_train, y_train, X_test, y_test, threshold=THRESHOLD
     )
+{% else %}
+    df_results = evaluate_models(
+        models, X_train, y_train, X_test, y_test
+    )
+{% endif %}
 
     from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR
     import pandas as pd
@@ -93,7 +99,11 @@ def run_full_pipeline() -> None:
 
     print('\n' + '=' * 60)
     print('Pipeline completado.')
+{% if task_type == "clasificacion" %}
     best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
+{% else %}
+    best = df_results.sort_values('RMSE_test', ascending=True).iloc[0]
+{% endif %}
     print(f'Mejor modelo: {best.to_dict()}')
 
 
@@ -102,8 +112,10 @@ def main():
     accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
     if accion == '0':
         run_full_pipeline()
+{% if task_type == "clasificacion" %}
     elif accion == '1':
         test_model()
+{% endif %}
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
         run_full_pipeline()
@@ -329,7 +341,11 @@ Estrategias disponibles (configura STRATEGY):
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models
+{% if task_type == "clasificacion" %}
 from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD, test_model
+{% else %}
+from {{ project_slug }}.models.predict_model import evaluate_models, test_model
+{% endif %}
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -345,7 +361,9 @@ from {{ project_slug }}.visualization.visualize import (
 DATA_FILE  = 'dataset.csv'
 TARGET_COL = 'target'
 TEST_SIZE  = 0.2
+{% if task_type == "clasificacion" %}
 THRESHOLD  = DECISION_THRESHOLD
+{% endif %}
 
 # Estrategia híbrida (ver docstring del módulo)
 STRATEGY   = 'pca_clf'          # ← ajusta
@@ -391,9 +409,15 @@ def run_full_pipeline() -> None:
     models = train_models(X_train, y_train, strategy=STRATEGY, tune_knn=True)
 
     print('\n6. Evaluando...')
+{% if task_type == "clasificacion" %}
     df_results = evaluate_models(
         models, X_train, y_train, X_test, y_test, threshold=THRESHOLD
     )
+{% else %}
+    df_results = evaluate_models(
+        models, X_train, y_train, X_test, y_test
+    )
+{% endif %}
 
     import pandas as pd
     from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR
@@ -415,7 +439,11 @@ def run_full_pipeline() -> None:
 
     print('\n' + '=' * 60)
     print('Pipeline completado.')
+{% if task_type == "clasificacion" %}
     best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
+{% else %}
+    best = df_results.sort_values('RMSE_test', ascending=True).iloc[0]
+{% endif %}
     print(f'Mejor modelo: {best.to_dict()}')
 
 
@@ -429,8 +457,6 @@ def main():
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
         run_full_pipeline()
-    best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
-    print(f'Mejor modelo: {best.to_dict()}')
 
 
 if __name__ == '__main__':

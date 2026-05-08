@@ -31,13 +31,13 @@ def test_preprocess_data_creates_scaler_artifact(df_with_target, patch_paths):
 
 
 def test_preprocess_data_with_pca(df_with_target, patch_paths):
-    """Con use_pca=0.95 debe reducir dimensionalidad y guardar pca.joblib."""
+    """Con use_pca=0.95 debe guardar pca.joblib."""
     X_train, X_test, _, _ = preprocess_data(
         df_with_target, target_col="target", use_pca=0.95
     )
     assert (patch_paths["ARTIFACTS_DIR"] / "pca.joblib").exists()
-    # La dimensión reducida debe ser <= la original
-    assert X_train.shape[1] <= 4
+    n_orig = df_with_target.shape[1] - 1  # sin columna target
+    assert X_train.shape[1] <= n_orig
 
 
 def test_preprocess_data_saves_processed_csvs(df_with_target, patch_paths):
@@ -173,7 +173,6 @@ def test_preprocess_data_y_reset_index(df_with_target, patch_paths):
 {% if ml_type == "hibrido" %}
 from {{ project_slug }}.features.build_features import (
     preprocess_data,
-    _feature_engineering,
     _strategy_pca,
     _strategy_kmeans_features,
     _strategy_iso_feature,
@@ -190,20 +189,22 @@ def test_preprocess_data_pca_clf(df_with_target, patch_paths):
 def test_preprocess_data_kmeans_features(df_with_target, patch_paths):
     """Estrategia kmeans_features: debe aumentar el nº de columnas."""
     n_clusters = 3
+    n_orig = df_with_target.shape[1] - 1  # sin target
     X_train, X_test, _, _ = preprocess_data(
         df_with_target, target_col="target",
         strategy="kmeans_features", n_clusters=n_clusters,
     )
-    # original: 4 features + n_clusters distancias + 1 label = 4 + 3 + 1 = 8
-    assert X_train.shape[1] == 4 + n_clusters + 1
+    # original + n_clusters distancias + 1 label
+    assert X_train.shape[1] == n_orig + n_clusters + 1
 
 
 def test_preprocess_data_iso_feature(df_with_target, patch_paths):
     """Estrategia iso_feature: debe añadir 1 columna extra (anomaly score)."""
+    n_orig = df_with_target.shape[1] - 1  # sin target
     X_train, X_test, _, _ = preprocess_data(
         df_with_target, target_col="target", strategy="iso_feature"
     )
-    assert X_train.shape[1] == 5  # 4 features + 1 score
+    assert X_train.shape[1] == n_orig + 1
 
 
 def test_preprocess_data_invalid_strategy(df_with_target, patch_paths):
@@ -224,9 +225,12 @@ def test_preprocess_data_semi_supervisado(df_with_target, patch_paths):
 
 
 def test_strategy_pca_reduces_dimensions(patch_paths):
-    """_strategy_pca debe reducir dimensiones manteniendo >= varianza deseada."""
-    X = np.random.randn(200, 10)
-    y = np.random.randint(0, 2, 200)
+    """_strategy_pca debe reducir dimensiones con datos correlacionados."""
+    np.random.seed(42)
+    # Datos con correlación fuerte: 10 features derivadas de 2 factores latentes
+    factors = np.random.randn(200, 2)
+    X = factors @ np.random.randn(2, 10) + np.random.randn(200, 10) * 0.1
+    y = (factors[:, 0] > 0).astype(int)
     X_pca, y_out = _strategy_pca(X, y, pca_variance=0.95)
     assert X_pca.shape[0] == 200
     assert X_pca.shape[1] < 10

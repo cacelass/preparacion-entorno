@@ -26,6 +26,9 @@ from sklearn.ensemble import RandomForestRegressor
 {% if model_type == "todos" or model_type == "KNN" %}
 from sklearn.neighbors import KNeighborsRegressor
 {% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
+from sklearn.tree import DecisionTreeRegressor
+{% endif %}
 from sklearn.model_selection import cross_val_score
 {% endif %}
 
@@ -132,6 +135,11 @@ def _build_models() -> dict:
 {% if model_type == "todos" or model_type == "KNN" %}
     models["KNN"] = KNeighborsRegressor(n_neighbors=7, weights="distance")
 {% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
+    models["DecisionTree"] = DecisionTreeRegressor(
+        max_depth=7, min_samples_leaf=5, random_state=42,
+    )
+{% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
     models["RandomForest"] = RandomForestRegressor(
         n_estimators=200, max_depth=10, max_features="sqrt",
@@ -146,7 +154,7 @@ def _build_models() -> dict:
         n_estimators=300, max_depth=6, learning_rate=0.05,
         subsample=0.8, colsample_bytree=0.8,
         reg_alpha=0.1, reg_lambda=1.0,
-        eval_metric="logloss", use_label_encoder=False,
+        eval_metric="logloss",
         random_state=42, n_jobs=-1,
     )
 {% else %}
@@ -1003,8 +1011,14 @@ import numpy as np
 import joblib
 
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+{% if task_type == "regresion" %}
+from sklearn.ensemble import RandomForestRegressor
+{% endif %}
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
+{% if task_type == "regresion" %}
+from sklearn.neighbors import KNeighborsRegressor
+{% endif %}
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
@@ -1046,6 +1060,7 @@ def _build_models(strategy: str) -> dict:
             class_weight="balanced",
             random_state=42,
         ),
+{% if task_type == "clasificacion" %}
         "RandomForest": RandomForestClassifier(
             n_estimators=200,
             max_depth=10,
@@ -1056,10 +1071,21 @@ def _build_models(strategy: str) -> dict:
             n_jobs=-1,
         ),
         "KNN": KNeighborsClassifier(n_neighbors=7, weights="distance"),
+{% else %}
+        "RandomForest": RandomForestRegressor(
+            n_estimators=200,
+            max_depth=10,
+            max_features="sqrt",
+            max_samples=0.8,
+            random_state=42,
+            n_jobs=-1,
+        ),
+        "KNN": KNeighborsRegressor(n_neighbors=7, weights="distance"),
+{% endif %}
     }
 
     if strategy in ("pca_clf", "umap_clf"):
-        # SVM con escalado propio: muy eficaz en espacios reducidos
+{% if task_type == "clasificacion" %}
         base["SVM_RBF"] = Pipeline([
             ("scaler", StandardScaler()),
             ("clf", SVC(
@@ -1067,9 +1093,16 @@ def _build_models(strategy: str) -> dict:
                 class_weight="balanced", probability=True, random_state=42,
             )),
         ])
+{% else %}
+        from sklearn.svm import SVR
+        base["SVR_RBF"] = Pipeline([
+            ("scaler", StandardScaler()),
+            ("reg", SVR(kernel="rbf", C=1.0, gamma="scale")),
+        ])
+{% endif %}
 
     if strategy in ("kmeans_features", "iso_feature"):
-        # GradBoost aprovecha bien distancias a centroides o anomaly scores
+{% if task_type == "clasificacion" %}
         base["GradientBoosting"] = GradientBoostingClassifier(
             n_estimators=200,
             max_depth=4,
@@ -1077,6 +1110,16 @@ def _build_models(strategy: str) -> dict:
             subsample=0.8,
             random_state=42,
         )
+{% else %}
+        from sklearn.ensemble import GradientBoostingRegressor
+        base["GradientBoosting"] = GradientBoostingRegressor(
+            n_estimators=200,
+            max_depth=4,
+            learning_rate=0.05,
+            subsample=0.8,
+            random_state=42,
+        )
+{% endif %}
 
 {% if use_xgboost or model_type == "XGBoost" %}
     # XGBoost: robusto ante outliers, regularización nativa, muy competitivo
@@ -1090,7 +1133,6 @@ def _build_models(strategy: str) -> dict:
         reg_alpha=0.1,
         reg_lambda=1.0,
         eval_metric="logloss",
-        use_label_encoder=False,
         random_state=42,
         n_jobs=-1,
     )
@@ -1121,17 +1163,27 @@ def _build_models(strategy: str) -> dict:
 {% if model_type == "todos" or model_type == "KNN" %}
 def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
     """
-    Busca el mejor k para KNN por validación cruzada (5-fold, métrica F1_weighted).
-    Devuelve el k con mayor F1 medio, priorizando k más alto en empates.
+    Busca el mejor k para KNN por validación cruzada (5-fold).
+    Devuelve el k con mayor métrica media, priorizando k más alto en empates.
     """
     print("    Buscando mejor k para KNN...")
-    best_k, best_score = 1, 0.0
+    best_k, best_score = 1, -float("inf")
     for k in k_range:
-        knn = KNeighborsClassifier(n_neighbors=k, weights="distance")
+{% if task_type == "clasificacion" %}
+        knn   = KNeighborsClassifier(n_neighbors=k, weights="distance")
         score = cross_val_score(knn, X_train, y_train, cv=5, scoring="f1_weighted").mean()
-        if score >= best_score:   # >= → preferimos k más alto en empates
+{% else %}
+        knn   = KNeighborsRegressor(n_neighbors=k, weights="distance")
+        score = cross_val_score(knn, X_train, y_train, cv=5,
+                                scoring="neg_root_mean_squared_error").mean()
+{% endif %}
+        if score >= best_score:
             best_k, best_score = k, score
+{% if task_type == "clasificacion" %}
     print(f"    Mejor k = {best_k}  (F1_weighted CV = {best_score:.3f})")
+{% else %}
+    print(f"    Mejor k = {best_k}  (RMSE CV = {-best_score:.4f})")
+{% endif %}
     return best_k
 
 {% endif %}
@@ -1166,18 +1218,31 @@ def train_models(
 {% if model_type == "todos" or model_type == "KNN" %}
     if tune_knn and "KNN" in models:
         best_k = _find_best_k(X_train, y_train)
+{% if task_type == "clasificacion" %}
         models["KNN"] = KNeighborsClassifier(n_neighbors=best_k, weights="distance")
+{% else %}
+        models["KNN"] = KNeighborsRegressor(n_neighbors=best_k, weights="distance")
+{% endif %}
 
-{% endif %}    trained = {}
+{% endif %}
+    trained = {}
     for name, model in models.items():
         print(f"    [{name}] entrenando...")
         model.fit(X_train, y_train)
 
         if cv_evaluate:
+{% if task_type == "clasificacion" %}
             cv_score = cross_val_score(
                 model, X_train, y_train, cv=5, scoring="f1_weighted"
             ).mean()
             print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
+{% else %}
+            cv_score = -cross_val_score(
+                model, X_train, y_train, cv=5,
+                scoring="neg_root_mean_squared_error",
+            ).mean()
+            print(f"      RMSE 5-fold CV: {cv_score:.4f}")
+{% endif %}
 
         joblib.dump(model, MODELS_DIR / f"{name}.joblib")
         print(f"      Guardado → {name}.joblib")

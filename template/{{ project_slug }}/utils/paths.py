@@ -10,7 +10,9 @@ MODELS_DIR = PROJECT_DIR / "models"
 ARTIFACTS_DIR = MODELS_DIR / "artifacts"
 REPORTS_DIR = PROJECT_DIR / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
+{% if ml_type == 'redes_neuronales' %}
 RUNS_DIR = PROJECT_DIR / "runs"  # TensorBoard logs
+{% endif %}
 
 
 def make_dirs():
@@ -21,7 +23,9 @@ def make_dirs():
         MODELS_DIR,
         ARTIFACTS_DIR,
         FIGURES_DIR,
+{% if ml_type == 'redes_neuronales' %}
         RUNS_DIR,
+{% endif %}
     ]:
         dir_path.mkdir(parents=True, exist_ok=True)
 
