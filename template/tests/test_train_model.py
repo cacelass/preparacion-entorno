@@ -327,7 +327,7 @@ def _make_Xy():
 
 
 def test_build_models_returns_dict():
-    models = _build_models()
+    models = _build_models(strategy="pca_clf")
     assert isinstance(models, dict)
     assert len(models) > 0
 

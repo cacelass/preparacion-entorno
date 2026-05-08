@@ -186,6 +186,13 @@ def test_plot_training_history_only_loss(patch_paths):
     assert (patch_paths["FIGURES_DIR"] / "training_history.png").exists()
 
 
+def test_plot_training_history_with_val_loss(patch_paths):
+    train_losses = [1.0, 0.8, 0.6]
+    val_losses   = [1.1, 0.9, 0.7]
+    plot_training_history(train_losses, val_losses=val_losses)
+    assert (patch_paths["FIGURES_DIR"] / "training_history.png").exists()
+
+
 def test_plot_training_history_with_acc(patch_paths):
     losses = [1.0, 0.8, 0.6]
     accs   = [0.5, 0.6, 0.7]
@@ -210,7 +217,9 @@ def test_plot_class_balance_saves_png(patch_paths):
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
+{% if task_type == "clasificacion" %}
     plot_class_balance,
+{% endif %}
     plot_pca_variance,
     plot_feature_importance,
 )
@@ -226,9 +235,11 @@ def test_plot_correlation_matrix_saves_png(patch_paths):
     assert (patch_paths["FIGURES_DIR"] / "correlation_matrix.png").exists()
 
 
+{% if task_type == "clasificacion" %}
 def test_plot_class_balance_saves_png(patch_paths):
     plot_class_balance(_df_with_target(), target_col="target")
     assert (patch_paths["FIGURES_DIR"] / "class_balance.png").exists()
+{% endif %}
 
 
 def test_plot_pca_variance_from_array(patch_paths):
