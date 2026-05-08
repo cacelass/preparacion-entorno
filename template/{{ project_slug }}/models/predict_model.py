@@ -558,7 +558,7 @@ import scipy.cluster.hierarchy as sch
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.decomposition import PCA
 
-from {{ project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR
+from {{ project_slug }}.utils.paths import MODELS_DIR, FIGURES_DIR, REPORTS_DIR
 
 
 def evaluate_models(models: dict, X) -> pd.DataFrame:
@@ -604,7 +604,7 @@ def evaluate_models(models: dict, X) -> pd.DataFrame:
 
     df_results = pd.DataFrame(results)
     if not df_results.empty:
-        df_results.to_csv(FIGURES_DIR / "resultados_clustering.csv", index=False)
+        df_results.to_csv(REPORTS_DIR / "resultados_clustering.csv", index=False)
         print(f"\n{'='*60}\n  Resumen:\n{'='*60}")
         print(df_results.to_string(index=False))
     return df_results

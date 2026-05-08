@@ -89,7 +89,9 @@ def patch_paths(monkeypatch, tmp_path):
         "REPORTS_DIR":        tmp_path / "reports",
         "PROCESSED_DATA_DIR": tmp_path / "data" / "processed",
         "RAW_DATA_DIR":       tmp_path / "data" / "raw",
+{% if ml_type == 'redes_neuronales' %}
         "RUNS_DIR":           tmp_path / "runs",
+{% endif %}
     }
     for d in dirs.values():
         d.mkdir(parents=True, exist_ok=True)
