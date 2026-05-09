@@ -5,6 +5,9 @@
         docs \
         profile \
         mlflow \
+{% if use_api %}
+        serve \
+{% endif %}
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -52,6 +55,11 @@ help:
 	@echo "    make run            ejecuta main.py"
 	@echo "    make profile        cProfile de main.py → reports/profile.prof"
 	@echo ""
+{% if use_api %}
+	@echo "  API REST"
+	@echo "    make serve          FastAPI en localhost:8000  (docs en /docs)"
+	@echo ""
+{% endif %}
 {% if ml_type == "redes_neuronales" %}
 	@echo "  Monitorizacion"
 {% if use_mlflow %}
@@ -123,6 +131,16 @@ pipeline: predict
 run:
 	uv run $(PYTHON) main.py
 
+{% if use_api %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  API REST — servir el modelo con FastAPI
+# ─────────────────────────────────────────────────────────────────────────────
+serve:
+	@echo "▶  Lanzando API REST en http://localhost:8000"
+	@echo "   Documentación interactiva: http://localhost:8000/docs"
+	uv run uvicorn api.main:app --reload --port 8000
+
+{% endif %}
 profile:
 	@echo "▶  Profiling main.py → reports/profile.prof"
 	uv run $(PYTHON) -m cProfile -o reports/profile.prof main.py

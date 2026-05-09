@@ -976,7 +976,7 @@ def train_models(
                     break
 
     tb.close()
-    out_path = MODELS_DIR / f"{MODEL_NAME}.pt"
+    out_path = MODELS_DIR / f"{MODEL_NAME}_final.pt"
     torch.save(model.state_dict(), out_path)
     print(f"    Guardado: {out_path}")
     return {MODEL_NAME: model}
@@ -985,7 +985,7 @@ def train_models(
 def load_model(input_dim: int, output_dim: int, weights_path: str = None):
     """Carga pesos finales y devuelve el modelo en modo eval."""
     if weights_path is None:
-        weights_path = f"{MODEL_NAME}.pt"
+        weights_path = f"{MODEL_NAME}_final.pt"
     path  = MODELS_DIR / weights_path if not str(weights_path).startswith("/") else weights_path
     model = _build_model(input_dim=input_dim, output_dim=output_dim).to(device)
     model.load_state_dict(torch.load(path, map_location=device, weights_only=True))

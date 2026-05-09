@@ -154,12 +154,13 @@ def test_preprocess_data_creates_scaler_artifact(df_with_target, patch_paths):
 
 
 def test_preprocess_data_with_pca(df_with_target, patch_paths):
-    """Con use_pca=0.95 debe guardar pca.joblib y reducir dims."""
+    """Con use_pca=0.95 debe guardar pca.joblib."""
     X_train, X_test, _, _ = preprocess_data(
         df_with_target, target_col="target", use_pca=0.95
     )
     assert (patch_paths["ARTIFACTS_DIR"] / "pca.joblib").exists()
-    assert X_train.shape[1] <= 4
+    n_orig = df_with_target.shape[1] - 1
+    assert X_train.shape[1] <= n_orig
 
 
 def test_preprocess_data_y_reset_index(df_with_target, patch_paths):

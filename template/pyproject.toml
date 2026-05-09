@@ -74,6 +74,7 @@ redes_neuronales = [
     "torchmetrics[visual]",
     "tensorboard",
     "polars",         # carga eficiente de datos con dtypes explícitos
+    "pyarrow",        # backend requerido por polars para conversión a pandas
 ]
 
 # Modelos híbridos: combinan técnicas supervisadas y no supervisadas
@@ -83,6 +84,16 @@ hibrido = [
     "xgboost",        # clasificador final alternativo
     "imbalanced-learn",
 ]
+
+{% if use_api %}
+# API REST para servir el modelo entrenado
+api = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "httpx",   # cliente HTTP para tests de la API
+]
+{% endif %}
 
 [tool.setuptools]
 packages = ["{{ project_slug }}"]
