@@ -1,6 +1,138 @@
 import pandas as pd
 from {{ project_slug }}.utils.paths import RAW_DATA_DIR
 
+{% if use_duckdb %}
+# ---------------------------------------------------------------------------
+# Carga con DuckDB — SQL directo sobre archivos CSV, Parquet y JSON
+# ---------------------------------------------------------------------------
+# DuckDB ejecuta queries SQL sobre archivos sin cargarlos en memoria completa.
+# Es columnar, vectorizado y multicore — ideal para datasets grandes (>1 GB).
+#
+# Ventajas frente a pandas.read_csv:
+#   - Selección de columnas en el query → menos memoria desde el inicio
+#   - Filtrado, agregaciones y joins directamente sobre el archivo
+#   - Soporta CSV, Parquet, JSON y JSON-Lines
+#   - Sin servidor ni configuración
+#
+# Ejemplo de uso:
+#
+#   df = load_data_duckdb(
+#       "ventas.csv",
+#       query="SELECT region, SUM(importe) AS total FROM datos GROUP BY region"
+#   )
+#
+#   # Cargar solo ciertas columnas:
+#   df = load_data_duckdb("clientes.csv", query="SELECT id, edad, churn FROM datos")
+#
+#   # Desde Parquet:
+#   df = load_data_duckdb("features.parquet")
+#
+#   # Exploración interactiva desde Python:
+#   import duckdb
+#   rel = duckdb.read_csv(str(RAW_DATA_DIR / "dataset.csv"))
+#   print(rel.describe())
+# ---------------------------------------------------------------------------
+
+import duckdb as _duckdb
+
+
+def load_data_duckdb(
+    filename: str,
+    query: str = None,
+    sample_n: int = None,
+) -> pd.DataFrame:
+    """
+    Carga datos con DuckDB: soporta CSV, Parquet y JSON.
+
+    Parameters
+    ----------
+    filename : nombre del archivo en data/raw/ (incluye extensión)
+    query    : SQL opcional sobre la tabla virtual 'datos'.
+               Si None, ejecuta SELECT * FROM datos.
+               Ejemplo: "SELECT col1, col2 FROM datos WHERE col3 > 0"
+    sample_n : si se indica, añade USING SAMPLE N ROWS al query para
+               cargar solo una muestra aleatoria (útil para exploración).
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Formatos soportados automáticamente:
+        .csv            → read_csv
+        .parquet / .pq  → read_parquet
+        .json / .jsonl  → read_json
+    """
+    file_path = RAW_DATA_DIR / filename
+    print(f"--> Cargando datos con DuckDB desde {file_path}...")
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"\n  Archivo no encontrado: {file_path}\n"
+            f"  Coloca tu dataset en: data/raw/{filename}"
+        )
+
+    suffix = file_path.suffix.lower()
+    if suffix == ".csv":
+        source = f"read_csv('{file_path}', auto_detect=true)"
+    elif suffix in (".parquet", ".pq"):
+        source = f"read_parquet('{file_path}')"
+    elif suffix in (".json", ".jsonl"):
+        source = f"read_json('{file_path}', auto_detect=true)"
+    else:
+        raise ValueError(f"Formato no soportado: {suffix}. Usa CSV, Parquet o JSON.")
+
+    base_query = query.replace("datos", source) if query else f"SELECT * FROM {source}"
+    if sample_n:
+        base_query += f" USING SAMPLE {sample_n} ROWS"
+
+    df = _duckdb.query(base_query).df()
+    size_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
+    print(f"    Shape: {df.shape}  |  Memoria: {size_mb:.2f} MB")
+    if sample_n:
+        print(f"    (muestra aleatoria de {sample_n} filas)")
+    return df
+
+
+def query_duckdb(sql: str, filename: str = None) -> pd.DataFrame:
+    """
+    Ejecuta un query SQL arbitrario con DuckDB.
+
+    Si se pasa `filename`, la tabla virtual se llama 'datos'.
+    Sin filename, el SQL puede referenciar rutas directamente.
+
+    Ejemplos:
+        # Contar nulos por columna
+        query_duckdb(
+            "SELECT COUNT(*) - COUNT(edad) AS nulos_edad FROM datos",
+            filename="clientes.csv"
+        )
+
+        # Join entre dos archivos Parquet
+        query_duckdb(
+            \"\"\"
+            SELECT a.id, a.feature, b.label
+            FROM read_parquet('data/raw/features.parquet') a
+            JOIN read_parquet('data/raw/labels.parquet') b USING (id)
+            \"\"\"
+        )
+    """
+    if filename:
+        file_path = RAW_DATA_DIR / filename
+        suffix    = file_path.suffix.lower()
+        if suffix == ".csv":
+            source = f"read_csv('{file_path}', auto_detect=true)"
+        elif suffix in (".parquet", ".pq"):
+            source = f"read_parquet('{file_path}')"
+        elif suffix in (".json", ".jsonl"):
+            source = f"read_json('{file_path}', auto_detect=true)"
+        else:
+            raise ValueError(f"Formato no soportado: {suffix}")
+        sql = sql.replace("datos", source)
+
+    return _duckdb.query(sql).df()
+
+{% endif %}
+
 {% if ml_type == 'redes_neuronales' %}
 # ---------------------------------------------------------------------------
 # Carga con Polars (más eficiente que pandas para datasets grandes)

@@ -85,6 +85,22 @@ hibrido = [
     "imbalanced-learn",
 ]
 
+{% if use_optuna %}
+# Optuna: optimizacion de hiperparametros
+optuna = [
+    "optuna",
+    "optuna-dashboard",  # UI web para explorar estudios (opcional)
+]
+{% endif %}
+
+{% if use_duckdb %}
+# DuckDB: queries SQL sobre CSV/Parquet/JSON sin servidor
+duckdb = [
+    "duckdb",
+    "pyarrow",   # necesario para leer/escribir Parquet con pandas y DuckDB
+]
+{% endif %}
+
 {% if use_api %}
 # API REST para servir el modelo entrenado
 api = [
