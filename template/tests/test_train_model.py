@@ -99,6 +99,15 @@ def test_load_models_specific_names(patch_paths):
     assert "RandomForest" in loaded
 
 {% endif %}
+{% if model_type == "todos" or model_type == "SVM" %}
+def test_svm_en_modelos_entrenados(patch_paths):
+    """SVM debe estar en los modelos entrenados."""
+    X, y = _make_Xy()
+    trained = train_models(X, y, tune_knn=False, cv_evaluate=False)
+    assert "SVM" in trained
+    assert hasattr(trained["SVM"], "predict")
+
+{% endif %}
 def test_load_models_missing_returns_empty(patch_paths):
     """Si no hay modelos guardados, load_models() debe devolver dict vacío."""
     loaded = load_models(["ModeloInexistente"])

@@ -5,6 +5,93 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.7.0] — 2026-05-09
+
+### Añadido
+- `use_monitoring` — módulo de monitorización sin dependencias externas (solo scipy).
+  Genera `monitoring/monitor.py` con `check_drift` (KS para numéricas, chi² para
+  categóricas), `check_performance` (métricas vs baseline JSON) y `run_monitoring`
+  que produce `drift_report.csv` y `drift_report.html`.
+  `make monitor` ejecuta el análisis completo.
+  11 tests en `test_monitoring.py`.
+- `model_type: SVM` — SVC (clasificación) y SVR (regresión) disponibles como opción
+  en `model_type`. Incluye Pipeline con StandardScaler interno para no depender del
+  scaler global. Objetivo Optuna incluido cuando `use_optuna=true`.
+- `.copier-answers.yml` añadido como placeholder en `template/` — Copier 9.x requiere
+  que el archivo exista físicamente para generarlo en el proyecto destino y habilitar
+  `copier update`.
+
+### Corregido
+- `model_type: SVM` — import de `Pipeline` en bloque Optuna usaba alias incorrecto.
+
+---
+
+## [1.6.0] — 2026-05-09
+
+### Añadido
+- `use_optuna` — optimización de hiperparámetros con Optuna.
+  Genera `tuning/tune_model.py` con objetivos por modelo y `task_type`.
+  `train_models()` carga `best_params_<modelo>.joblib` automáticamente si existen.
+  `make tune` lanza la optimización. `OPTUNA_TRIALS` configurable en `main.py`.
+  4 tests en `test_tuning.py`.
+
+---
+
+## [1.5.0] — 2026-05-09
+
+### Añadido
+- `use_duckdb` — carga de datos con DuckDB sobre CSV, Parquet y JSON sin servidor.
+  Genera `load_data_duckdb()` con query SQL opcional y muestreo aleatorio,
+  y `query_duckdb()` para SQL arbitrario.
+  `make query` lanza el shell DuckDB interactivo.
+  6 tests en `test_make_dataset.py`.
+
+---
+
+## [1.4.0] — 2026-05-09
+
+### Añadido
+- `use_api` — API REST con FastAPI: `/health`, `/info` y `/predict`.
+  Adaptado a los 4 `ml_type` y ambos `task_type`. `make serve` en `localhost:8000`.
+  8 tests en `test_api.py`.
+
+### Corregido
+- `redes_neuronales` — modelo guardado como `MLP_final.pt` (antes `MLP.pt`).
+- `pyarrow` añadido al extra `redes_neuronales`.
+
+---
+
+
+### Añadido
+- `use_duckdb` — carga de datos con DuckDB sobre CSV, Parquet y JSON sin servidor.
+  Genera `load_data_duckdb()` con soporte de query SQL opcional y muestreo aleatorio
+  (`sample_n`), y `query_duckdb()` para SQL arbitrario con alias `datos`.
+- `make query` — shell DuckDB interactivo sobre `data/raw/` (solo si `use_duckdb=true`).
+- Extra `duckdb` en `pyproject.toml` con `pyarrow` incluido para soporte Parquet.
+- 6 tests en `test_make_dataset.py` cubriendo CSV, Parquet, query, sample y errores.
+
+---
+
+## [1.4.0] — 2026-05-09
+
+### Añadido
+- `use_api` — API REST con FastAPI para servir el modelo entrenado.
+  Genera `api/main.py` con endpoints `/health`, `/info` y `/predict`,
+  y `api/schemas.py` con modelos Pydantic V2.
+  Adaptado a los 4 tipos de ML y ambos `task_type`.
+- `make serve` — lanza uvicorn en `localhost:8000` (docs interactivos en `/docs`).
+- Extra `api` en `pyproject.toml` con `fastapi`, `uvicorn` y `httpx`.
+- 8 tests en `test_api.py` cubriendo health, info, predict, 422 y 503.
+- Con `use_api=false` la carpeta `api/` y `test_api.py` se eliminan automáticamente.
+
+### Corregido
+- `redes_neuronales` — modelo guardado como `MLP_final.pt` (antes `MLP.pt`) para
+  consistencia entre `train_model.py`, `predict_model.py` y la API.
+- `redes_neuronales` — `pyarrow` añadido al extra `redes_neuronales` (requerido por polars).
+- `test_build_features.py` — assert PCA con dimensión hardcodeada a 4 corregido.
+
+---
+
 ## [1.2.0] — 2026-05-05
 
 ### Añadido
