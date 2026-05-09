@@ -93,6 +93,7 @@ model_type:
     - LogisticRegression
     - KNN
     - DecisionTree
+    - SVM
   default: todos
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 
@@ -105,6 +106,24 @@ cluster_model:
     - AgglomerativeClustering
   default: todos
   when: "{{ ml_type == 'no_supervisado' }}"
+
+# --- Monitoring ---
+use_monitoring:
+  type: bool
+  help: "Añadir modulo de monitorizacion? (drift detection, performance tracking, make monitor)"
+  default: false
+
+# --- Optuna ---
+use_optuna:
+  type: bool
+  help: "Añadir optimizacion de hiperparametros con Optuna? (make tune)"
+  default: false
+
+# --- DuckDB ---
+use_duckdb:
+  type: bool
+  help: "Añadir carga de datos con DuckDB? (CSV/Parquet/JSON con SQL, muy rapido en datasets grandes)"
+  default: false
 
 # --- API REST (FastAPI) ---
 use_api:
@@ -161,7 +180,16 @@ project_version:
 # --- Tareas post-generacion ---
 _tasks:
   - >-
-    uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if use_api %} --extra api{% endif %}
+    uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if use_api %} --extra api{% endif %}{% if use_duckdb %} --extra duckdb{% endif %}{% if use_optuna %} --extra optuna{% endif %}
+    {% if not use_api %}
+    && rm -rf api tests/test_api.py
+    {% endif %}
+    {% if not use_optuna %}
+    && rm -rf tuning tests/test_tuning.py
+    {% endif %}
+    {% if not use_monitoring %}
+    && rm -rf monitoring tests/test_monitoring.py
+    {% endif %}
     && uv run python -c "import sklearn; print('scikit-learn OK')"
     {% if ml_type == 'redes_neuronales' %}
     && uv run python -c "import torch; print('torch', torch.__version__)"
@@ -175,8 +203,17 @@ _tasks:
     {% if use_mlflow %}
     && uv run python -c "import mlflow; print('mlflow', mlflow.__version__)"
     {% endif %}
+    {% if use_optuna %}
+    && uv run python -c "import optuna; print('optuna', optuna.__version__)"
+    {% endif %}
+    {% if use_duckdb %}
+    && uv run python -c "import duckdb; print('duckdb', duckdb.__version__)"
+    {% endif %}
     {% if not use_api %}
     && rm -rf api tests/test_api.py
+    {% endif %}
+    {% if not use_optuna %}
+    && rm -rf tuning tests/test_tuning.py
     {% endif %}
 
 _subdirectory: template

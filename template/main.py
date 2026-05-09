@@ -32,6 +32,11 @@ THRESHOLD    = DECISION_THRESHOLD
 # None → sin PCA | 0.95 → conservar 95% varianza | int → nº componentes fijo
 USE_PCA      = None   # ← ajusta: None | 0.95 | 10
 
+{% if use_optuna %}
+# Optuna: número de trials por modelo. Más trials → mejor resultado pero más tiempo.
+OPTUNA_TRIALS = 30
+{% endif %}
+
 
 def run_full_pipeline() -> None:
     print('=' * 60)
@@ -51,7 +56,15 @@ def run_full_pipeline() -> None:
         test_size=TEST_SIZE, use_pca=USE_PCA,
     )
 
+{% if use_optuna %}
+    print('\n4. Optimizando hiperparámetros con Optuna...')
+    from tuning.tune_model import tune_models as _tune
+    _tune(X_train, y_train, n_trials=OPTUNA_TRIALS)
+
+    print('\n5. Entrenando modelos con mejores params...')
+{% else %}
     print('\n4. Entrenando modelos...')
+{% endif %}
     models = train_models(X_train, y_train, tune_knn=True, cv_evaluate=True)
 
     print('\n5. Evaluando...')

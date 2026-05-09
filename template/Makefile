@@ -5,8 +5,17 @@
         docs \
         profile \
         mlflow \
+{% if use_monitoring %}
+        monitor \
+{% endif %}
+{% if use_optuna %}
+        tune \
+{% endif %}
 {% if use_api %}
         serve \
+{% endif %}
+{% if use_duckdb %}
+        query \
 {% endif %}
         clean clean-models clean-figures clean-all \
         run info help
@@ -55,6 +64,21 @@ help:
 	@echo "    make run            ejecuta main.py"
 	@echo "    make profile        cProfile de main.py → reports/profile.prof"
 	@echo ""
+{% if use_monitoring %}
+	@echo "  Monitoring"
+	@echo "    make monitor        drift detection + performance report"
+	@echo ""
+{% endif %}
+{% if use_optuna %}
+	@echo "  Optuna"
+	@echo "    make tune           optimiza hiperparámetros (n_trials en main.py)"
+	@echo ""
+{% endif %}
+{% if use_duckdb %}
+	@echo "  DuckDB"
+	@echo "    make query          Shell SQL interactivo sobre data/raw/"
+	@echo ""
+{% endif %}
 {% if use_api %}
 	@echo "  API REST"
 	@echo "    make serve          FastAPI en localhost:8000  (docs en /docs)"
@@ -131,6 +155,34 @@ pipeline: predict
 run:
 	uv run $(PYTHON) main.py
 
+{% if use_monitoring %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  Monitoring — drift detection y performance tracking
+# ─────────────────────────────────────────────────────────────────────────────
+monitor:
+	@echo "▶  Ejecutando monitorización de drift y rendimiento..."
+	uv run python -m monitoring.monitor
+
+{% endif %}
+{% if use_optuna %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  Optuna — optimizacion de hiperparametros
+# ─────────────────────────────────────────────────────────────────────────────
+tune:
+	@echo "▶  Lanzando optimizacion Optuna (OPTUNA_TRIALS en main.py)"
+	uv run python -m tuning.tune_model
+
+{% endif %}
+{% if use_duckdb %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  DuckDB — exploración SQL interactiva sobre data/raw/
+# ─────────────────────────────────────────────────────────────────────────────
+query:
+	@echo "▶  DuckDB shell — escribe .quit para salir"
+	@echo "   Ejemplo: SELECT * FROM read_csv('data/raw/dataset.csv') LIMIT 10;"
+	uv run duckdb
+
+{% endif %}
 {% if use_api %}
 # ─────────────────────────────────────────────────────────────────────────────
 #  API REST — servir el modelo con FastAPI
