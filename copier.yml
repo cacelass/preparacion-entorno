@@ -93,6 +93,7 @@ model_type:
     - LogisticRegression
     - KNN
     - DecisionTree
+    - SVM
   default: todos
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
 

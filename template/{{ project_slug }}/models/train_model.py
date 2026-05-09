@@ -15,6 +15,11 @@ from sklearn.tree import DecisionTreeClassifier
 {% if model_type == "todos" or model_type == "KNN" %}
 from sklearn.neighbors import KNeighborsClassifier
 {% endif %}
+{% if model_type == "todos" or model_type == "SVM" %}
+from sklearn.svm import SVC
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler as _SVMScaler
+{% endif %}
 from sklearn.model_selection import cross_val_score
 {% else %}
 {% if model_type == "todos" %}
@@ -28,6 +33,11 @@ from sklearn.neighbors import KNeighborsRegressor
 {% endif %}
 {% if model_type == "todos" or model_type == "DecisionTree" %}
 from sklearn.tree import DecisionTreeRegressor
+{% endif %}
+{% if model_type == "todos" or model_type == "SVM" %}
+from sklearn.svm import SVR
+from sklearn.pipeline import Pipeline as _SVMPipeline
+from sklearn.preprocessing import StandardScaler as _SVMScaler
 {% endif %}
 from sklearn.model_selection import cross_val_score
 {% endif %}
@@ -53,12 +63,22 @@ import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 {% endif %}
 
-from {{ project_slug }}.utils.paths import MODELS_DIR
+from {{ project_slug }}.utils.paths import MODELS_DIR, ARTIFACTS_DIR
 
 
 # ---------------------------------------------------------------------------
 # Configuración de modelos
 # ---------------------------------------------------------------------------
+
+def _load_best_params(model_name: str) -> dict:
+    """Carga los mejores hiperparámetros de Optuna si existen."""
+    path = ARTIFACTS_DIR / f"best_params_{model_name}.joblib"
+    if path.exists():
+        params = joblib.load(path)
+        print(f"    [{model_name}] best_params cargados desde Optuna: {params}")
+        return params
+    return {}
+
 
 def _build_models() -> dict:
     """
@@ -74,6 +94,9 @@ def _build_models() -> dict:
 {% endif %}
 {% if model_type == "todos" or model_type == "DecisionTree" %}
     DecisionTree       → caja blanca. Regularizar con max_depth y min_samples_leaf.
+{% if model_type == "todos" or model_type == "SVM" %}
+    SVM                → margen máximo con kernel RBF. Incluye escalado interno.
+{% endif %}
 {% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto con feature importances.
@@ -106,25 +129,87 @@ def _build_models() -> dict:
     """
     models = {}
 
-{% if task_type == "clasificacion" %}
+{% if use_optuna %}
+    _best = {name: _load_best_params(name) for name in [
 {% if model_type == "todos" or model_type == "KNN" %}
-    models["KNN"] = KNeighborsClassifier(n_neighbors=7, weights="distance")
+        "KNN",
 {% endif %}
 {% if model_type == "todos" or model_type == "LogisticRegression" %}
+        "LogisticRegression",
+{% endif %}
+{% if model_type == "todos" or model_type == "DecisionTree" %}
+        "DecisionTree",
+{% endif %}
+{% if model_type == "todos" or model_type == "RandomForest" %}
+        "RandomForest",
+{% endif %}
+{% if use_xgboost or model_type == "XGBoost" %}
+        "XGBoost",
+{% endif %}
+{% if use_lightgbm or model_type == "LightGBM" %}
+        "LightGBM",
+{% endif %}
+    ]}
+{% endif %}
+
+{% if task_type == "clasificacion" %}
+{% if model_type == "todos" or model_type == "KNN" %}
+{% if use_optuna %}
+    models["KNN"] = KNeighborsClassifier(**{
+        "n_neighbors": 7, "weights": "distance",
+        **_best.get("KNN", {}),
+    })
+{% else %}
+    models["KNN"] = KNeighborsClassifier(n_neighbors=7, weights="distance")
+{% endif %}
+{% endif %}
+{% if model_type == "todos" or model_type == "LogisticRegression" %}
+{% if use_optuna %}
+    models["LogisticRegression"] = LogisticRegression(**{
+        "max_iter": 1000, "class_weight": "balanced", "random_state": 42,
+        **_best.get("LogisticRegression", {}),
+    })
+{% else %}
     models["LogisticRegression"] = LogisticRegression(
         max_iter=1000, class_weight="balanced", random_state=42,
     )
 {% endif %}
+{% endif %}
 {% if model_type == "todos" or model_type == "DecisionTree" %}
+{% if use_optuna %}
+    models["DecisionTree"] = DecisionTreeClassifier(**{
+        "max_depth": 7, "min_samples_leaf": 5, "class_weight": "balanced", "random_state": 42,
+        **_best.get("DecisionTree", {}),
+    })
+{% else %}
     models["DecisionTree"] = DecisionTreeClassifier(
         max_depth=7, min_samples_leaf=5, class_weight="balanced", random_state=42,
     )
 {% endif %}
+{% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
+{% if use_optuna %}
+    models["RandomForest"] = RandomForestClassifier(**{
+        "n_estimators": 200, "max_depth": 10, "max_features": "sqrt",
+        "max_samples": 0.8, "class_weight": "balanced", "random_state": 42, "n_jobs": -1,
+        **_best.get("RandomForest", {}),
+    })
+{% else %}
     models["RandomForest"] = RandomForestClassifier(
         n_estimators=200, max_depth=10, max_features="sqrt",
         max_samples=0.8, class_weight="balanced", random_state=42, n_jobs=-1,
     )
+{% endif %}
+{% endif %}
+{% if model_type == "todos" or model_type == "SVM" %}
+    # SVM con escalado interno en Pipeline para no depender del scaler global
+    models["SVM"] = Pipeline([
+        ("scaler", _SVMScaler()),
+        ("svc", SVC(
+            kernel="rbf", C=1.0, gamma="scale",
+            class_weight="balanced", probability=True, random_state=42,
+        )),
+    ])
 {% endif %}
 {% else %}
 {% if model_type == "todos" %}
@@ -133,23 +218,60 @@ def _build_models() -> dict:
     models["Lasso"] = Lasso(alpha=0.1, max_iter=2000)
 {% endif %}
 {% if model_type == "todos" or model_type == "KNN" %}
+{% if use_optuna %}
+    models["KNN"] = KNeighborsRegressor(**{
+        "n_neighbors": 7, "weights": "distance",
+        **_best.get("KNN", {}),
+    })
+{% else %}
     models["KNN"] = KNeighborsRegressor(n_neighbors=7, weights="distance")
 {% endif %}
+{% endif %}
 {% if model_type == "todos" or model_type == "DecisionTree" %}
+{% if use_optuna %}
+    models["DecisionTree"] = DecisionTreeRegressor(**{
+        "max_depth": 7, "min_samples_leaf": 5, "random_state": 42,
+        **_best.get("DecisionTree", {}),
+    })
+{% else %}
     models["DecisionTree"] = DecisionTreeRegressor(
         max_depth=7, min_samples_leaf=5, random_state=42,
     )
 {% endif %}
+{% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
+{% if use_optuna %}
+    models["RandomForest"] = RandomForestRegressor(**{
+        "n_estimators": 200, "max_depth": 10, "max_features": "sqrt",
+        "max_samples": 0.8, "random_state": 42, "n_jobs": -1,
+        **_best.get("RandomForest", {}),
+    })
+{% else %}
     models["RandomForest"] = RandomForestRegressor(
         n_estimators=200, max_depth=10, max_features="sqrt",
         max_samples=0.8, random_state=42, n_jobs=-1,
     )
 {% endif %}
 {% endif %}
+{% if model_type == "todos" or model_type == "SVM" %}
+    models["SVM"] = _SVMPipeline([
+        ("scaler", _SVMScaler()),
+        ("svr", SVR(kernel="rbf", C=1.0, gamma="scale")),
+    ])
+{% endif %}
+{% endif %}
 
 {% if use_xgboost or model_type == "XGBoost" %}
 {% if task_type == "clasificacion" %}
+{% if use_optuna %}
+    models["XGBoost"] = XGBClassifier(**{
+        "n_estimators": 300, "max_depth": 6, "learning_rate": 0.05,
+        "subsample": 0.8, "colsample_bytree": 0.8,
+        "reg_alpha": 0.1, "reg_lambda": 1.0,
+        "eval_metric": "logloss", "random_state": 42, "n_jobs": -1,
+        **_best.get("XGBoost", {}),
+    })
+{% else %}
     models["XGBoost"] = XGBClassifier(
         n_estimators=300, max_depth=6, learning_rate=0.05,
         subsample=0.8, colsample_bytree=0.8,
@@ -157,6 +279,16 @@ def _build_models() -> dict:
         eval_metric="logloss",
         random_state=42, n_jobs=-1,
     )
+{% endif %}
+{% else %}
+{% if use_optuna %}
+    models["XGBoost"] = XGBRegressor(**{
+        "n_estimators": 300, "max_depth": 6, "learning_rate": 0.05,
+        "subsample": 0.8, "colsample_bytree": 0.8,
+        "reg_alpha": 0.1, "reg_lambda": 1.0,
+        "eval_metric": "rmse", "random_state": 42, "n_jobs": -1,
+        **_best.get("XGBoost", {}),
+    })
 {% else %}
     models["XGBoost"] = XGBRegressor(
         n_estimators=300, max_depth=6, learning_rate=0.05,
@@ -167,15 +299,35 @@ def _build_models() -> dict:
     )
 {% endif %}
 {% endif %}
+{% endif %}
 
 {% if use_lightgbm or model_type == "LightGBM" %}
 {% if task_type == "clasificacion" %}
+{% if use_optuna %}
+    models["LightGBM"] = LGBMClassifier(**{
+        "n_estimators": 300, "num_leaves": 31, "learning_rate": 0.05,
+        "subsample": 0.8, "colsample_bytree": 0.8, "min_child_samples": 20,
+        "reg_alpha": 0.1, "reg_lambda": 1.0, "class_weight": "balanced",
+        "random_state": 42, "n_jobs": -1, "verbose": -1,
+        **_best.get("LightGBM", {}),
+    })
+{% else %}
     models["LightGBM"] = LGBMClassifier(
         n_estimators=300, num_leaves=31, learning_rate=0.05,
         subsample=0.8, colsample_bytree=0.8, min_child_samples=20,
         reg_alpha=0.1, reg_lambda=1.0, class_weight="balanced",
         random_state=42, n_jobs=-1, verbose=-1,
     )
+{% endif %}
+{% else %}
+{% if use_optuna %}
+    models["LightGBM"] = LGBMRegressor(**{
+        "n_estimators": 300, "num_leaves": 31, "learning_rate": 0.05,
+        "subsample": 0.8, "colsample_bytree": 0.8, "min_child_samples": 20,
+        "reg_alpha": 0.1, "reg_lambda": 1.0,
+        "random_state": 42, "n_jobs": -1, "verbose": -1,
+        **_best.get("LightGBM", {}),
+    })
 {% else %}
     models["LightGBM"] = LGBMRegressor(
         n_estimators=300, num_leaves=31, learning_rate=0.05,
@@ -183,6 +335,7 @@ def _build_models() -> dict:
         reg_alpha=0.1, reg_lambda=1.0,
         random_state=42, n_jobs=-1, verbose=-1,
     )
+{% endif %}
 {% endif %}
 {% endif %}
 
