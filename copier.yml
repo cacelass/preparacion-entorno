@@ -181,15 +181,6 @@ project_version:
 _tasks:
   - >-
     uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if use_api %} --extra api{% endif %}{% if use_duckdb %} --extra duckdb{% endif %}{% if use_optuna %} --extra optuna{% endif %}
-    {% if not use_api %}
-    && rm -rf api tests/test_api.py
-    {% endif %}
-    {% if not use_optuna %}
-    && rm -rf tuning tests/test_tuning.py
-    {% endif %}
-    {% if not use_monitoring %}
-    && rm -rf monitoring tests/test_monitoring.py
-    {% endif %}
     && uv run python -c "import sklearn; print('scikit-learn OK')"
     {% if ml_type == 'redes_neuronales' %}
     && uv run python -c "import torch; print('torch', torch.__version__)"
@@ -209,12 +200,14 @@ _tasks:
     {% if use_duckdb %}
     && uv run python -c "import duckdb; print('duckdb', duckdb.__version__)"
     {% endif %}
-    {% if not use_api %}
-    && rm -rf api tests/test_api.py
-    {% endif %}
-    {% if not use_optuna %}
-    && rm -rf tuning tests/test_tuning.py
-    {% endif %}
+
+_exclude:
+  - "{% if not use_api %}api{% endif %}"
+  - "{% if not use_api %}tests/test_api.py{% endif %}"
+  - "{% if not use_optuna %}tuning{% endif %}"
+  - "{% if not use_optuna %}tests/test_tuning.py{% endif %}"
+  - "{% if not use_monitoring %}monitoring{% endif %}"
+  - "{% if not use_monitoring %}tests/test_monitoring.py{% endif %}"
 
 _subdirectory: template
 _templates_suffix: ""

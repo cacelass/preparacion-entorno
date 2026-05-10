@@ -5,18 +5,7 @@
         docs \
         profile \
         mlflow \
-{% if use_monitoring %}
-        monitor \
-{% endif %}
-{% if use_optuna %}
-        tune \
-{% endif %}
-{% if use_api %}
-        serve \
-{% endif %}
-{% if use_duckdb %}
-        query \
-{% endif %}
+        monitor tune serve query \
         clean clean-models clean-figures clean-all \
         run info help
 

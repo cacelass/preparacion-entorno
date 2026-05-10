@@ -408,6 +408,9 @@ def train_models(
 
     trained = {}
     for name, model in models.items():
+{% if use_mlflow %}
+        mlflow.end_run()  # cerrar cualquier run activo antes de abrir uno nuevo
+{% endif %}
         print(f"    [{name}] entrenando...")
 
 {% if use_mlflow %}
