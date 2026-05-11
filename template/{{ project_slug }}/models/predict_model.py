@@ -76,6 +76,9 @@ def evaluate_models(
     results = []
     for name, model in models.items():
         print(f"\n--- {name} ---")
+{% if use_mlflow %}
+        mlflow.end_run()  # cerrar run activo antes de abrir uno nuevo
+{% endif %}
 
 {% if task_type == "clasificacion" %}
         if threshold != 0.5 and hasattr(model, "predict_proba"):
@@ -449,13 +452,16 @@ def predict_proba_new(model_name: str, X_new) -> np.ndarray:
 #     return best_threshold, best_f1
 
 
+{% endif %}  {# end task_type == clasificacion #}
+
+
 # ---------------------------------------------------------------------------
 # Modo prueba: carga artefactos y evalúa sobre datos nuevos introducidos
 # por el usuario en tiempo de ejecución.
 # ---------------------------------------------------------------------------
-def test_model() -> None:
+def try_model() -> None:
     """
-    Modo interactivo de prueba del modelo entrenado.
+    Modo interactivo: introduce tus datos y el modelo predice el resultado.
 
     Flujo:
       1. Lista los modelos disponibles en models/ y pide elegir uno.
@@ -522,12 +528,13 @@ def test_model() -> None:
         print(f"\nError en preprocesado: {e}")
         return
 
+    # ── 6. Predecir ────────────────────────────────────────────────────
+    print(f"\n{'='*50}")
+{% if task_type == "clasificacion" %}
     # ── 5. Cargar umbral (si existe) ───────────────────────────────────
     threshold_path = ARTIFACTS_DIR / "threshold.joblib"
     threshold = joblib.load(threshold_path) if threshold_path.exists() else 0.5
 
-    # ── 6. Predecir ────────────────────────────────────────────────────
-    print(f"\n{'='*50}")
     if hasattr(model, "predict_proba"):
         proba = model.predict_proba(X_new)[0]
         pred  = int(proba[1] >= threshold)
@@ -535,12 +542,21 @@ def test_model() -> None:
         print(f"  Umbral     : {threshold:.4f}")
         print(f"  Predicción : {pred}")
         print(f"  Probabilidades: {dict(enumerate(proba.round(4).tolist()))}")
+        # Decodificar etiqueta original si existe target_encoder
+        te_path = ARTIFACTS_DIR / "target_encoder.joblib"
+        if te_path.exists():
+            te = joblib.load(te_path)
+            print(f"  Clase      : {te.inverse_transform([pred])[0]}")
     else:
         pred = model.predict(X_new)[0]
         print(f"  Modelo     : {model_name}")
-        print(f"  Predicción : {pred}")
-    print(f"{'='*50}\n")
+        print(f"  Predicción : {int(pred)}")
+{% else %}
+    pred = model.predict(X_new)[0]
+    print(f"  Modelo     : {model_name}")
+    print(f"  Valor pred.: {float(pred):.4f}")
 {% endif %}
+    print(f"{'='*50}\n")
 
 
 {% elif ml_type == 'no_supervisado' %}
@@ -668,7 +684,7 @@ def load_models(model_names: list = None) -> dict:
 # ---------------------------------------------------------------------------
 # Modo prueba: asigna cluster a una muestra nueva introducida por el usuario.
 # ---------------------------------------------------------------------------
-def test_model() -> None:
+def try_model() -> None:
     """
     Modo interactivo de prueba para modelos de clustering.
 
@@ -1009,7 +1025,7 @@ def predict_new(model, X_new, num_classes=2, threshold=0.5,
 # ---------------------------------------------------------------------------
 # Modo prueba: carga el modelo PyTorch y predice sobre entrada del usuario.
 # ---------------------------------------------------------------------------
-def test_model() -> None:
+def try_model() -> None:
     """
     Modo interactivo de prueba del modelo de red neuronal entrenado.
 

@@ -9,7 +9,9 @@ import pytest
 {% if ml_type == "supervisado" %}
 from {{ project_slug }}.models.train_model import (
     _build_models,
+{% if model_type == "todos" or model_type == "KNN" %}
     _find_best_k,
+{% endif %}
     train_models,
     load_models,
 )
@@ -313,7 +315,9 @@ def test_load_model_after_train(patch_paths):
 {% if ml_type == "hibrido" %}
 from {{ project_slug }}.models.train_model import (
     _build_models,
+{% if model_type == "todos" or model_type == "KNN" %}
     _find_best_k,
+{% endif %}
     train_models,
     load_models,
 )

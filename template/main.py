@@ -6,9 +6,10 @@ Ejecutar: python main.py
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models
-from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD
 {% if task_type == "clasificacion" %}
-from {{ project_slug }}.models.predict_model import test_model
+from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD, try_model
+{% else %}
+from {{ project_slug }}.models.predict_model import evaluate_models, try_model
 {% endif %}
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
@@ -26,7 +27,9 @@ DATA_FILE    = 'dataset.csv'
 TARGET_COL   = 'target'
 SCALER_TYPE  = 'standard'   # 'standard' | 'minmax'
 TEST_SIZE    = 0.2
+{% if task_type == "clasificacion" %}
 THRESHOLD    = DECISION_THRESHOLD
+{% endif %}
 
 # PCA opcional: reducción de dimensionalidad antes del modelado.
 # None → sin PCA | 0.95 → conservar 95% varianza | int → nº componentes fijo
@@ -122,12 +125,12 @@ def run_full_pipeline() -> None:
 
 def main():
     print('=' * 60)
-    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
         run_full_pipeline()
 {% if task_type == "clasificacion" %}
     elif accion == '1':
-        test_model()
+        try_model()
 {% endif %}
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
@@ -141,7 +144,7 @@ if __name__ == '__main__':
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models, find_optimal_k
-from {{ project_slug }}.models.predict_model import evaluate_models, plot_dendrogram, test_model
+from {{ project_slug }}.models.predict_model import evaluate_models, plot_dendrogram, try_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -196,11 +199,11 @@ def run_full_pipeline() -> None:
 
 def main():
     print('=' * 60)
-    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
         run_full_pipeline()
     elif accion == '1':
-        test_model()
+        try_model()
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
         run_full_pipeline()
@@ -216,7 +219,7 @@ from torch.utils.tensorboard import SummaryWriter
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models, MODEL_NAME
-from {{ project_slug }}.models.predict_model import evaluate_models, test_model
+from {{ project_slug }}.models.predict_model import evaluate_models, try_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
@@ -312,11 +315,11 @@ def run_full_pipeline() -> None:
 
 def main():
     print('=' * 60)
-    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
         run_full_pipeline()
     elif accion == '1':
-        test_model()
+        try_model()
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
         run_full_pipeline()
@@ -355,9 +358,9 @@ from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models
 {% if task_type == "clasificacion" %}
-from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD, test_model
+from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD, try_model
 {% else %}
-from {{ project_slug }}.models.predict_model import evaluate_models, test_model
+from {{ project_slug }}.models.predict_model import evaluate_models, try_model
 {% endif %}
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
@@ -462,11 +465,11 @@ def run_full_pipeline() -> None:
 
 def main():
     print('=' * 60)
-    accion = input('Ejecutar pipeline completo (0) o probar el modelo (1)? (0/1): ').strip()
+    accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
         run_full_pipeline()
     elif accion == '1':
-        test_model()
+        try_model()
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
         run_full_pipeline()
