@@ -114,8 +114,9 @@ def test_evaluate_models_saves_csv(patch_paths):
 def test_predict_new_after_train(patch_paths):
     """predict_new debe cargar el modelo y predecir correctamente."""
     X_train, X_test, y_train, _ = _make_data()
-    train_models(X_train, y_train, tune_knn=False, cv_evaluate=False)
-    preds = predict_new("RandomForest", X_test)
+    trained = train_models(X_train, y_train, tune_knn=False, cv_evaluate=False)
+    model_name = list(trained.keys())[0]  # usar el primer modelo disponible
+    preds = predict_new(model_name, X_test)
     assert len(preds) == len(X_test)
 {% if task_type == "clasificacion" %}
     assert set(preds).issubset({0, 1})
@@ -134,8 +135,9 @@ def test_predict_new_raises_if_missing(patch_paths):
 def test_predict_proba_new_shape(patch_paths):
     """predict_proba_new debe devolver array (n_samples, n_classes)."""
     X_train, X_test, y_train, _ = _make_data()
-    train_models(X_train, y_train, tune_knn=False, cv_evaluate=False)
-    proba = predict_proba_new("RandomForest", X_test)
+    trained = train_models(X_train, y_train, tune_knn=False, cv_evaluate=False)
+    model_name = list(trained.keys())[0]
+    proba = predict_proba_new(model_name, X_test)
     assert proba.shape == (len(X_test), 2)
     assert np.allclose(proba.sum(axis=1), 1.0, atol=1e-5)
 
