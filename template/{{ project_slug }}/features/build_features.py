@@ -129,10 +129,15 @@ def preprocess_data(
         cols_encoded = [c for c in encoders if c != "__target__"]
         print(f"    Encoders guardados → encoders.joblib  ({cols_encoded})")
 
-    # 8. Split estratificado
+{% if task_type == "clasificacion" %}
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y,
     )
+{% else %}
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state,
+    )
+{% endif %}
 
     # Guardar nombres de features originales (antes de PCA) para test_model()
     joblib.dump(list(X.columns), ARTIFACTS_DIR / "feature_names.joblib")
@@ -155,7 +160,11 @@ def preprocess_data(
         X_train, X_test = _apply_pca(X_train, X_test, use_pca)
 
     print(f"    Train: {X_train.shape} | Test: {X_test.shape}")
+{% if task_type == "clasificacion" %}
     print(f"    Proporción clases (train): {y_train.value_counts(normalize=True).to_dict()}")
+{% else %}
+    print(f"    Target (train) — media: {y_train.mean():.4f}, std: {y_train.std():.4f}")
+{% endif %}
 
     # Guardar conjuntos procesados
     pd.DataFrame(X_train).to_csv(PROCESSED_DATA_DIR / "X_train.csv", index=False)
@@ -352,7 +361,6 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     # Transformación logarítmica
     df = _apply_logcols(df, LOGCOLS)
 
-    le = LabelEncoder()
     encoders = {}
     for col in cat_cols:
         le_col = LabelEncoder()
@@ -460,7 +468,11 @@ def preprocess_data(
 
     if y.dtype == object or str(y.dtype) == "category":
         le_target = LabelEncoder()
-        y = pd.Series(le_target.fit_transform(y.astype(str)), name=target_col)
+        y = pd.Series(
+            le_target.fit_transform(y.astype(str)),
+            index=y.index,
+            name=target_col,
+        )
         encoders["__target__"] = le_target
         joblib.dump(le_target, ARTIFACTS_DIR / "target_encoder.joblib")
 
@@ -473,9 +485,15 @@ def preprocess_data(
     joblib.dump(list(X.columns), ARTIFACTS_DIR / "feature_names.joblib")
     print(f"    feature_names.joblib guardado ({len(X.columns)} features)")
 
+{% if task_type == "clasificacion" %}
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state, stratify=y
+        X, y, test_size=test_size, random_state=random_state, stratify=y,
     )
+{% else %}
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state,
+    )
+{% endif %}
 
     scaler = StandardScaler()
     X_train_s = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
@@ -656,7 +674,11 @@ def preprocess_data(
 
     if y.dtype == object or str(y.dtype) == "category":
         le_target = LabelEncoder()
-        y = pd.Series(le_target.fit_transform(y.astype(str)), name=target_col)
+        y = pd.Series(
+            le_target.fit_transform(y.astype(str)),
+            index=y.index,
+            name=target_col,
+        )
         encoders["__target__"] = le_target
         joblib.dump(le_target, ARTIFACTS_DIR / "target_encoder.joblib")
 
@@ -696,10 +718,16 @@ def preprocess_data(
     joblib.dump(list(X.columns), ARTIFACTS_DIR / "feature_names.joblib")
     print(f"    feature_names.joblib guardado ({len(X.columns)} features)")
 
+{% if task_type == "clasificacion" %}
     X_train, X_test, y_train, y_test = train_test_split(
         X_final, y_final, test_size=test_size, random_state=random_state,
         stratify=y_final,
     )
+{% else %}
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_final, y_final, test_size=test_size, random_state=random_state,
+    )
+{% endif %}
 
     print(f"    Train: {X_train.shape} | Test: {X_test.shape}")
     pd.DataFrame(X_train).to_csv(PROCESSED_DATA_DIR / "X_train.csv", index=False)
