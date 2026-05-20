@@ -46,6 +46,9 @@ dev = [
 supervisado = [
     "lightgbm",
     "xgboost",
+{% if use_catboost or model_type == "CatBoost" %}
+    "catboost",
+{% endif %}
     "statsmodels",
     "imbalanced-learn",
 {% if use_shap %}
@@ -82,6 +85,9 @@ hibrido = [
     "umap-learn",     # UMAP como alternativa a PCA (no lineal)
     "lightgbm",       # clasificador final potente
     "xgboost",        # clasificador final alternativo
+{% if use_catboost or model_type == "CatBoost" %}
+    "catboost",       # boosting nativo para variables categoricas
+{% endif %}
     "imbalanced-learn",
 ]
 

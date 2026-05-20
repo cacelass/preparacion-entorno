@@ -6,6 +6,7 @@
         profile \
         mlflow \
         monitor tune serve query \
+{% if use_docker %}        docker-run docker-update docker-down {% endif %}\
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -90,6 +91,12 @@ help:
 	@echo "    make clean-figures  borra figuras de reports/figures/"
 	@echo "    make clean-all      todo lo anterior"
 	@echo ""
+{% if use_docker %}	@echo "  Docker"
+	@echo "    make docker-run     construye imagen y lanza el chat en http://localhost:8080"
+	@echo "    make docker-update  reconstruye la imagen con los cambios mas recientes"
+	@echo "    make docker-down    para y elimina los contenedores"
+	@echo ""
+{% endif %}
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Entorno
@@ -257,6 +264,34 @@ clean-figures:
 
 clean-all: clean clean-models clean-figures
 	@echo "  Limpieza completa."
+
+
+{% if use_docker %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  Docker — interfaz web de chat
+# ─────────────────────────────────────────────────────────────────────────────
+docker-run:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Construyendo y arrancando contenedor Docker"
+	@echo "  Chat disponible en: http://localhost:8080"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	docker compose up -d --build
+	@echo ""
+	@echo "  Logs en tiempo real: docker compose logs -f"
+	@echo ""
+
+docker-update:
+	@echo "  Reconstruyendo imagen con cambios recientes..."
+	docker compose up -d --build --force-recreate
+	@echo "  Imagen actualizada y contenedor reiniciado."
+
+docker-down:
+	@echo "  Parando contenedores..."
+	docker compose down
+	@echo "  Contenedores detenidos."
+{% endif %}
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Info del entorno

@@ -8,6 +8,7 @@
 {% endif %}{% if use_mlflow %}![Tracking](https://img.shields.io/badge/Experiment%20Tracking-MLflow-blue?logo=mlflow)
 {% endif %}![Version](https://img.shields.io/badge/Version-{{ project_version }}-green)
 ![Author](https://img.shields.io/badge/Author-{{ project_author_name | replace(" ", "%20") | replace("-", "--") }}-blueviolet)
+![Template](https://img.shields.io/badge/Generado%20con-dskit-58a6ff?logo=github)
 
 > {{ project_description }}
 
@@ -44,6 +45,50 @@
 └── pyproject.toml
 ```
 
+
+{% if use_docker %}
+## Docker — Interfaz de chat
+
+La imagen Docker incluye una interfaz web de chat para interactuar con los
+modelos entrenados directamente desde el navegador.
+
+### Arrancar
+
+```bash
+# Construir y lanzar (entrena automaticamente si no hay modelos)
+make docker-run
+
+# O directamente con Docker Compose
+docker compose up -d
+```
+
+La interfaz estara disponible en **http://localhost:8080**
+
+> Si no existe ningun modelo entrenado, el contenedor intentara entrenar
+> automaticamente al arrancar (requiere `dataset.csv` en la raiz del proyecto).
+
+### Comandos Docker
+
+```bash
+make docker-run     # construir imagen + arrancar contenedor
+make docker-update  # reconstruir con los ultimos cambios
+make docker-down    # parar y eliminar contenedores
+```
+
+### Comandos disponibles en el chat
+
+| Comando | Descripcion |
+|---|---|
+| `status` | Estado del sistema y modelos cargados |
+| `predict` | Prediccion interactiva paso a paso |
+| `info` | Detalle de features y clases |
+| `train` | Lanzar entrenamiento desde el chat |
+| `reload` | Recargar modelos del disco |
+| `help` | Mostrar ayuda |
+
+---
+{% endif %}
+
 ## Inicio rápido
 
 ```bash
@@ -63,3 +108,7 @@ python main.py
 ```
 
 Consulta el archivo `ayuda` para más detalles.
+
+---
+
+Generado con la plantilla **[dskit](https://github.com/cacelass/dskit)**.

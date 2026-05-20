@@ -1,0 +1,80 @@
+# .dockerignore — {{ project_name }}
+# Excluye archivos innecesarios de la imagen Docker.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Entornos virtuales y caches Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Control de versiones
+.git/
+.gitignore
+.gitattributes
+
+# Herramientas de desarrollo
+.copier-answers.yml
+.editorconfig
+.pre-commit-config.yaml
+
+# Notebooks (demasiado pesados para el contenedor de inferencia)
+notebooks/
+
+# Documentacion Sphinx (no necesaria en el contenedor)
+docs/_build/
+docs/
+
+# Reportes y figuras generadas
+reports/
+
+# IDEs y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Tests (no se ejecutan en produccion)
+tests/
+
+# Archivos de configuracion CI
+.github/
+.gitlab-ci.yml
+
+# Logs locales
+*.log
+logs/
+
+# Variables de entorno locales (nunca incluir en la imagen)
+.env
+.env.*
+!.env.example
+
+# Datos grandes (se montan como volumen)
+data/raw/
+data/interim/
+data/processed/
+# dataset.csv en la RAIZ se copia como fallback para auto-train (no excluir)
+
+# Artefactos de entrenamiento (se montan como volumen)
+# models/      <- NO excluir: se monta como volumen en docker-compose.yml
+
+{% if use_mlflow %}
+# Servidor MLflow local
+mlruns/
+mlflow.db
+{% endif %}
+
+{% if ml_type == 'redes_neuronales' %}
+# TensorBoard logs
+runs/
+{% endif %}

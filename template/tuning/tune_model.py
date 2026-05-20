@@ -211,6 +211,39 @@ def _objective_lgbm(trial, X_train, y_train):{% if task_type == "clasificacion" 
 {% endif %}
 
 
+{% if use_catboost or model_type == "CatBoost" %}
+def _objective_catboost(trial, X_train, y_train):
+{% if task_type == "clasificacion" %}
+    from catboost import CatBoostClassifier
+    model = CatBoostClassifier(
+        iterations     = trial.suggest_int("iterations",    50,  500, step=50),
+        depth          = trial.suggest_int("depth",          3,   10),
+        learning_rate  = trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+        l2_leaf_reg    = trial.suggest_float("l2_leaf_reg",   1e-2, 10.0, log=True),
+        border_count   = trial.suggest_categorical("border_count", [32, 64, 128, 254]),
+        loss_function  = "Logloss",
+        eval_metric    = "Accuracy",
+        random_seed    = 42,
+        verbose        = 0,
+    )
+{% else %}
+    from catboost import CatBoostRegressor
+    model = CatBoostRegressor(
+        iterations     = trial.suggest_int("iterations",    50,  500, step=50),
+        depth          = trial.suggest_int("depth",          3,   10),
+        learning_rate  = trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+        l2_leaf_reg    = trial.suggest_float("l2_leaf_reg",   1e-2, 10.0, log=True),
+        border_count   = trial.suggest_categorical("border_count", [32, 64, 128, 254]),
+        loss_function  = "RMSE",
+        random_seed    = 42,
+        verbose        = 0,
+    )
+{% endif %}
+    scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
+    return -scores.mean() if _MINIMIZE else scores.mean()
+{% endif %}
+
+
 # ---------------------------------------------------------------------------
 # Mapa modelo → función objetivo
 # ---------------------------------------------------------------------------
@@ -232,6 +265,9 @@ _OBJECTIVES["XGBoost"] = _objective_xgb
 {% endif %}
 {% if use_lightgbm or model_type == "LightGBM" %}
 _OBJECTIVES["LightGBM"] = _objective_lgbm
+{% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+_OBJECTIVES["CatBoost"] = _objective_catboost
 {% endif %}
 {% if model_type == "todos" or model_type == "SVM" %}
 

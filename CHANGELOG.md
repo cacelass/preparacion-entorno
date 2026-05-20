@@ -5,6 +5,33 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+
+## [1.8.0] — 2026-05-20
+### Añadido
+- `use_catboost` — integración completa de CatBoost (supervisado + híbrido).
+  - `copier.yml`: variable `use_catboost: bool` (default false) + choice `CatBoost` en `model_type`.
+  - `pyproject.toml`: extra `catboost` en las dependencias opcionales de `supervisado` e `hibrido`.
+  - `train_model.py`: imports `CatBoostClassifier` / `CatBoostRegressor`, entradas en
+    `_build_models()` para supervisado (clf + reg, con y sin Optuna) e híbrido (clf + reg).
+  - `tune_model.py`: función `_objective_catboost` (trials: iterations, depth, learning_rate,
+    l2_leaf_reg, border_count) + entrada en `_OBJECTIVES`.
+  - `README.md`: badge `· CatBoost ✓` junto a XGBoost y LightGBM.
+  - `_tasks`: verificación `import catboost` tras `uv sync` si `use_catboost=true`.
+- `use_docker` — configuracion Docker completa con interfaz web de chat.
+  - `Dockerfile` con imagen Python slim, `uv`, `figlet` y banner ASCII DSKIT al arrancar.
+  - `docker-compose.yml` con volumenes para `models/`, `data/` y `apuntes/`.
+  - `docker/app.py` — servidor FastAPI + WebSocket que expone los modelos entrenados.
+  - `docker/static/index.html` — interfaz de chat con tema oscuro, markdown renderizado,
+    mensajes de usuario a la derecha y bot a la izquierda, chips de comandos rapidos.
+  - `docker/entrypoint.sh` — arranca banner, comprueba modelos (entrena si no hay ninguno)
+    y lanza uvicorn.
+  - `.dockerignore` ajustado al proyecto.
+  - `make docker-run`, `make docker-update`, `make docker-down` en el Makefile.
+- `README.md` — seccion Docker, badge dskit y enlace a `https://github.com/cacelass/dskit`.
+- Herramientas instaladas en el contenedor: `markitdown`, `graphify`.
+
+---
+
 ## [1.7.0] — 2026-05-09
 
 ### Añadido

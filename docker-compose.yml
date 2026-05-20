@@ -1,0 +1,56 @@
+# docker-compose.yml — {{ project_name }}
+# Generado por dskit (https://github.com/cacelass/dskit)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Uso rapido:
+#   docker compose up -d          # arrancar (entrena si no hay modelos)
+#   docker compose logs -f        # ver logs en tiempo real
+#   docker compose down           # parar y eliminar contenedores
+#   docker compose down -v        # parar + eliminar volumenes anonimos
+#
+# La interfaz de chat estara disponible en: http://localhost:8080
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  chat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: {{ project_slug }}:{{ project_version }}
+    container_name: {{ project_slug }}-chat
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      # Modelos entrenados — persisten entre reinicios
+      - ./models:/app/models
+      # Datos de entrada — coloca aqui dataset.csv
+      - ./data:/app/data
+      # Apuntes de clase
+      - ./apuntes:/app/apuntes
+
+    environment:
+      # Entorno de ejecucion
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      # Configuracion del proyecto (solo lectura; el template ya las graba en codigo)
+      - PROJECT_NAME={{ project_name }}
+      - PROJECT_VERSION={{ project_version }}
+      - ML_TYPE={{ ml_type }}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    # Limite de recursos (ajustar segun maquina)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M

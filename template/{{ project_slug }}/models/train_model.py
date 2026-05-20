@@ -56,6 +56,13 @@ from lightgbm import LGBMClassifier
 from lightgbm import LGBMRegressor
 {% endif %}
 {% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+{% if task_type == "clasificacion" %}
+from catboost import CatBoostClassifier
+{% else %}
+from catboost import CatBoostRegressor
+{% endif %}
+{% endif %}
 
 {% if use_mlflow %}
 import mlflow
@@ -107,6 +114,9 @@ def _build_models() -> dict:
 {% if use_lightgbm or model_type == "LightGBM" %}
     LightGBM           → leaf-wise boosting. Más rápido en datasets grandes.
 {% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+    CatBoost           → boosting nativo para categoricas. Poco tunning necesario.
+{% endif %}
 {% else %}
 {% if model_type == "todos" %}
     LinearRegression   → modelo base. Rápido e interpretable.
@@ -124,6 +134,9 @@ def _build_models() -> dict:
 {% endif %}
 {% if use_lightgbm or model_type == "LightGBM" %}
     LightGBM           → leaf-wise boosting para regresión.
+{% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+    CatBoost           → boosting nativo para categoricas, regresión.
 {% endif %}
 {% endif %}
     """
@@ -148,6 +161,9 @@ def _build_models() -> dict:
 {% endif %}
 {% if use_lightgbm or model_type == "LightGBM" %}
         "LightGBM",
+{% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+        "CatBoost",
 {% endif %}
     ]}
 {% endif %}
@@ -334,6 +350,43 @@ def _build_models() -> dict:
         subsample=0.8, colsample_bytree=0.8, min_child_samples=20,
         reg_alpha=0.1, reg_lambda=1.0,
         random_state=42, n_jobs=-1, verbose=-1,
+    )
+{% endif %}
+{% endif %}
+{% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+{% if task_type == "clasificacion" %}
+{% if use_optuna %}
+    models["CatBoost"] = CatBoostClassifier(**{
+        "iterations": 300, "depth": 6, "learning_rate": 0.05,
+        "l2_leaf_reg": 3.0, "border_count": 254,
+        "loss_function": "Logloss", "eval_metric": "Accuracy",
+        "random_seed": 42, "verbose": 0,
+        **_best.get("CatBoost", {}),
+    })
+{% else %}
+    models["CatBoost"] = CatBoostClassifier(
+        iterations=300, depth=6, learning_rate=0.05,
+        l2_leaf_reg=3.0, border_count=254,
+        loss_function="Logloss", eval_metric="Accuracy",
+        random_seed=42, verbose=0,
+    )
+{% endif %}
+{% else %}
+{% if use_optuna %}
+    models["CatBoost"] = CatBoostRegressor(**{
+        "iterations": 300, "depth": 6, "learning_rate": 0.05,
+        "l2_leaf_reg": 3.0, "border_count": 254,
+        "loss_function": "RMSE",
+        "random_seed": 42, "verbose": 0,
+        **_best.get("CatBoost", {}),
+    })
+{% else %}
+    models["CatBoost"] = CatBoostRegressor(
+        iterations=300, depth=6, learning_rate=0.05,
+        l2_leaf_reg=3.0, border_count=254,
+        loss_function="RMSE",
+        random_seed=42, verbose=0,
     )
 {% endif %}
 {% endif %}
@@ -1187,6 +1240,13 @@ from xgboost import XGBClassifier
 {% if use_lightgbm or model_type == "LightGBM" %}
 from lightgbm import LGBMClassifier
 {% endif %}
+{% if use_catboost or model_type == "CatBoost" %}
+{% if task_type == "clasificacion" %}
+from catboost import CatBoostClassifier
+{% else %}
+from catboost import CatBoostRegressor
+{% endif %}
+{% endif %}
 
 from {{ project_slug }}.utils.paths import MODELS_DIR
 
@@ -1311,6 +1371,34 @@ def _build_models(strategy: str) -> dict:
         n_jobs=-1,
         verbose=-1,
     )
+{% endif %}
+
+{% if use_catboost or model_type == "CatBoost" %}
+    # CatBoost: manejo nativo de categoricas, no requiere encoders externos.
+{% if task_type == "clasificacion" %}
+    base["CatBoost"] = CatBoostClassifier(
+        iterations=300,
+        depth=6,
+        learning_rate=0.05,
+        l2_leaf_reg=3.0,
+        border_count=254,
+        loss_function="Logloss",
+        eval_metric="Accuracy",
+        random_seed=42,
+        verbose=0,
+    )
+{% else %}
+    base["CatBoost"] = CatBoostRegressor(
+        iterations=300,
+        depth=6,
+        learning_rate=0.05,
+        l2_leaf_reg=3.0,
+        border_count=254,
+        loss_function="RMSE",
+        random_seed=42,
+        verbose=0,
+    )
+{% endif %}
 {% endif %}
 
     return base
