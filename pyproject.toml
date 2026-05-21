@@ -33,11 +33,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
     "invoke",
     "nbdime",
     "ruff",
     "pytest",
+    "pytest-cov",
     "sphinx",
     "snakeviz",
 ]
@@ -46,6 +46,9 @@ dev = [
 supervisado = [
     "lightgbm",
     "xgboost",
+{% if use_catboost or model_type == "CatBoost" %}
+    "catboost",
+{% endif %}
     "statsmodels",
     "imbalanced-learn",
 {% if use_shap %}
@@ -74,6 +77,7 @@ redes_neuronales = [
     "torchmetrics[visual]",
     "tensorboard",
     "polars",         # carga eficiente de datos con dtypes explícitos
+    "pyarrow",        # backend requerido por polars para conversión a pandas
 ]
 
 # Modelos híbridos: combinan técnicas supervisadas y no supervisadas
@@ -81,11 +85,45 @@ hibrido = [
     "umap-learn",     # UMAP como alternativa a PCA (no lineal)
     "lightgbm",       # clasificador final potente
     "xgboost",        # clasificador final alternativo
-    "imbalanced-learn",
-{% if use_shap %}
-    "shap",
+{% if use_catboost or model_type == "CatBoost" %}
+    "catboost",       # boosting nativo para variables categoricas
 {% endif %}
+    "imbalanced-learn",
 ]
+
+{% if use_optuna %}
+# Optuna: optimizacion de hiperparametros
+optuna = [
+    "optuna",
+    "optuna-dashboard",  # UI web para explorar estudios (opcional)
+]
+{% endif %}
+
+{% if use_duckdb %}
+# DuckDB: queries SQL sobre CSV/Parquet/JSON sin servidor
+duckdb = [
+    "duckdb",
+    "pyarrow",   # necesario para leer/escribir Parquet con pandas y DuckDB
+]
+{% endif %}
+
+{% if use_api %}
+# API REST para servir el modelo entrenado
+api = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "httpx",   # cliente HTTP para tests de la API
+]
+{% endif %}
+
+{% if use_monitoring %}
+# Monitorización: drift detection y performance tracking
+monitoring = [
+    "evidently",   # drift detection + HTML reports
+    "scipy",       # tests KS y chi-cuadrado (incluido en core, aquí explícito)
+]
+{% endif %}
 
 [tool.setuptools]
 packages = ["{{ project_slug }}"]

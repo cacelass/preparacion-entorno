@@ -8,12 +8,13 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../src/'))
+# El paquete vive en la raíz del proyecto (src-layout no usado)
+sys.path.insert(0, os.path.abspath('../..'))
 
 
 
 project = '{{ project_slug }}'
-copyright = '2025, {{ project_author_name }}'
+copyright = '2026, {{ project_author_name }}'
 author = '{{ project_author_name }}'
 
 # -- General configuration ---------------------------------------------------

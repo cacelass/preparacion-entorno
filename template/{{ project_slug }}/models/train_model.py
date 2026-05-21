@@ -1113,9 +1113,78 @@ def train_models(
     # model   = torch.compile(model)   # PyTorch >= 2.0: descomentar para mayor velocidad
     print(f"    Parámetros: {sum(p.numel() for p in model.parameters()):,}")
 
+    # ── Optimizador configurable ─────────────────────────────────────────
+{% set _opt = optimizer_type if optimizer_type is defined else 'AdamW' %}
+{% if _opt == 'AdamW' %}
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+{% elif _opt == 'Adam' %}
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+{% elif _opt == 'SGD' %}
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, nesterov=True)
+{% elif _opt == 'RMSProp' %}
+    optimizer = torch.optim.RMSprop(model.parameters(), lr=lr, momentum=0.9)
+{% elif _opt == 'Adagrad' %}
+    optimizer = torch.optim.Adagrad(model.parameters(), lr=lr)
+{% else %}
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+{% endif %}
+    print(f"    Optimizador: {{ optimizer_type if optimizer_type is defined else 'AdamW' }}")
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-    criterion = nn.CrossEntropyLoss()  # cambiar a MSELoss para regresión
+
+    # ── Función de pérdida configurable ─────────────────────────────────
+{% set _loss_raw = nn_loss_fn if nn_loss_fn is defined else 'Auto' %}
+{% if _loss_raw == 'Auto' %}
+{%   if task_type == 'regresion' %}
+    criterion = nn.MSELoss()
+    print("    Loss: MSELoss (regresión — Auto)")
+{%   else %}
+    criterion = nn.CrossEntropyLoss()
+    print("    Loss: CrossEntropyLoss (clasificación — Auto)")
+{%   endif %}
+{% elif _loss_raw == 'MSELoss' %}
+    criterion = nn.MSELoss()
+    print("    Loss: MSELoss")
+{% elif _loss_raw == 'L1Loss' %}
+    criterion = nn.L1Loss()
+    print("    Loss: L1Loss")
+{% elif _loss_raw == 'BCEWithLogitsLoss' %}
+    criterion = nn.BCEWithLogitsLoss()
+    print("    Loss: BCEWithLogitsLoss")
+{% else %}
+    criterion = nn.CrossEntropyLoss()
+    print("    Loss: CrossEntropyLoss")
+{% endif %}
+
+    # ── TorchMetrics ─────────────────────────────────────────────────────
+    try:
+        from torchmetrics import MetricCollection
+{% if task_type == 'clasificacion' %}
+        from torchmetrics.classification import (
+            MulticlassAccuracy, MulticlassF1Score,
+            MulticlassPrecision, MulticlassRecall,
+        )
+        _metrics_train = MetricCollection({
+            "acc":       MulticlassAccuracy(num_classes=output_dim),
+            "f1":        MulticlassF1Score(num_classes=output_dim, average="macro"),
+            "precision": MulticlassPrecision(num_classes=output_dim, average="macro"),
+            "recall":    MulticlassRecall(num_classes=output_dim, average="macro"),
+        }).to(device)
+        _metrics_val = _metrics_train.clone().to(device)
+{% else %}
+        from torchmetrics.regression import MeanAbsoluteError, MeanSquaredError, R2Score
+        _metrics_train = MetricCollection({
+            "mae":  MeanAbsoluteError(),
+            "rmse": MeanSquaredError(squared=False),
+            "r2":   R2Score(),
+        }).to(device)
+        _metrics_val = _metrics_train.clone().to(device)
+{% endif %}
+        _use_metrics = True
+        print("    TorchMetrics: activo")
+    except ImportError:
+        _use_metrics = False
+        print("    TorchMetrics: no disponible (pip install torchmetrics)")
+
     tb        = SummaryWriter(log_dir=str(RUNS_DIR))
     print(f"    TensorBoard: tensorboard --logdir {RUNS_DIR}")
     if patience > 0:
@@ -1128,14 +1197,23 @@ def train_models(
         # ── Entrenamiento ────────────────────────────────────────────────
         model.train()
         total_loss = 0.0
+        if _use_metrics:
+            _metrics_train.reset()
         for X_b, y_b in loader:
             X_b, y_b = X_b.to(device), y_b.to(device)
             optimizer.zero_grad()
-            loss = criterion(model(X_b), y_b)
+            preds_b = model(X_b)
+            loss = criterion(preds_b, y_b)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             total_loss += loss.item()
+            if _use_metrics:
+{% if task_type == 'clasificacion' %}
+                _metrics_train.update(preds_b.argmax(dim=-1), y_b)
+{% else %}
+                _metrics_train.update(preds_b.squeeze(), y_b.float())
+{% endif %}
 
         scheduler.step()
         avg_loss = total_loss / len(loader)
@@ -1143,20 +1221,39 @@ def train_models(
         # ── Validación ───────────────────────────────────────────────────
         model.eval()
         val_loss = 0.0
+        if _use_metrics:
+            _metrics_val.reset()
         with torch.no_grad():
             for X_b, y_b in val_loader:
                 X_b, y_b = X_b.to(device), y_b.to(device)
-                val_loss += criterion(model(X_b), y_b).item()
+                preds_b = model(X_b)
+                val_loss += criterion(preds_b, y_b).item()
+                if _use_metrics:
+{% if task_type == 'clasificacion' %}
+                    _metrics_val.update(preds_b.argmax(dim=-1), y_b)
+{% else %}
+                    _metrics_val.update(preds_b.squeeze(), y_b.float())
+{% endif %}
         avg_val_loss = val_loss / len(val_loader)
 
         tb.add_scalar("Loss/train", avg_loss,     epoch)
         tb.add_scalar("Loss/val",   avg_val_loss, epoch)
         tb.add_scalar("LR",         scheduler.get_last_lr()[0], epoch)
+        if _use_metrics:
+            for k, v in _metrics_train.compute().items():
+                tb.add_scalar(f"Train/{k}", v.item(), epoch)
+            for k, v in _metrics_val.compute().items():
+                tb.add_scalar(f"Val/{k}", v.item(), epoch)
 
         if (epoch + 1) % 10 == 0:
+            metrics_str = ""
+            if _use_metrics:
+                m = _metrics_val.compute()
+                metrics_str = "  ".join(f"{k}={v.item():.3f}" for k, v in m.items())
             print(f"    Epoch {epoch+1}/{epochs} — "
                   f"train: {avg_loss:.4f}  val: {avg_val_loss:.4f}  "
-                  f"LR: {scheduler.get_last_lr()[0]:.2e}")
+                  f"LR: {scheduler.get_last_lr()[0]:.2e}"
+                  + (f"  [{metrics_str}]" if metrics_str else ""))
 
         if checkpoint_every > 0 and (epoch + 1) % checkpoint_every == 0:
             torch.save({
@@ -1207,7 +1304,18 @@ def load_checkpoint(input_dim: int, output_dim: int, checkpoint_path: str):
     """Carga un checkpoint para continuar el entrenamiento."""
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model      = _build_model(input_dim=input_dim, output_dim=output_dim).to(device)
+{% set _opt2 = optimizer_type if optimizer_type is defined else 'AdamW' %}
+{% if _opt2 == 'Adam' %}
+    optimizer  = torch.optim.Adam(model.parameters())
+{% elif _opt2 == 'SGD' %}
+    optimizer  = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+{% elif _opt2 == 'RMSProp' %}
+    optimizer  = torch.optim.RMSprop(model.parameters())
+{% elif _opt2 == 'Adagrad' %}
+    optimizer  = torch.optim.Adagrad(model.parameters())
+{% else %}
     optimizer  = torch.optim.AdamW(model.parameters())
+{% endif %}
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     epoch_inicio = checkpoint["epoch"]

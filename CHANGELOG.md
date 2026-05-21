@@ -5,6 +5,92 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.8.1] — 2026-05-20
+
+### Añadido / Mejorado 
+
+Los notebooks de la plantilla ahora integran contenido educativo **directamente en el flujo de trabajo**
+del proyecto, condicionado con Jinja a `ml_type == 'redes_neuronales'` y a la arquitectura (`nn_model`),
+el optimizador (`optimizer_type`), la función de pérdida (`nn_loss_fn`) y el tipo de tarea (`task_type`).
+
+#### `0-0-DescargaDatos.ipynb`
+- **§3b — Rangos de features** (nuevo): barras de rango/media/std pre-normalización; detecta
+  features con varianza ≈ 0 y rangos extremos (>100× mediana) antes del scaler.
+- **§12 — Checklist NN** (nuevo al final): evalúa automáticamente muestras, nulos, infinitos,
+  encoding del target, balance de clases / outliers extremos en regresión, varianza de features,
+  y aviso temporal para LSTM/GRU/Transformer. Muestra semáforo ✓/! /✗ con consejo de acción.
+
+#### `0-1-ProcesamientoDatos.ipynb`
+- **§3b — Forma del tensor de entrada** (nuevo): muestra la forma exacta que espera cada
+  arquitectura (`MLP` → 2D, `CNN1D` → unsqueeze canal, `LSTM`/`GRU` → unsqueeze seq_len,
+  `Transformer` → transponer). Detecta NaNs/infs en `X_train` con mensaje de corrección.
+- **§3c — Dtypes y balance** (nuevo): verifica que las clases son enteros desde 0
+  (`CrossEntropyLoss` requiere `torch.long`), detecta desbalance con ratio, muestra estadísticas
+  del target en regresión y recomienda escalar si `std > 10`.
+
+#### `0-2-Ejecucion.ipynb`
+- **§3b — Autograd** (nuevo, solo NN): demo interactiva del grafo de cómputo con tensor simple;
+  explica el ciclo `forward → backward → step → zero_grad`; muestra el `grad_fn` del modelo real.
+- **§3c — Optimizador** (nuevo, solo NN): curva de convergencia del `optimizer_type` elegido
+  en un problema juguete de regresión 1D; parámetros aprendidos vs esperados.
+- **§3d — Función de pérdida** (nuevo, solo NN): tabla comparativa MSE/L1/Huber en regresión;
+  demo CrossEntropy/BCE con logits en clasificación; visualización de probabilidades post-softmax.
+  Condicionado a `task_type` y al `nn_loss_fn` elegido.
+- **§3e — TorchMetrics** (nuevo, solo NN): calcula Accuracy/F1/Precision/Recall/AUROC
+  (clasificación) o MAE/RMSE/R² (regresión) sobre el conjunto de test completo usando
+  `MetricCollection`; AUROC solo disponible para `MLP` y `CNN1D`.
+
+
+### Añadido
+- **`optimizer_type`** — nueva pregunta en `copier.yml` (solo `redes_neuronales`).
+  Permite elegir el optimizador PyTorch: `AdamW` (default) | `Adam` | `SGD` | `RMSProp` | `Adagrad`.
+  El `train_model.py` y `load_checkpoint` se generan con el optimizador elegido.
+- **`nn_loss_fn`** — nueva pregunta en `copier.yml` (solo `redes_neuronales`).
+  Permite elegir la función de pérdida: `Auto` (CrossEntropy/MSE según `task_type`) |
+  `CrossEntropyLoss` | `MSELoss` | `L1Loss` | `BCEWithLogitsLoss`.
+- **TorchMetrics** integrado en el bucle de entrenamiento (`redes_neuronales`).
+  - Clasificación: `MulticlassAccuracy`, `F1Score`, `Precision`, `Recall` (macro).
+  - Regresión: `MAE`, `RMSE`, `R²`.
+  - Métricas train/val logueadas en TensorBoard (escalares `Train/*` y `Val/*`) y
+    mostradas en la consola cada 10 épocas.
+  - Degradación silenciosa si `torchmetrics` no está disponible.
+- **Notebooks PyTorch educativos** (solo `ml_type = redes_neuronales`):
+  - `1-0-Autograd.ipynb` — mecanismo autograd, DAG de cómputo, gradientes.
+  - `1-1-Optimizadores.ipynb` — SGD, Adagrad, Adam, RMSProp, Adadelta con CIFAR-10.
+  - `1-2-FuncionesDePerdida.ipynb` — MSE, L1, MBE, SVM Loss, CrossEntropy.
+  - `1-3-Scores.ipynb` — `torchmetrics`: F1, Accuracy, Precision, Recall, AUROC,
+    `MetricCollection`, HammingDistance.
+  - Excluidos automáticamente en otros `ml_type` vía `_exclude`.
+- **`api/__init__.py`** añadido (BUG-031): el directorio `api/` ahora es un paquete Python válido.
+- **`make lock`** (BUG-032): nuevo target que ejecuta `uv lock`.
+- **`make docs`** ahora depende de `setup` (BUG-014): evita que sphinx-autodoc falle sin entorno.
+- **Extra `monitoring`** en `pyproject.toml` (BUG-029): añade `evidently` y `scipy` cuando
+  `use_monitoring = yes`; incluido en `uv sync` de `_tasks` y verificado con `import evidently`.
+
+### Corregido
+- **BUG-002** — `make test` ahora pasa `--cov={{ project_slug }} --cov-report=term-missing
+  --cov-report=html:htmlcov` para cobertura real del paquete.
+- **BUG-022** — `docs/source/conf.py`: `sys.path` apuntaba a `../../src/` inexistente;
+  corregido a `../..` (layout plano del proyecto).
+- **BUG-015** — `.gitignore`: `__pycache__/` solo cubría la raíz; cambiado a
+  `**/__pycache__/` para recursividad completa. Añadido `*.pyo` explícito.
+- **BUG-016** — Notebooks sin indicación de entorno: todos los notebooks
+  (`.ipynb`) reciben ahora una celda markdown de advertencia al inicio con el
+  comando `make lab` / `make notebook` para garantizar que se lanzan con `uv run`.
+- **BUG-024** — Celdas de carga de datos sin guardia: `load_data(DATA_FILE)` en
+  `0-0-DescargaDatos` y `0-1-ProcesamientoDatos`, y `pd.read_csv(X_train.csv)` en
+  `0-2-Ejecucion`, ahora están envueltas en `try/except FileNotFoundError` con
+  mensaje de ayuda que indica el comando `make data && make features` o el paso
+  previo requerido.
+- **BUG-023** — Combinaciones de opciones inviables: añadido `_message_before_copy`
+  en `copier.yml` que advierte al usuario antes de generar. Añadido texto de ayuda
+  detallado en `use_api` explicando el requisito de `make train` previo.
+- **BUG-022** — `docs/source/conf.py`: `sys.path` apuntaba a `../../src/` inexistente.
+  Corregido a `../..` (ya en v1.8.1, confirmado en auditoría).
+
+
+---
+
 
 ## [1.8.0] — 2026-05-20
 ### Añadido

@@ -783,7 +783,10 @@ def try_model() -> None:
 {% elif ml_type == 'redes_neuronales' %}
 """
 predict_model.py — Evaluación y exportación de predicciones (PyTorch).
-Arquitectura activa: {{ nn_model }}
+Arquitectura : {{ nn_model }}
+Tarea        : {{ task_type }}
+Optimizador  : {{ optimizer_type if optimizer_type is defined else 'AdamW' }}
+Loss         : {{ nn_loss_fn if nn_loss_fn is defined else 'Auto' }}
 """
 import os
 import numpy as np
@@ -793,10 +796,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+{% if task_type == 'clasificacion' %}
 from sklearn.metrics import (
     accuracy_score, f1_score, precision_score, recall_score,
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
 )
+{% else %}
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+{% endif %}
 
 from {{ project_slug }}.utils.paths import FIGURES_DIR, MODELS_DIR, REPORTS_DIR
 
@@ -808,74 +815,117 @@ elif torch.backends.mps.is_available():
 else:
     device = torch.device("cpu")
 
+# ── TorchMetrics (opcional) ──────────────────────────────────────────────────
+try:
+    from torchmetrics import MetricCollection
+{% if task_type == 'clasificacion' %}
+    from torchmetrics.classification import (
+        MulticlassAccuracy, MulticlassF1Score,
+        MulticlassPrecision, MulticlassRecall,
+    )
+    def _build_tm_metrics(num_classes: int):
+        return MetricCollection({
+            "Accuracy":  MulticlassAccuracy(num_classes=num_classes, average="macro"),
+            "F1":        MulticlassF1Score(num_classes=num_classes, average="macro"),
+            "Precision": MulticlassPrecision(num_classes=num_classes, average="macro"),
+            "Recall":    MulticlassRecall(num_classes=num_classes, average="macro"),
+        }).to(device)
+{% else %}
+    from torchmetrics.regression import MeanAbsoluteError, MeanSquaredError, R2Score
+    def _build_tm_metrics(_=None):
+        return MetricCollection({
+            "MAE":  MeanAbsoluteError(),
+            "RMSE": MeanSquaredError(squared=False),
+            "R2":   R2Score(),
+        }).to(device)
+{% endif %}
+    _HAS_TM = True
+except ImportError:
+    _HAS_TM = False
 
-def evaluate_models(models, X_test, y_test, num_classes=2, tb_writer=None) -> pd.DataFrame:
+
+{% if task_type == 'clasificacion' %}
+def evaluate_models(models, X_test, y_test, num_classes: int = 2,
+                    tb_writer=None) -> pd.DataFrame:
     """
-    Evalúa modelos PyTorch sobre el conjunto de test.
+    Evalúa modelos PyTorch (clasificación) sobre el conjunto de test.
 
     Genera por cada modelo:
-      - Matriz de confusión PNG en reports/figures/
+      - Matriz de confusión PNG en figures/
       - Distribución de probabilidades PNG (solo binario)
       - CSV con métricas en reports/resultados_{{ nn_model }}.csv
-      - CSV con predicciones individuales en reports/predicciones_{{ nn_model }}.csv
+      - CSV con predicciones individuales
+
+    Métricas: Accuracy, F1, Precision, Recall (macro via torchmetrics si disponible,
+    sklearn como fallback).
     """
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"\n{'='*60}\n  Evaluación — {{ nn_model }}\n{'='*60}")
+    print(f"\n{'='*60}\n  Evaluación clasificación — {{ nn_model }}\n{'='*60}")
     results = []
 
     for name, model in models.items():
         print(f"\n--- {name} ---")
         model.eval()
+
+        X_t = torch.tensor(
+            X_test.values if hasattr(X_test, "values") else X_test,
+            dtype=torch.float32,
+        ).to(device)
+        y_true = np.array(y_test.values if hasattr(y_test, "values") else y_test)
+
         with torch.no_grad():
-            X_t    = torch.tensor(
-                X_test.values if hasattr(X_test, "values") else X_test,
-                dtype=torch.float32,
-            ).to(device)
             logits = model(X_t)
             if num_classes == 1:
-                proba  = torch.sigmoid(logits).cpu().numpy().flatten()
-                y_pred = (proba >= 0.5).astype(int)
+                proba     = torch.sigmoid(logits).cpu().numpy().flatten()
+                y_pred    = (proba >= 0.5).astype(int)
                 proba_out = proba
             else:
-                proba_mat  = torch.softmax(logits, dim=1).cpu().numpy()
-                y_pred     = np.argmax(proba_mat, axis=1)
-                proba_out  = proba_mat
+                proba_mat = torch.softmax(logits, dim=1).cpu().numpy()
+                y_pred    = np.argmax(proba_mat, axis=1)
+                proba_out = proba_mat
 
-        y_true = y_test.values if hasattr(y_test, "values") else np.array(y_test)
-
-        acc  = accuracy_score(y_true, y_pred)
-        f1   = f1_score(y_true, y_pred, average="weighted", zero_division=0)
-        prec = precision_score(y_true, y_pred, average="weighted", zero_division=0)
-        rec  = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+        # ── Métricas ─────────────────────────────────────────────────────
+        if _HAS_TM and num_classes > 1:
+            _tm = _build_tm_metrics(num_classes)
+            _tm.update(
+                torch.tensor(y_pred, dtype=torch.long),
+                torch.tensor(y_true, dtype=torch.long),
+            )
+            tm_res = {k: v.item() for k, v in _tm.compute().items()}
+            acc, f1, prec, rec = (
+                tm_res["Accuracy"], tm_res["F1"],
+                tm_res["Precision"], tm_res["Recall"],
+            )
+            print("  [torchmetrics — macro]")
+        else:
+            acc  = accuracy_score(y_true, y_pred)
+            f1   = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+            prec = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+            rec  = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+            print("  [sklearn — weighted]")
 
         print(f"  Accuracy  : {acc:.4f}")
-        print(f"  F1 (w)    : {f1:.4f}")
+        print(f"  F1        : {f1:.4f}")
         print(f"  Precision : {prec:.4f}")
         print(f"  Recall    : {rec:.4f}")
-        print()
-        print(classification_report(y_true, y_pred, zero_division=0))
+        if num_classes > 1:
+            print()
+            print(classification_report(y_true, y_pred, zero_division=0))
 
         if tb_writer:
-            tb_writer.add_scalar("Eval/Accuracy",  acc, 0)
-            tb_writer.add_scalar("Eval/F1",        f1,  0)
-            tb_writer.add_scalar("Eval/Precision", prec, 0)
-            tb_writer.add_scalar("Eval/Recall",    rec,  0)
+            for tag, val in [("Accuracy", acc), ("F1", f1),
+                             ("Precision", prec), ("Recall", rec)]:
+                tb_writer.add_scalar(f"Eval/{tag}", val, 0)
 
         _plot_confusion_matrix(y_true, y_pred, name, tb_writer)
-
         if num_classes == 2:
             _plot_proba_distribution(proba_out, y_true, name)
-
-        # ── Exportar predicciones individuales a CSV ──────────────────────
         _export_predictions(y_true, y_pred, proba_out, name, num_classes)
 
         results.append({
-            "Modelo":    name,
-            "Accuracy":  round(acc,  4),
-            "F1":        round(f1,   4),
-            "Precision": round(prec, 4),
-            "Recall":    round(rec,  4),
+            "Modelo": name, "Accuracy": round(acc, 4), "F1": round(f1, 4),
+            "Precision": round(prec, 4), "Recall": round(rec, 4),
         })
 
     df_results = pd.DataFrame(results).sort_values("F1", ascending=False)
@@ -883,6 +933,127 @@ def evaluate_models(models, X_test, y_test, num_classes=2, tb_writer=None) -> pd
     df_results.to_csv(out_csv, index=False)
     print(f"\n  Métricas guardadas → {out_csv}")
     return df_results
+
+{% else %}
+# ── REGRESIÓN ────────────────────────────────────────────────────────────────
+def evaluate_models(models, X_test, y_test, tb_writer=None) -> pd.DataFrame:
+    """
+    Evalúa modelos PyTorch (regresión) sobre el conjunto de test.
+
+    Genera por cada modelo:
+      - Scatter predicho vs real PNG en figures/
+      - Distribución de residuos PNG en figures/
+      - CSV con métricas (RMSE, MAE, MAPE, R²) en reports/
+      - CSV con predicciones individuales
+
+    Métricas: RMSE, MAE, MAPE, R² (torchmetrics si disponible, sklearn como fallback).
+    """
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"\n{'='*60}\n  Evaluación regresión — {{ nn_model }}\n{'='*60}")
+    results = []
+
+    for name, model in models.items():
+        print(f"\n--- {name} ---")
+        model.eval()
+
+        X_t = torch.tensor(
+            X_test.values if hasattr(X_test, "values") else X_test,
+            dtype=torch.float32,
+        ).to(device)
+        y_true = np.array(y_test.values if hasattr(y_test, "values") else y_test,
+                          dtype=np.float32)
+
+        with torch.no_grad():
+            preds_t = model(X_t).squeeze().cpu()
+
+        y_pred = preds_t.numpy().astype(np.float32)
+
+        # ── Métricas ─────────────────────────────────────────────────────
+        if _HAS_TM:
+            _tm = _build_tm_metrics()
+            _tm.update(preds_t, torch.tensor(y_true))
+            tm_res  = {k: v.item() for k, v in _tm.compute().items()}
+            rmse    = tm_res["RMSE"]
+            mae     = tm_res["MAE"]
+            r2      = tm_res["R2"]
+            print("  [torchmetrics]")
+        else:
+            rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+            mae  = float(mean_absolute_error(y_true, y_pred))
+            r2   = float(r2_score(y_true, y_pred))
+            print("  [sklearn]")
+
+        # MAPE manual (evitar div/0)
+        mask = y_true != 0
+        mape = float(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100) \
+               if mask.any() else float("nan")
+
+        print(f"  RMSE : {rmse:.4f}")
+        print(f"  MAE  : {mae:.4f}")
+        print(f"  MAPE : {mape:.2f}%")
+        print(f"  R²   : {r2:.4f}")
+
+        if tb_writer:
+            for tag, val in [("RMSE", rmse), ("MAE", mae), ("R2", r2)]:
+                tb_writer.add_scalar(f"Eval/{tag}", val, 0)
+
+        _plot_regression_scatter(y_true, y_pred, name)
+        _plot_residuals(y_true, y_pred, name)
+
+        # CSV predicciones individuales
+        df_preds = pd.DataFrame({"y_true": y_true, "y_pred": y_pred.round(4),
+                                  "residuo": (y_true - y_pred).round(4)})
+        out_pred = REPORTS_DIR / f"predicciones_{name}.csv"
+        df_preds.to_csv(out_pred, index=False)
+        print(f"    predicciones guardadas → {out_pred}")
+
+        results.append({
+            "Modelo": name,
+            "RMSE": round(rmse, 4), "MAE": round(mae, 4),
+            "MAPE_%": round(mape, 2), "R2": round(r2, 4),
+        })
+
+    df_results = pd.DataFrame(results).sort_values("RMSE", ascending=True)
+    out_csv = REPORTS_DIR / "resultados_{{ nn_model }}.csv"
+    df_results.to_csv(out_csv, index=False)
+    print(f"\n  Métricas guardadas → {out_csv}")
+    return df_results
+
+
+def _plot_regression_scatter(y_true, y_pred, model_name: str):
+    """Scatter predicho vs real con línea y=x."""
+    fig, ax = plt.subplots(figsize=(7, 6))
+    ax.scatter(y_true, y_pred, alpha=0.4, s=15, color="steelblue")
+    lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+    ax.plot(lims, lims, "r--", lw=1.5, label="y = ŷ")
+    ax.set_xlabel("Real"); ax.set_ylabel("Predicho")
+    ax.set_title(f"Predicho vs Real — {model_name}")
+    ax.legend(); fig.tight_layout()
+    path = FIGURES_DIR / f"scatter_{model_name}.png"
+    fig.savefig(path, dpi=150); plt.close(fig)
+    print(f"    scatter_{model_name}.png guardado")
+
+
+def _plot_residuals(y_true, y_pred, model_name: str):
+    """Distribución de residuos + Q-Q plot."""
+    residuos = y_true - y_pred
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+    axes[0].hist(residuos, bins=40, color="steelblue", edgecolor="white")
+    axes[0].axvline(0, color="red", lw=1.5, linestyle="--")
+    axes[0].set_title(f"Distribución de residuos — {model_name}")
+    axes[0].set_xlabel("Residuo")
+
+    import scipy.stats as stats
+    stats.probplot(residuos, dist="norm", plot=axes[1])
+    axes[1].set_title("Q-Q plot (normalidad de residuos)")
+
+    fig.tight_layout()
+    path = FIGURES_DIR / f"residuos_{model_name}.png"
+    fig.savefig(path, dpi=150); plt.close(fig)
+    print(f"    residuos_{model_name}.png guardado")
+{% endif %}
 
 
 def _export_predictions(y_true, y_pred, proba, model_name: str, num_classes: int):
