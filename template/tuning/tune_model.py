@@ -370,27 +370,73 @@ def _objective_nn(trial, X_train, y_train, input_dim: int, output_dim: int):
     y_tr, y_val = y_arr[:-n_val], y_arr[-n_val:]
 
     loader = DataLoader(
+{% if task_type == 'regresion' %}
+        TensorDataset(torch.tensor(X_tr, dtype=torch.float32),
+                      torch.tensor(y_tr, dtype=torch.float32)),
+{% else %}
         TensorDataset(torch.tensor(X_tr, dtype=torch.float32),
                       torch.tensor(y_tr, dtype=torch.long)),
+{% endif %}
         batch_size=batch_size, shuffle=True,
     )
     val_X = torch.tensor(X_val, dtype=torch.float32).to(device)
+{% if task_type == 'regresion' %}
+    val_y = torch.tensor(y_val, dtype=torch.float32).to(device)
+{% else %}
     val_y = torch.tensor(y_val, dtype=torch.long).to(device)
+{% endif %}
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+{% set _opt = optimizer_type if optimizer_type is defined else 'AdamW' %}
+{% if _opt == 'AdamW' %}
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+{% elif _opt == 'Adam' %}
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+{% elif _opt == 'SGD' %}
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, nesterov=True)
+{% elif _opt == 'RMSProp' %}
+    optimizer = torch.optim.RMSprop(model.parameters(), lr=lr, momentum=0.9)
+{% elif _opt == 'Adagrad' %}
+    optimizer = torch.optim.Adagrad(model.parameters(), lr=lr)
+{% else %}
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+{% endif %}
+
+{% set _loss = nn_loss_fn if nn_loss_fn is defined else 'Auto' %}
+{% if _loss == 'Auto' %}
+{%   if task_type == 'regresion' %}
+    criterion = nn.MSELoss()
+{%   else %}
     criterion = nn.CrossEntropyLoss()
+{%   endif %}
+{% elif _loss == 'MSELoss' %}
+    criterion = nn.MSELoss()
+{% elif _loss == 'L1Loss' %}
+    criterion = nn.L1Loss()
+{% elif _loss == 'BCEWithLogitsLoss' %}
+    criterion = nn.BCEWithLogitsLoss()
+{% else %}
+    criterion = nn.CrossEntropyLoss()
+{% endif %}
 
     for epoch in range(epochs):
         model.train()
         for Xb, yb in loader:
             Xb, yb = Xb.to(device), yb.to(device)
             optimizer.zero_grad()
+{% if task_type == 'regresion' %}
+            criterion(model(Xb).squeeze(), yb).backward()
+{% else %}
             criterion(model(Xb), yb).backward()
+{% endif %}
             optimizer.step()
 
         model.eval()
         with torch.no_grad():
+{% if task_type == 'regresion' %}
+            val_loss = criterion(model(val_X).squeeze(), val_y).item()
+{% else %}
             val_loss = criterion(model(val_X), val_y).item()
+{% endif %}
 
         trial.report(val_loss, epoch)
         if trial.should_prune():
@@ -399,7 +445,7 @@ def _objective_nn(trial, X_train, y_train, input_dim: int, output_dim: int):
     return val_loss  # minimize
 
 
-_OBJECTIVES = {"{{ nn_model }}": None}  # sentinel para tune_models
+_OBJECTIVES = {"{{ nn_model }}": _objective_nn}
 
 {% elif ml_type == "no_supervisado" %}
 

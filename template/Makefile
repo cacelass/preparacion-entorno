@@ -1,6 +1,6 @@
 .PHONY: setup install-deps \
         data features train predict \
-        test smoke lint format \
+        test smoke lint format lock \
         lab notebook tb \
         docs \
         profile \
@@ -292,6 +292,13 @@ docker-down:
 	docker compose down
 	@echo "  Contenedores detenidos."
 {% endif %}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Dependencias
+# ─────────────────────────────────────────────────────────────────────────────
+lock:
+	uv lock
+	@echo "  uv.lock actualizado."
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Info del entorno

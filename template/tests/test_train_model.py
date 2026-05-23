@@ -279,7 +279,7 @@ def test_train_models_returns_dict(patch_paths):
         X_train, y_train,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
-        epochs=2, batch_size=16, checkpoint_every=0,
+        epochs=2, batch_size=16, checkpoint_every=0, val_split=0.2,
     )
     assert isinstance(trained, dict)
     assert MODEL_NAME in trained
@@ -291,7 +291,7 @@ def test_train_models_saves_pt(patch_paths):
         X_train, y_train,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
-        epochs=2, batch_size=16, checkpoint_every=0,
+        epochs=2, batch_size=16, checkpoint_every=0, val_split=0.2,
     )
     assert (patch_paths["MODELS_DIR"] / f"{MODEL_NAME}_final.pt").exists()
 
@@ -302,7 +302,7 @@ def test_load_model_after_train(patch_paths):
         X_train, y_train,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
-        epochs=2, batch_size=16, checkpoint_every=0,
+        epochs=2, batch_size=16, checkpoint_every=0, val_split=0.2,
     )
     model = load_model(
         input_dim=X_train.shape[1],

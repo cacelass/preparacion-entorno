@@ -104,6 +104,18 @@ def patch_paths(monkeypatch, tmp_path):
         f"{slug}.features.build_features",
         f"{slug}.visualization.visualize",
         f"{slug}.data.make_dataset",
+{% if use_optuna %}
+        "tuning.tune_model",
+{% endif %}
+{% if use_monitoring %}
+        "monitoring.monitor",
+{% endif %}
+{% if use_api %}
+        "api.main",
+{% endif %}
+{% if use_docker %}
+        "chat.app",
+{% endif %}
     ]
     for mod_path in candidate_modules:
         try:

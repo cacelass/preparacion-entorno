@@ -219,78 +219,144 @@ def test_plot_dendrogram_saves_png(patch_paths):
 {% if ml_type == "redes_neuronales" %}
 torch = pytest.importorskip("torch")
 from {{ project_slug }}.models.predict_model import evaluate_models, predict_new
-from {{ project_slug }}.models.train_model import MLP, train_models
+from {{ project_slug }}.models.train_model import train_models, MODEL_NAME
 
 
-def _make_splits(n=200, n_feat=4):
+def _make_splits_clf(n=200, n_feat=4):
+    """Datos sintéticos de clasificación para tests NN."""
     from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import StandardScaler
     np.random.seed(42)
     X = pd.DataFrame(np.random.randn(n, n_feat),
                      columns=[f"feat_{i}" for i in range(n_feat)])
     y = pd.Series((X["feat_0"] + X["feat_1"] > 0).astype(int), name="target")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    scaler = StandardScaler()
-    X_train_s = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-    X_test_s  = pd.DataFrame(scaler.transform(X_test),      columns=X_test.columns)
-    return X_train_s, X_test_s, y_train.reset_index(drop=True), y_test.reset_index(drop=True)
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)
+    sc = StandardScaler()
+    X_tr = pd.DataFrame(sc.fit_transform(X_tr), columns=X_tr.columns)
+    X_te = pd.DataFrame(sc.transform(X_te),     columns=X_te.columns)
+    return X_tr, X_te, y_tr.reset_index(drop=True), y_te.reset_index(drop=True)
 
+
+{% if task_type == "regresion" %}
+def _make_splits_reg(n=200, n_feat=4):
+    """Datos sintéticos de regresión para tests NN."""
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+    np.random.seed(42)
+    X = pd.DataFrame(np.random.randn(n, n_feat),
+                     columns=[f"feat_{i}" for i in range(n_feat)])
+    y = pd.Series(X["feat_0"] * 2.5 + X["feat_1"] - X["feat_2"]
+                  + np.random.randn(n) * 0.3, name="target")
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)
+    sc = StandardScaler()
+    X_tr = pd.DataFrame(sc.fit_transform(X_tr), columns=X_tr.columns)
+    X_te = pd.DataFrame(sc.transform(X_te),     columns=X_te.columns)
+    return X_tr, X_te, y_tr.reset_index(drop=True), y_te.reset_index(drop=True)
+{% endif %}
+
+
+{% if task_type == "clasificacion" %}
+# ── Tests clasificación ──────────────────────────────────────────────────────
 
 def test_evaluate_models_returns_dataframe(patch_paths):
-    X_train, X_test, y_train, y_test = _make_splits()
-    trained = train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=2, batch_size=32, checkpoint_every=0,
-    )
-    df_res = evaluate_models(trained, X_test, y_test, num_classes=y_train.nunique())
-    assert isinstance(df_res, pd.DataFrame)
-    assert "MLP" in df_res["Modelo"].values
+    X_tr, X_te, y_tr, y_te = _make_splits_clf()
+    n_cls = int(y_tr.nunique())
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=n_cls,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    df = evaluate_models(trained, X_te, y_te, num_classes=n_cls)
+    assert isinstance(df, pd.DataFrame)
+    assert MODEL_NAME in df["Modelo"].values
 
 
-def test_evaluate_models_columns(patch_paths):
-    X_train, X_test, y_train, y_test = _make_splits()
-    trained = train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=2, batch_size=32, checkpoint_every=0,
-    )
-    df_res = evaluate_models(trained, X_test, y_test, num_classes=y_train.nunique())
+def test_evaluate_models_clf_columns(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_clf()
+    n_cls = int(y_tr.nunique())
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=n_cls,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    df = evaluate_models(trained, X_te, y_te, num_classes=n_cls)
     for col in ["Modelo", "Accuracy", "F1", "Precision", "Recall"]:
-        assert col in df_res.columns
+        assert col in df.columns, f"Falta columna: {col}"
 
 
 def test_evaluate_models_accuracy_range(patch_paths):
-    X_train, X_test, y_train, y_test = _make_splits()
-    trained = train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=2, batch_size=32, checkpoint_every=0,
-    )
-    df_res = evaluate_models(trained, X_test, y_test, num_classes=y_train.nunique())
-    assert (df_res["Accuracy"].between(0, 1)).all()
+    X_tr, X_te, y_tr, y_te = _make_splits_clf()
+    n_cls = int(y_tr.nunique())
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=n_cls,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    df = evaluate_models(trained, X_te, y_te, num_classes=n_cls)
+    assert (df["Accuracy"].between(0, 1)).all()
 
 
 def test_evaluate_models_saves_confusion_matrix_png(patch_paths):
-    X_train, X_test, y_train, y_test = _make_splits()
-    trained = train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=2, batch_size=32, checkpoint_every=0,
-    )
-    evaluate_models(trained, X_test, y_test, num_classes=y_train.nunique())
-    assert list(patch_paths["FIGURES_DIR"].glob("cm_MLP.png"))
+    X_tr, X_te, y_tr, y_te = _make_splits_clf()
+    n_cls = int(y_tr.nunique())
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=n_cls,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    evaluate_models(trained, X_te, y_te, num_classes=n_cls)
+    assert list(patch_paths["FIGURES_DIR"].glob(f"cm_{MODEL_NAME}.png"))
 
 
-def test_predict_new_returns_predictions(patch_paths):
-    X_train, X_test, y_train, y_test = _make_splits()
-    trained = train_models(
-        X_train, y_train,
-        input_dim=X_train.shape[1], output_dim=y_train.nunique(),
-        epochs=2, batch_size=32, checkpoint_every=0,
-    )
-    model = trained["MLP"]
-    preds = predict_new(model, X_test, num_classes=y_train.nunique())
-    assert len(preds) == len(X_test)
-    assert set(preds).issubset(set(y_train.unique()))
+def test_predict_new_clf_valid_classes(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_clf()
+    n_cls = int(y_tr.nunique())
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=n_cls,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    preds = predict_new(trained[MODEL_NAME], X_te, num_classes=n_cls)
+    assert len(preds) == len(X_te)
+    assert set(preds).issubset(set(y_tr.unique()))
+
+{% else %}
+# ── Tests regresión ──────────────────────────────────────────────────────────
+
+def test_evaluate_models_reg_returns_dataframe(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_reg()
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=1,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    df = evaluate_models(trained, X_te, y_te)
+    assert isinstance(df, pd.DataFrame)
+    assert MODEL_NAME in df["Modelo"].values
+
+
+def test_evaluate_models_reg_columns(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_reg()
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=1,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    df = evaluate_models(trained, X_te, y_te)
+    for col in ["Modelo", "RMSE", "MAE", "R2"]:
+        assert col in df.columns, f"Falta columna: {col}"
+
+
+def test_evaluate_models_rmse_non_negative(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_reg()
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=1,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    df = evaluate_models(trained, X_te, y_te)
+    assert (df["RMSE"] >= 0).all()
+
+
+def test_evaluate_models_reg_saves_scatter_png(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_reg()
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=1,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    evaluate_models(trained, X_te, y_te)
+    assert list(patch_paths["FIGURES_DIR"].glob(f"scatter_{MODEL_NAME}.png"))
+
+
+def test_predict_new_reg_returns_floats(patch_paths):
+    X_tr, X_te, y_tr, y_te = _make_splits_reg()
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=1,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    preds = predict_new(trained[MODEL_NAME], X_te, num_classes=1)
+    assert len(preds) == len(X_te)
+{% endif %}
 {% endif %}

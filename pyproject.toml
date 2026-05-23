@@ -121,7 +121,7 @@ api = [
 # Monitorización: drift detection y performance tracking
 monitoring = [
     "evidently",   # drift detection + HTML reports
-    "scipy",       # tests KS y chi-cuadrado (incluido en core, aquí explícito)
+    "scipy",       # stats KS/chi² (reforzado explícitamente)
 ]
 {% endif %}
 

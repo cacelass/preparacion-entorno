@@ -383,6 +383,46 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     return X_scaled
 
 
+def process_input(df_new: pd.DataFrame) -> np.ndarray:
+    """
+    Preprocesa un DataFrame nuevo para inferencia (no supervisado).
+
+    Aplica el mismo scaler y encoders guardados durante el entrenamiento.
+    Usado por la API, el chat y try_model().
+
+    Parameters
+    ----------
+    df_new : DataFrame con las mismas columnas que el dataset original.
+
+    Returns
+    -------
+    np.ndarray escalado listo para predict() / clustering.
+    """
+    scaler_path = ARTIFACTS_DIR / "scaler.joblib"
+    enc_path    = ARTIFACTS_DIR / "encoders.joblib"
+
+    if not scaler_path.exists():
+        raise FileNotFoundError(
+            f"scaler.joblib no encontrado en {ARTIFACTS_DIR}. "
+            "Ejecuta make features primero."
+        )
+
+    scaler   = joblib.load(scaler_path)
+    encoders = joblib.load(enc_path) if enc_path.exists() else {}
+
+    df = df_new.copy()
+    for col, le in encoders.items():
+        if col == "__target__":
+            continue
+        if col in df.columns:
+            df[col] = le.transform(df[col].astype(str))
+
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
+
+    return scaler.transform(df).astype(np.float32)
+
+
 def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
     """
     Aplica transformación logarítmica np.log1p() a las columnas indicadas.
@@ -861,6 +901,67 @@ def _strategy_semi_supervised(X_scaled, y, labeled_fraction, random_state):
     changed = (y_propagated != y).sum()
     print(f"    LabelSpreading: {changed} etiquetas propagadas/corregidas")
     return X_scaled, y_propagated
+
+
+def process_input(df_new: pd.DataFrame) -> np.ndarray:
+    """
+    Preprocesa un DataFrame nuevo para inferencia (híbrido).
+
+    Aplica scaler, encoders y la transformación dimensional guardada
+    en artifacts/ (PCA, UMAP, KMeans-features o IsolationForest).
+
+    Parameters
+    ----------
+    df_new : DataFrame con las mismas columnas que el dataset original
+             (sin columna objetivo).
+
+    Returns
+    -------
+    np.ndarray transformado listo para predict().
+    """
+    scaler_path = ARTIFACTS_DIR / "scaler.joblib"
+    enc_path    = ARTIFACTS_DIR / "encoders.joblib"
+
+    if not scaler_path.exists():
+        raise FileNotFoundError(
+            f"scaler.joblib no encontrado en {ARTIFACTS_DIR}. "
+            "Ejecuta make features primero."
+        )
+
+    scaler   = joblib.load(scaler_path)
+    encoders = joblib.load(enc_path) if enc_path.exists() else {}
+
+    df = df_new.copy()
+    for col, le in encoders.items():
+        if col == "__target__":
+            continue
+        if col in df.columns:
+            df[col] = le.transform(df[col].astype(str))
+
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
+    X_scaled = scaler.transform(df).astype(np.float32)
+
+    # Aplicar la misma transformación dimensional usada en el entrenamiento
+    for artifact, tfn in [
+        ("pca.joblib",              lambda m, X: m.transform(X)),
+        ("umap.joblib",             lambda m, X: m.transform(X)),
+        ("kmeans_feature.joblib",   lambda m, X: np.hstack([
+                                        X, m.transform(X),
+                                        m.predict(X).reshape(-1, 1).astype(float)
+                                    ])),
+        ("isolation_forest.joblib", lambda m, X: np.hstack([
+                                        X, m.decision_function(X).reshape(-1, 1)
+                                    ])),
+    ]:
+        path = ARTIFACTS_DIR / artifact
+        if path.exists():
+            art    = joblib.load(path)
+            X_scaled = tfn(art, X_scaled)
+            logger.debug(f"process_input: {artifact} → shape {X_scaled.shape}")
+            break
+
+    return X_scaled
 
 
 def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:

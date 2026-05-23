@@ -87,12 +87,21 @@ def test_tune_models_nn_devuelve_dict(patch_paths):
     """tune_models debe devolver un dict con params de la red."""
     from tuning.tune_model import tune_models
     X_train, y_train = _make_Xy()
+{% if task_type == "regresion" %}
+    result = tune_models(
+        X_train, y_train,
+        n_trials=2,
+        input_dim=X_train.shape[1],
+        output_dim=1,
+    )
+{% else %}
     result = tune_models(
         X_train, y_train,
         n_trials=2,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
     )
+{% endif %}
     assert isinstance(result, dict)
 
 
@@ -101,12 +110,21 @@ def test_tune_models_nn_guarda_joblib(patch_paths):
     import joblib
     from tuning.tune_model import tune_models
     X_train, y_train = _make_Xy()
+{% if task_type == "regresion" %}
+    tune_models(
+        X_train, y_train,
+        n_trials=2,
+        input_dim=X_train.shape[1],
+        output_dim=1,
+    )
+{% else %}
     tune_models(
         X_train, y_train,
         n_trials=2,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
     )
+{% endif %}
     path = patch_paths["ARTIFACTS_DIR"] / "best_params_{{ nn_model }}.joblib"
     assert path.exists()
     params = joblib.load(path)

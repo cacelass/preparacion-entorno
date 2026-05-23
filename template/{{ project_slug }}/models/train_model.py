@@ -728,12 +728,13 @@ def load_models(model_names: list = None) -> dict:
 {% elif ml_type == "redes_neuronales" %}
 import os
 import math
+import joblib
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
 
-from {{ project_slug }}.utils.paths import MODELS_DIR, RUNS_DIR
+from {{ project_slug }}.utils.paths import MODELS_DIR, RUNS_DIR, ARTIFACTS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -1285,6 +1286,10 @@ def train_models(
     out_path = MODELS_DIR / f"{MODEL_NAME}_final.pt"
     torch.save(model.state_dict(), out_path)
     print(f"    Guardado: {out_path}")
+
+    # Guardar output_dim para que la API sepa cuántas clases/dimensiones usar al cargar
+    joblib.dump(output_dim, ARTIFACTS_DIR / "output_dim.joblib")
+
     return {MODEL_NAME: model}
 
 

@@ -287,8 +287,13 @@ def run_full_pipeline() -> None:
         except FileNotFoundError:
             pass
 
+{% if task_type == 'regresion' %}
     input_dim  = X_train.shape[1]
-    output_dim = len(y_train.unique())
+    output_dim = 1   # regresión → una neurona de salida
+{% else %}
+    input_dim  = X_train.shape[1]
+    output_dim = int(y_train.nunique())
+{% endif %}
     print(f'   input_dim={input_dim}  output_dim={output_dim}')
 
     print(f'\n4. Entrenando {MODEL_NAME}...')
@@ -301,16 +306,26 @@ def run_full_pipeline() -> None:
     )
 
     print('\n5. Evaluando...')
+{% if task_type == 'regresion' %}
+    df_results = evaluate_models(
+        models, X_test, y_test, tb_writer=tb,
+    )
+{% else %}
     df_results = evaluate_models(
         models, X_test, y_test, num_classes=output_dim, tb_writer=tb,
     )
+{% endif %}
 
     tb.close()
     print('\n' + '=' * 60)
     print('Pipeline completado.')
     if not df_results.empty:
         best = df_results.iloc[0]
+{% if task_type == 'regresion' %}
+        print(f'Resultado: RMSE={best["RMSE"]:.4f}  MAE={best["MAE"]:.4f}  R²={best["R2"]:.4f}')
+{% else %}
         print(f'Resultado: Accuracy={best["Accuracy"]:.4f}  F1={best["F1"]:.4f}')
+{% endif %}
 
 
 def main():

@@ -1,13 +1,13 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-1.7.0-blue)
+![version](https://img.shields.io/badge/dskit-1.8.2-blue)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
 ![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
 
 **Template profesional para Data Science y AI Engineering**
 
-Plantilla basada en [copier](https://copier.readthedocs.io), diseñada para iniciar proyectos de ML de forma organizada, reproducible y lista para producción. Construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo de trabajo desde la ingesta de datos hasta el modelo evaluado, exportado y servido como API.
+Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML de forma organizada, reproducible y lista para producción. Construida sobre `uv`, con una arquitectura modular que cubre el flujo completo desde la ingesta de datos hasta el modelo evaluado, exportado y servido como API o interfaz de chat.
 
 ---
 
@@ -16,13 +16,20 @@ Plantilla basada en [copier](https://copier.readthedocs.io), diseñada para inic
 - [DSKIT](#dskit)
   - [Índice](#índice)
   - [Características](#características)
+    - [Tipos de ML y arquitecturas](#tipos-de-ml-y-arquitecturas)
+    - [Módulos opcionales](#módulos-opcionales)
+    - [Pipeline de calidad integrado](#pipeline-de-calidad-integrado)
   - [Requisitos previos](#requisitos-previos)
   - [Instalación rápida](#instalación-rápida)
-  - [Variables](#variables)
-    - [Validaciones](#validaciones)
+  - [Variables de configuración](#variables-de-configuración)
+    - [Validaciones automáticas](#validaciones-automáticas)
   - [Uso](#uso)
   - [Estructura generada](#estructura-generada)
-  - [Makefile](#makefile)
+  - [Makefile — referencia completa](#makefile--referencia-completa)
+  - [Notas por tipo de ML](#notas-por-tipo-de-ml)
+    - [`redes_neuronales`](#redes_neuronales)
+    - [`no_supervisado`](#no_supervisado)
+    - [`hibrido`](#hibrido)
   - [Changelog](#changelog)
   - [License](#license)
 
@@ -30,33 +37,42 @@ Plantilla basada en [copier](https://copier.readthedocs.io), diseñada para inic
 
 ## Características
 
-- **4 tipos de ML** con código y tests listos desde el primer `make run`:
-  `supervisado`, `no_supervisado`, `redes_neuronales`, `hibrido`
+### Tipos de ML y arquitecturas
+- **4 tipos de ML**: `supervisado`, `no_supervisado`, `redes_neuronales`, `hibrido`
 - **2 tipos de tarea** (`task_type`): `clasificacion` o `regresion`
-- **5 arquitecturas de red neuronal**: MLP, CNN1D, LSTM, GRU, Transformer
-- **XGBoost y LightGBM** opcionales en supervisado e híbrido
-- **Selector de modelo** (`model_type`): `todos`, RandomForest, XGBoost, LightGBM, LogisticRegression, KNN, DecisionTree, **SVM**
-- **API REST** opcional (`use_api`): FastAPI con `/health`, `/info` y `/predict` — `make serve`
-- **DuckDB** opcional (`use_duckdb`): carga CSV/Parquet/JSON con SQL directo — `make query`
-- **Optuna** opcional (`use_optuna`): HPO automática por modelo — `make tune` + `make train`
-- **Monitoring** opcional (`use_monitoring`): drift KS/chi², performance vs baseline — `make monitor`
-- **MLflow** opcional: tracking de experimentos, artifacts y Model Registry
+- **5 arquitecturas NN** (`nn_model`): MLP · CNN1D · LSTM · GRU · Transformer
+- **Optimizador configurable** (`optimizer_type`): AdamW · Adam · SGD · RMSProp · Adagrad
+- **Función de pérdida configurable** (`nn_loss_fn`): Auto · CrossEntropyLoss · MSELoss · L1Loss · BCEWithLogitsLoss
+- **Selector de modelo** (`model_type`): todos · RandomForest · XGBoost · LightGBM · LogisticRegression · KNN · DecisionTree · SVM · CatBoost
+
+### Módulos opcionales
+| Flag | Descripción | Make target |
+|---|---|---|
+| `use_api` | API REST FastAPI — `/health`, `/info`, `/predict` | `make serve` |
+| `use_optuna` | HPO automática por modelo con Optuna | `make tune` |
+| `use_monitoring` | Drift KS/chi² + performance vs baseline (Evidently) | `make monitor` |
+| `use_mlflow` | Tracking de experimentos, artifacts y Model Registry | `make mlflow` |
+| `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
+| `use_docker` | Docker + interfaz de chat Gradio | `make chat` |
+| `use_shap` | SHAP values — importancia de features | automático |
+| `use_xgboost` | XGBoost (supervisado/híbrido) | automático |
+| `use_lightgbm` | LightGBM (supervisado/híbrido) | automático |
+| `use_catboost` | CatBoost (supervisado/híbrido) | automático |
+
+### Pipeline de calidad integrado
+- **TorchMetrics** en bucle de entrenamiento y evaluación NN (Accuracy/F1/Precision/Recall para clasificación, MAE/RMSE/R² para regresión)
 - **Early stopping** y **validation split** configurables en redes neuronales
-- **`uv sync` automático** tras generar el proyecto
-- **`make smoke`**: tests de humo para verificar que el pipeline arranca
-- **`make profile`**: profiling con cProfile + snakeviz
 - **TensorBoard** integrado en redes neuronales (`make tb`)
-- Gestión de entornos con `uv` y grupos de dependencias por tipo de ML
-- Documentación con Sphinx, tests con pytest, linting con ruff
+- **`make smoke`** — tests de humo que verifican que el pipeline arranca sin errores
+- **`make profile`** — profiling con cProfile + snakeviz
+- **`make lock`** — regenera `uv.lock` tras cambios en dependencias
+- `uv sync` automático tras generar el proyecto
 
 ---
 
 ## Requisitos previos
 
 ```bash
-sudo apt install pipx
-pipx ensurepath
-pipx install copier
 pip install copier uv
 ```
 
@@ -70,69 +86,80 @@ Python >= 3.10 requerido.
 copier copy --trust gh:cacelass/dskit nombre_proyecto
 ```
 
-O desde una copia local:
+O desde copia local:
 
 ```bash
 copier copy --trust ./dskit nombre_proyecto
 ```
 
-Copier ejecuta `uv sync` automáticamente tras generar. Si falla, hazlo manualmente:
+Copier ejecuta `uv sync` automáticamente. Si falla, hazlo manualmente:
 
 ```bash
 cd nombre_proyecto
 uv sync --extra dev --extra <ml_type>
-source .venv/bin/activate
 ```
-
-> Los iconos de micrófono en los prompts son parte de la UI de copier y no son configurables.
 
 ---
 
-## Variables
+## Variables de configuración
 
-Copier muestra solo las preguntas relevantes según las respuestas anteriores — las variables condicionales no aparecen si no aplican.
+Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 
 | Variable | Valores | Condición | Descripción |
 |---|---|---|---|
 | `project_name` | texto | siempre | Nombre del proyecto |
+| `project_slug` | `[a-z0-9_]` | siempre | Nombre del paquete Python (auto desde project_name) |
 | `project_author_name` | texto | siempre | Nombre del autor |
 | `project_author_email` | email | siempre | Email (validado) |
 | `project_description` | texto | siempre | Descripción breve |
-| `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | siempre | Determina qué código se genera |
+| `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | siempre | Determina el código generado |
 | `task_type` | `clasificacion` · `regresion` | supervisado, redes_neuronales, hibrido | Tipo de tarea |
-| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` | solo redes_neuronales | Arquitectura de red |
-| `model_type` | `todos` · `RandomForest` · `XGBoost` · `LightGBM` · `LogisticRegression` · `KNN` · `DecisionTree` · `SVM` | solo supervisado e hibrido | Modelo a entrenar |
-| `use_xgboost` | true · false | solo supervisado e hibrido | Añade XGBoost |
-| `use_lightgbm` | true · false | solo supervisado e hibrido | Añade LightGBM |
-| `use_mlflow` | true · false | siempre | Integra MLflow |
-| `use_monitoring` | true · false | siempre | Drift detection y performance tracking |
-| `use_optuna` | true · false | siempre | HPO automática con Optuna |
-| `use_duckdb` | true · false | siempre | Carga con DuckDB (CSV/Parquet/JSON + SQL) |
-| `use_api` | true · false | siempre | Genera API REST con FastAPI |
-| `python_version` | `3.10` – `3.13` | siempre | Versión de Python |
-| `project_version` | texto | siempre | Versión inicial |
+| `model_type` | `todos` · `RandomForest` · `XGBoost` · `LightGBM` · `LogisticRegression` · `KNN` · `DecisionTree` · `SVM` · `CatBoost` | supervisado, hibrido | Modelo a entrenar |
+| `cluster_model` | `todos` · `KMeans` · `DBSCAN` · `AgglomerativeClustering` · `GaussianMixture` · `HDBSCAN` | no_supervisado | Algoritmo de clustering |
+| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` | redes_neuronales | Arquitectura |
+| `optimizer_type` | `AdamW` · `Adam` · `SGD` · `RMSProp` · `Adagrad` | redes_neuronales | Optimizador PyTorch |
+| `nn_loss_fn` | `Auto` · `CrossEntropyLoss` · `MSELoss` · `L1Loss` · `BCEWithLogitsLoss` | redes_neuronales | Función de pérdida |
+| `use_xgboost` | true/false | supervisado, hibrido | Añade XGBoost |
+| `use_lightgbm` | true/false | supervisado, hibrido | Añade LightGBM |
+| `use_catboost` | true/false | supervisado, hibrido | Añade CatBoost |
+| `use_shap` | true/false | supervisado, hibrido | SHAP values |
+| `use_mlflow` | true/false | siempre | MLflow tracking |
+| `use_monitoring` | true/false | siempre | Drift + performance monitoring |
+| `use_optuna` | true/false | siempre | HPO con Optuna |
+| `use_duckdb` | true/false | siempre | DuckDB SQL sobre ficheros |
+| `use_api` | true/false | siempre | API REST FastAPI |
+| `use_docker` | true/false | siempre | Docker + chat Gradio |
+| `python_version` | `3.10`–`3.13` | siempre | Versión de Python |
+| `project_version` | texto | siempre | Versión inicial del proyecto |
 
-### Validaciones
-
-Copier valida automáticamente antes de generar:
-- Slug solo con `[a-z0-9_]` empezando por letra
-- Email con formato válido
+### Validaciones automáticas
+- `project_slug`: solo `[a-z0-9_]` empezando por letra — los guiones se transforman a `_`
+- `project_author_email`: formato válido requerido
 
 ---
 
 ## Uso
 
 ```bash
-make help       # ver todos los comandos disponibles
-make run        # pipeline completo
-make smoke      # tests de humo rápidos
-make profile    # cProfile → reports/profile.prof
-make tb         # TensorBoard localhost:6006 (solo redes_neuronales)
-make mlflow     # MLflow UI localhost:5000 (solo si use_mlflow=true)
-make monitor    # drift + performance report (solo si use_monitoring=true)
-make tune       # HPO con Optuna (solo si use_optuna=true)
-make serve      # API REST localhost:8000   (solo si use_api=true)
-make query      # Shell DuckDB interactivo  (solo si use_duckdb=true)
+make help        # ver todos los comandos disponibles
+make run         # pipeline completo: data → features → train → predict
+make data        # solo ingesta de datos
+make features    # solo preprocesado
+make train       # solo entrenamiento
+make predict     # solo evaluación
+make smoke       # tests de humo rápidos
+make test        # suite completa de tests con cobertura
+make lint        # ruff check
+make format      # ruff format
+make profile     # cProfile → reports/profile.prof
+make lock        # regenera uv.lock
+make tb          # TensorBoard localhost:6006   (redes_neuronales)
+make mlflow      # MLflow UI localhost:5000     (use_mlflow=true)
+make monitor     # drift + performance report  (use_monitoring=true)
+make tune        # HPO con Optuna              (use_optuna=true)
+make serve       # API REST localhost:8000     (use_api=true)
+make query       # Shell DuckDB interactivo   (use_duckdb=true)
+make chat        # Interfaz Gradio            (use_docker=true)
 ```
 
 ---
@@ -141,35 +168,44 @@ make query      # Shell DuckDB interactivo  (solo si use_duckdb=true)
 
 ```
 nombre_proyecto/
-├── <project_slug>/           ← paquete Python
-│   ├── data/make_dataset.py  ← carga pandas + DuckDB (si use_duckdb=true)
-│   ├── features/build_features.py
+├── <project_slug>/
+│   ├── data/
+│   │   └── make_dataset.py       ← carga pandas / DuckDB (si use_duckdb)
+│   ├── features/
+│   │   └── build_features.py     ← preprocesado + process_input() para inferencia
 │   ├── models/
-│   │   ├── train_model.py    ← adaptado al ml_type, task_type y nn_model
-│   │   └── predict_model.py  ← métricas, figuras y CSVs en reports/
+│   │   ├── train_model.py        ← adaptado a ml_type, task_type, nn_model,
+│   │   │                            optimizer_type, nn_loss_fn
+│   │   └── predict_model.py      ← evaluate_models() + TorchMetrics + figuras
 │   ├── utils/paths.py
 │   └── visualization/visualize.py
-├── api/                      ← solo si use_api=true
-│   ├── main.py               ← FastAPI: /health /info /predict
-│   └── schemas.py            ← Pydantic V2
-├── tuning/                   ← solo si use_optuna=true
-│   └── tune_model.py         ← objetivos Optuna por modelo + tune_models()
-├── monitoring/               ← solo si use_monitoring=true
-│   └── monitor.py            ← check_drift, check_performance, run_monitoring
+├── api/                          ← (use_api=true)
+│   ├── main.py                   ← FastAPI: /health /info /predict + lifespan
+│   └── schemas.py                ← Pydantic V2: PredictRequest, PredictResponse
+├── tuning/                       ← (use_optuna=true)
+│   └── tune_model.py             ← _objective_* por modelo + tune_models()
+├── monitoring/                   ← (use_monitoring=true)
+│   └── monitor.py                ← check_drift, check_performance, run_monitoring
+├── chat/                         ← (use_docker=true)
+│   └── app.py                    ← interfaz Gradio conectada al modelo
 ├── data/{raw,interim,processed,external}/
-├── models/                   ← pesos .pt / .joblib + best_params_*.joblib
+├── models/                       ← pesos .pt / .joblib + artifacts/
+│   └── artifacts/                ← scaler.joblib, encoders.joblib, output_dim.joblib…
 ├── notebooks/
 ├── reports/
-│   ├── figures/              ← matrices de confusión, real vs predicho, SHAP
-│   ├── monitoring/           ← drift_report.csv + drift_report.html
-│   └── resultados_*.csv      ← métricas ordenadas
+│   ├── figures/
+│   ├── monitoring/
+│   └── resultados_*.csv
 ├── tests/
-│   ├── conftest.py
+│   ├── conftest.py               ← patch_paths fixture (parchea todas las rutas)
 │   ├── test_train_model.py
-│   ├── test_api.py           ← solo si use_api=true
-│   ├── test_tuning.py        ← solo si use_optuna=true
-│   └── test_monitoring.py    ← solo si use_monitoring=true
-├── .copier-answers.yml       ← generado por copier, habilita copier update
+│   ├── test_predict_model.py
+│   ├── test_build_features.py
+│   ├── test_make_dataset.py
+│   ├── test_api.py               ← (use_api=true)
+│   ├── test_tuning.py            ← (use_optuna=true)
+│   └── test_monitoring.py        ← (use_monitoring=true)
+├── .copier-answers.yml
 ├── Makefile
 ├── pyproject.toml
 └── main.py
@@ -177,23 +213,50 @@ nombre_proyecto/
 
 ---
 
-## Makefile
+## Makefile — referencia completa
 
 | Target | Descripción |
 |---|---|
-| `make run` | Pipeline completo (`main.py`) |
-| `make data / train / predict` | Pasos individuales |
-| `make test` | pytest completo |
+| `make run` | Pipeline completo |
+| `make data` | Ingesta de datos |
+| `make features` | Preprocesado |
+| `make train` | Entrenamiento |
+| `make predict` | Evaluación + figuras + CSV |
+| `make test` | pytest con cobertura (`--cov=<slug>`) |
 | `make smoke` | Solo `@pytest.mark.smoke` |
-| `make lint / format` | ruff check / ruff format |
+| `make lint` | `ruff check` |
+| `make format` | `ruff format` |
 | `make profile` | cProfile → `reports/profile.prof` |
-| `make tb` | TensorBoard localhost:6006 *(redes_neuronales)* |
-| `make mlflow` | MLflow UI localhost:5000 *(use_mlflow=true)* |
-| `make monitor` | Drift + performance report *(use_monitoring=true)* |
-| `make tune` | HPO con Optuna *(use_optuna=true)* |
-| `make serve` | API REST localhost:8000 *(use_api=true)* |
-| `make query` | Shell DuckDB interactivo *(use_duckdb=true)* |
-| `make clean-all` | Cachés + modelos + figuras |
+| `make lock` | `uv lock` — regenera lockfile |
+| `make docs` | Sphinx autodoc |
+| `make tb` | TensorBoard :6006 *(redes_neuronales)* |
+| `make mlflow` | MLflow UI :5000 *(use_mlflow)* |
+| `make monitor` | Drift + performance report *(use_monitoring)* |
+| `make tune` | HPO Optuna *(use_optuna)* |
+| `make serve` | API REST :8000 *(use_api)* |
+| `make query` | Shell DuckDB *(use_duckdb)* |
+| `make chat` | Gradio :7860 *(use_docker)* |
+| `make clean-all` | Limpia cachés, modelos y figuras |
+| `make info` | Muestra versiones del entorno |
+
+---
+
+## Notas por tipo de ML
+
+### `redes_neuronales`
+- `output_dim` se calcula automáticamente: `n_clases` para clasificación, `1` para regresión
+- `output_dim.joblib` se guarda en `models/artifacts/` para que la API lo cargue correctamente
+- TorchMetrics proporciona métricas consistentes entre entrenamiento y evaluación
+- El optimizador elegido (`optimizer_type`) se aplica en `train_model.py`, `tune_model.py` y `load_checkpoint()`
+- La función de pérdida (`nn_loss_fn=Auto`) se selecciona automáticamente según `task_type`
+
+### `no_supervisado`
+- `process_input()` disponible para inferencia desde API y chat
+- Monitorización de drift disponible aunque no haya variable objetivo
+
+### `hibrido`
+- `process_input()` aplica automáticamente la transformación dimensional guardada (PCA, UMAP, KMeans-features o IsolationForest)
+- Compatible con todos los flags opcionales simultáneamente
 
 ---
 
@@ -206,4 +269,3 @@ Ver [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 GPL-3.0
-
