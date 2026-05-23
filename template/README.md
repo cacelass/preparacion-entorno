@@ -1,208 +1,116 @@
-# DSKIT
+# {{ project_name }}
 
-![version](https://img.shields.io/badge/dskit-1.7.0-blue)
-![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
-![uv](https://img.shields.io/badge/gestor-uv-green)
-![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
+![Python](https://img.shields.io/badge/Python-{{ python_version }}+-blue?logo=python&logoColor=white)
+{% if ml_type == 'supervisado' %}![ML Type](https://img.shields.io/badge/ML-Supervised%20{{ task_type | capitalize }}-orange)
+{% elif ml_type == 'no_supervisado' %}![ML Type](https://img.shields.io/badge/ML-Unsupervised%20Clustering-orange)
+{% elif ml_type == 'redes_neuronales' %}![ML Type](https://img.shields.io/badge/ML-Neural%20Networks%20{{ nn_model }}-orange)
+{% elif ml_type == 'hibrido' %}![ML Type](https://img.shields.io/badge/ML-Hybrid-orange)
+{% endif %}{% if use_mlflow %}![Tracking](https://img.shields.io/badge/Experiment%20Tracking-MLflow-blue?logo=mlflow)
+{% endif %}![Version](https://img.shields.io/badge/Version-{{ project_version }}-green)
+![Author](https://img.shields.io/badge/Author-{{ project_author_name | replace(" ", "%20") | replace("-", "--") }}-blueviolet)
+![Template](https://img.shields.io/badge/Generado%20con-dskit-58a6ff?logo=github)
 
-**Template profesional para Data Science y AI Engineering**
+> {{ project_description }}
 
-Plantilla basada en [copier](https://copier.readthedocs.io), diseñada para iniciar proyectos de ML de forma organizada, reproducible y lista para producción. Construida sobre `uv`, Sphinx y una arquitectura modular que cubre todo el flujo de trabajo desde la ingesta de datos hasta el modelo evaluado, exportado y servido como API.
-
----
-
-## Índice
-
-- [DSKIT](#dskit)
-  - [Índice](#índice)
-  - [Características](#características)
-  - [Requisitos previos](#requisitos-previos)
-  - [Instalación rápida](#instalación-rápida)
-  - [Variables](#variables)
-    - [Validaciones](#validaciones)
-  - [Uso](#uso)
-  - [Estructura generada](#estructura-generada)
-  - [Makefile](#makefile)
-  - [Changelog](#changelog)
-  - [License](#license)
+**Tipo de ML:** `{{ ml_type }}`{% if ml_type == "redes_neuronales" %} — arquitectura: `{{ nn_model }}`{% endif %}  
+**Autor:** {{ project_author_name }}  
+**Versión:** {{ project_version }}{% if use_xgboost %} · XGBoost ✓{% endif %}{% if use_lightgbm %} · LightGBM ✓{% endif %}{% if use_catboost or model_type == 'CatBoost' %} · CatBoost ✓{% endif %}
 
 ---
 
-## Características
-
-- **4 tipos de ML** con código y tests listos desde el primer `make run`:
-  `supervisado`, `no_supervisado`, `redes_neuronales`, `hibrido`
-- **2 tipos de tarea** (`task_type`): `clasificacion` o `regresion`
-- **5 arquitecturas de red neuronal**: MLP, CNN1D, LSTM, GRU, Transformer
-- **XGBoost y LightGBM** opcionales en supervisado e híbrido
-- **Selector de modelo** (`model_type`): `todos`, RandomForest, XGBoost, LightGBM, LogisticRegression, KNN, DecisionTree, **SVM**
-- **API REST** opcional (`use_api`): FastAPI con `/health`, `/info` y `/predict` — `make serve`
-- **DuckDB** opcional (`use_duckdb`): carga CSV/Parquet/JSON con SQL directo — `make query`
-- **Optuna** opcional (`use_optuna`): HPO automática por modelo — `make tune` + `make train`
-- **Monitoring** opcional (`use_monitoring`): drift KS/chi², performance vs baseline — `make monitor`
-- **MLflow** opcional: tracking de experimentos, artifacts y Model Registry
-- **Early stopping** y **validation split** configurables en redes neuronales
-- **`uv sync` automático** tras generar el proyecto
-- **`make smoke`**: tests de humo para verificar que el pipeline arranca
-- **`make profile`**: profiling con cProfile + snakeviz
-- **TensorBoard** integrado en redes neuronales (`make tb`)
-- Gestión de entornos con `uv` y grupos de dependencias por tipo de ML
-- Documentación con Sphinx, tests con pytest, linting con ruff
-
----
-
-## Requisitos previos
-
-```bash
-sudo apt install pipx
-pipx ensurepath
-pipx install copier
-pip install copier uv
-```
-
-Python >= 3.10 requerido.
-
----
-
-## Instalación rápida
-
-```bash
-copier copy --trust gh:cacelass/dskit nombre_proyecto
-```
-
-O desde una copia local:
-
-```bash
-copier copy --trust ./dskit nombre_proyecto
-```
-
-Copier ejecuta `uv sync` automáticamente tras generar. Si falla, hazlo manualmente:
-
-```bash
-cd nombre_proyecto
-uv sync --extra dev --extra <ml_type>
-source .venv/bin/activate
-```
-
-> Los iconos de micrófono en los prompts son parte de la UI de copier y no son configurables.
-
----
-
-## Variables
-
-Copier muestra solo las preguntas relevantes según las respuestas anteriores — las variables condicionales no aparecen si no aplican.
-
-| Variable | Valores | Condición | Descripción |
-|---|---|---|---|
-| `project_name` | texto | siempre | Nombre del proyecto |
-| `project_author_name` | texto | siempre | Nombre del autor |
-| `project_author_email` | email | siempre | Email (validado) |
-| `project_description` | texto | siempre | Descripción breve |
-| `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | siempre | Determina qué código se genera |
-| `task_type` | `clasificacion` · `regresion` | supervisado, redes_neuronales, hibrido | Tipo de tarea |
-| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` | solo redes_neuronales | Arquitectura de red |
-| `model_type` | `todos` · `RandomForest` · `XGBoost` · `LightGBM` · `LogisticRegression` · `KNN` · `DecisionTree` · `SVM` | solo supervisado e hibrido | Modelo a entrenar |
-| `use_xgboost` | true · false | solo supervisado e hibrido | Añade XGBoost |
-| `use_lightgbm` | true · false | solo supervisado e hibrido | Añade LightGBM |
-| `use_mlflow` | true · false | siempre | Integra MLflow |
-| `use_monitoring` | true · false | siempre | Drift detection y performance tracking |
-| `use_optuna` | true · false | siempre | HPO automática con Optuna |
-| `use_duckdb` | true · false | siempre | Carga con DuckDB (CSV/Parquet/JSON + SQL) |
-| `use_api` | true · false | siempre | Genera API REST con FastAPI |
-| `python_version` | `3.10` – `3.13` | siempre | Versión de Python |
-| `project_version` | texto | siempre | Versión inicial |
-
-### Validaciones
-
-Copier valida automáticamente antes de generar:
-- Slug solo con `[a-z0-9_]` empezando por letra
-- Email con formato válido
-
----
-
-## Uso
-
-```bash
-make help       # ver todos los comandos disponibles
-make run        # pipeline completo
-make smoke      # tests de humo rápidos
-make profile    # cProfile → reports/profile.prof
-make tb         # TensorBoard localhost:6006 (solo redes_neuronales)
-make mlflow     # MLflow UI localhost:5000 (solo si use_mlflow=true)
-make monitor    # drift + performance report (solo si use_monitoring=true)
-make tune       # HPO con Optuna (solo si use_optuna=true)
-make serve      # API REST localhost:8000   (solo si use_api=true)
-make query      # Shell DuckDB interactivo  (solo si use_duckdb=true)
-```
-
----
-
-## Estructura generada
+## Estructura del proyecto
 
 ```
-nombre_proyecto/
-├── <project_slug>/           ← paquete Python
-│   ├── data/make_dataset.py  ← carga pandas + DuckDB (si use_duckdb=true)
-│   ├── features/build_features.py
-│   ├── models/
-│   │   ├── train_model.py    ← adaptado al ml_type, task_type y nn_model
-│   │   └── predict_model.py  ← métricas, figuras y CSVs en reports/
-│   ├── utils/paths.py
-│   └── visualization/visualize.py
-├── api/                      ← solo si use_api=true
-│   ├── main.py               ← FastAPI: /health /info /predict
-│   └── schemas.py            ← Pydantic V2
-├── tuning/                   ← solo si use_optuna=true
-│   └── tune_model.py         ← objetivos Optuna por modelo + tune_models()
-├── monitoring/               ← solo si use_monitoring=true
-│   └── monitor.py            ← check_drift, check_performance, run_monitoring
-├── data/{raw,interim,processed,external}/
-├── models/                   ← pesos .pt / .joblib + best_params_*.joblib
+{{ project_slug }}/
+├── data/
+│   ├── raw/            ← datos originales (nunca modificar)
+│   ├── interim/        ← datos en proceso
+│   └── processed/      ← datos listos para modelar
+├── models/             ← modelos entrenados (.joblib / .pt)
+│   └── artifacts/      ← encoders, scalers, etc.
 ├── notebooks/
-├── reports/
-│   ├── figures/              ← matrices de confusión, real vs predicho, SHAP
-│   ├── monitoring/           ← drift_report.csv + drift_report.html
-│   └── resultados_*.csv      ← métricas ordenadas
+│   ├── 0-0-...-Descargadatos.ipynb
+│   ├── 0-1-...-ProcesamientoDatos.ipynb
+│   └── 0-2-...-Ejecucion.ipynb
+├── reports/figures/    ← gráficos generados
+├── {{ project_slug }}/
+│   ├── data/           make_dataset.py
+│   ├── features/       build_features.py
+│   ├── models/         train_model.py · predict_model.py
+│   ├── visualization/  visualize.py
+│   └── utils/          paths.py
 ├── tests/
-│   ├── conftest.py
-│   ├── test_train_model.py
-│   ├── test_api.py           ← solo si use_api=true
-│   ├── test_tuning.py        ← solo si use_optuna=true
-│   └── test_monitoring.py    ← solo si use_monitoring=true
-├── .copier-answers.yml       ← generado por copier, habilita copier update
+├── main.py             ← pipeline completo
 ├── Makefile
-├── pyproject.toml
-└── main.py
+└── pyproject.toml
 ```
 
----
 
-## Makefile
+{% if use_docker %}
+## Docker — Interfaz de chat
 
-| Target | Descripción |
+Generado con la plantilla **[dskit](https://github.com/cacelass/dskit)**.
+
+La imagen Docker incluye una interfaz web de chat para interactuar con los
+modelos entrenados directamente desde el navegador.
+
+### Arrancar
+
+```bash
+# Construir y lanzar (entrena automaticamente si no hay modelos)
+make docker-run
+
+# O directamente con Docker Compose
+docker compose up -d
+```
+
+La interfaz estara disponible en **http://localhost:8080**
+
+> Si no existe ningun modelo entrenado, el contenedor intentara entrenar
+> automaticamente al arrancar (requiere `dataset.csv` en la raiz del proyecto).
+
+### Comandos Docker
+
+```bash
+make docker-run     # construir imagen + arrancar contenedor
+make docker-update  # reconstruir con los ultimos cambios
+make docker-down    # parar y eliminar contenedores
+```
+
+### Comandos disponibles en el chat
+
+| Comando | Descripcion |
 |---|---|
-| `make run` | Pipeline completo (`main.py`) |
-| `make data / train / predict` | Pasos individuales |
-| `make test` | pytest completo |
-| `make smoke` | Solo `@pytest.mark.smoke` |
-| `make lint / format` | ruff check / ruff format |
-| `make profile` | cProfile → `reports/profile.prof` |
-| `make tb` | TensorBoard localhost:6006 *(redes_neuronales)* |
-| `make mlflow` | MLflow UI localhost:5000 *(use_mlflow=true)* |
-| `make monitor` | Drift + performance report *(use_monitoring=true)* |
-| `make tune` | HPO con Optuna *(use_optuna=true)* |
-| `make serve` | API REST localhost:8000 *(use_api=true)* |
-| `make query` | Shell DuckDB interactivo *(use_duckdb=true)* |
-| `make clean-all` | Cachés + modelos + figuras |
+| `status` | Estado del sistema y modelos cargados |
+| `predict` | Prediccion interactiva paso a paso |
+| `info` | Detalle de features y clases |
+| `train` | Lanzar entrenamiento desde el chat |
+| `reload` | Recargar modelos del disco |
+| `help` | Mostrar ayuda |
+
+---
+{% endif %}
+
+## Inicio rápido
+
+```bash
+# 1. Instalar dependencias
+make setup
+
+# 2. Activar entorno
+source .venv/bin/activate
+
+# 3. Colocar datos en data/raw/ y editar DATA_FILE / TARGET_COL en main.py
+
+# 4. Explorar con notebooks
+invoke lab
+
+# 5. Pipeline completo
+python main.py
+```
+
+Consulta el archivo `ayuda` para más detalles.
 
 ---
 
-## Changelog
-
-Ver [CHANGELOG.md](CHANGELOG.md).
-
----
-
-## License
-
-GPL-3.0
+Template generado con https://github.com/cacelass/dskit
