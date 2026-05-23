@@ -6,25 +6,38 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ─── Fase 1: Render + AST sin generar proyectos reales ────────────────────
   validate-template:
-    name: Render + AST (1003 checks)
+    name: Render + AST (1180 checks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          node-version: 24
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Instalar jinja2
-        run: pip install jinja2
+      - name: Instalar jinja2 y pyyaml
+        run: pip install jinja2 pyyaml
 
-      - name: Validar copier.yml
-        run: python -c "import yaml; yaml.safe_load(open('copier.yml')); print('copier.yml OK')"
+      - name: Validar copier.yml (YAML válido)
+        run: python -c "
+import yaml, sys
+try:
+    yaml.safe_load(open('copier.yml'))
+    print('copier.yml OK')
+except Exception as e:
+    print(f'ERROR: {e}')
+    sys.exit(1)
+"
 
-      - name: Render + AST — 17 combinaciones x 59 ficheros
+      - name: Render + AST — 20 combinaciones x 59 ficheros
         run: python .github/scripts/validate_template.py
 
   # ─── Fase 2: Generar proyecto real y ejecutar smoke tests ─────────────────
@@ -38,86 +51,48 @@ jobs:
         include:
           - label: sup-clf
             extras: supervisado
-            data: >-
-              ml_type=supervisado
-              task_type=clasificacion
-              model_type=todos
+            data: "ml_type=supervisado task_type=clasificacion model_type=todos"
 
           - label: sup-reg
             extras: supervisado
-            data: >-
-              ml_type=supervisado
-              task_type=regresion
-              model_type=todos
+            data: "ml_type=supervisado task_type=regresion model_type=todos"
 
           - label: nosup
             extras: no_supervisado
-            data: >-
-              ml_type=no_supervisado
-              task_type=clasificacion
-              cluster_model=todos
+            data: "ml_type=no_supervisado task_type=clasificacion cluster_model=todos"
 
           - label: nn-mlp-clf-adamw
             extras: redes_neuronales
-            data: >-
-              ml_type=redes_neuronales
-              task_type=clasificacion
-              nn_model=MLP
-              optimizer_type=AdamW
-              nn_loss_fn=Auto
+            data: "ml_type=redes_neuronales task_type=clasificacion nn_model=MLP optimizer_type=AdamW nn_loss_fn=Auto"
 
           - label: nn-mlp-reg-sgd-mse
             extras: redes_neuronales
-            data: >-
-              ml_type=redes_neuronales
-              task_type=regresion
-              nn_model=MLP
-              optimizer_type=SGD
-              nn_loss_fn=MSELoss
+            data: "ml_type=redes_neuronales task_type=regresion nn_model=MLP optimizer_type=SGD nn_loss_fn=MSELoss"
 
           - label: nn-lstm-clf-rmsprop
             extras: redes_neuronales
-            data: >-
-              ml_type=redes_neuronales
-              task_type=clasificacion
-              nn_model=LSTM
-              optimizer_type=RMSProp
-              nn_loss_fn=BCEWithLogitsLoss
+            data: "ml_type=redes_neuronales task_type=clasificacion nn_model=LSTM optimizer_type=RMSProp nn_loss_fn=BCEWithLogitsLoss"
 
           - label: nn-gru-reg-adagrad-l1
             extras: redes_neuronales
-            data: >-
-              ml_type=redes_neuronales
-              task_type=regresion
-              nn_model=GRU
-              optimizer_type=Adagrad
-              nn_loss_fn=L1Loss
+            data: "ml_type=redes_neuronales task_type=regresion nn_model=GRU optimizer_type=Adagrad nn_loss_fn=L1Loss"
 
           - label: nn-transformer-clf
             extras: redes_neuronales
-            data: >-
-              ml_type=redes_neuronales
-              task_type=clasificacion
-              nn_model=Transformer
-              optimizer_type=AdamW
-              nn_loss_fn=Auto
+            data: "ml_type=redes_neuronales task_type=clasificacion nn_model=Transformer optimizer_type=AdamW nn_loss_fn=Auto"
 
           - label: hibrido-clf
             extras: hibrido
-            data: >-
-              ml_type=hibrido
-              task_type=clasificacion
-              model_type=todos
+            data: "ml_type=hibrido task_type=clasificacion model_type=todos"
 
           - label: hibrido-reg
             extras: hibrido
-            data: >-
-              ml_type=hibrido
-              task_type=regresion
-              model_type=todos
+            data: "ml_type=hibrido task_type=regresion model_type=todos"
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          node-version: 24
 
       - uses: astral-sh/setup-uv@v3
         with:
@@ -127,8 +102,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar copier
-        run: pip install copier
+      - name: Instalar copier y pyyaml
+        run: pip install copier pyyaml
 
       - name: Escribir data file para copier
         run: python .github/scripts/write_data_file.py "${{ matrix.data }}"
@@ -138,6 +113,8 @@ jobs:
           copier copy --trust --defaults \
             --data-file /tmp/copier-data.yml \
             . /tmp/generated
+          echo "Generado OK — contenido:"
+          ls /tmp/generated
 
       - name: Instalar dependencias
         working-directory: /tmp/generated
