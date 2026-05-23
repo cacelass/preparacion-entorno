@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Fase 1: Render + AST sin generar proyectos reales ────────────────────
+  validate-template:
+    name: Render + AST (1003 checks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar jinja2
+        run: pip install jinja2
+
+      - name: Validar copier.yml
+        run: python -c "import yaml; yaml.safe_load(open('copier.yml')); print('copier.yml OK')"
+
+      - name: Render + AST — 17 combinaciones x 59 ficheros
+        run: python .github/scripts/validate_template.py
+
+  # ─── Fase 2: Generar proyecto real y ejecutar smoke tests ─────────────────
+  smoke:
+    name: smoke / ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    needs: validate-template
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: sup-clf
+            extras: supervisado
+            data: >-
+              ml_type=supervisado
+              task_type=clasificacion
+              model_type=todos
+
+          - label: sup-reg
+            extras: supervisado
+            data: >-
+              ml_type=supervisado
+              task_type=regresion
+              model_type=todos
+
+          - label: nosup
+            extras: no_supervisado
+            data: >-
+              ml_type=no_supervisado
+              task_type=clasificacion
+              cluster_model=todos
+
+          - label: nn-mlp-clf-adamw
+            extras: redes_neuronales
+            data: >-
+              ml_type=redes_neuronales
+              task_type=clasificacion
+              nn_model=MLP
+              optimizer_type=AdamW
+              nn_loss_fn=Auto
+
+          - label: nn-mlp-reg-sgd-mse
+            extras: redes_neuronales
+            data: >-
+              ml_type=redes_neuronales
+              task_type=regresion
+              nn_model=MLP
+              optimizer_type=SGD
+              nn_loss_fn=MSELoss
+
+          - label: nn-lstm-clf-rmsprop
+            extras: redes_neuronales
+            data: >-
+              ml_type=redes_neuronales
+              task_type=clasificacion
+              nn_model=LSTM
+              optimizer_type=RMSProp
+              nn_loss_fn=BCEWithLogitsLoss
+
+          - label: nn-gru-reg-adagrad-l1
+            extras: redes_neuronales
+            data: >-
+              ml_type=redes_neuronales
+              task_type=regresion
+              nn_model=GRU
+              optimizer_type=Adagrad
+              nn_loss_fn=L1Loss
+
+          - label: nn-transformer-clf
+            extras: redes_neuronales
+            data: >-
+              ml_type=redes_neuronales
+              task_type=clasificacion
+              nn_model=Transformer
+              optimizer_type=AdamW
+              nn_loss_fn=Auto
+
+          - label: hibrido-clf
+            extras: hibrido
+            data: >-
+              ml_type=hibrido
+              task_type=clasificacion
+              model_type=todos
+
+          - label: hibrido-reg
+            extras: hibrido
+            data: >-
+              ml_type=hibrido
+              task_type=regresion
+              model_type=todos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar copier
+        run: pip install copier
+
+      - name: Escribir data file para copier
+        run: python .github/scripts/write_data_file.py "${{ matrix.data }}"
+
+      - name: Generar proyecto con copier
+        run: |
+          copier copy --trust --defaults \
+            --data-file /tmp/copier-data.yml \
+            . /tmp/generated
+
+      - name: Instalar dependencias
+        working-directory: /tmp/generated
+        run: uv sync --extra dev --extra ${{ matrix.extras }}
+
+      - name: Smoke tests
+        working-directory: /tmp/generated
+        run: uv run pytest -m smoke --tb=short -q
+
+      - name: Lint
+        working-directory: /tmp/generated
+        run: uv run ruff check .

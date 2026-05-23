@@ -27,6 +27,7 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
   - [Estructura generada](#estructura-generada)
   - [Makefile — referencia completa](#makefile--referencia-completa)
   - [Notas por tipo de ML](#notas-por-tipo-de-ml)
+    - [`supervisado`](#supervisado)
     - [`redes_neuronales`](#redes_neuronales)
     - [`no_supervisado`](#no_supervisado)
     - [`hibrido`](#hibrido)
@@ -242,6 +243,13 @@ nombre_proyecto/
 ---
 
 ## Notas por tipo de ML
+
+### `supervisado`
+- `model_type=todos` entrena y evalúa todos los modelos disponibles en paralelo y devuelve un ranking por F1/RMSE
+- SHAP values (`use_shap=True`) se calculan automáticamente sobre el mejor modelo tras la evaluación
+- Con `use_optuna=True`, cada modelo tiene su propia función objetivo (`_objective_rf`, `_objective_xgb`, etc.) y los mejores parámetros se guardan en `artifacts/`
+- El `DECISION_THRESHOLD` (umbral de clasificación binaria) se puede ajustar manualmente o calcular automáticamente con `find_optimal_threshold()` en `predict_model.py`
+- Cuando `use_mlflow=True`, cada `train_models()` abre un run automáticamente y loguea parámetros, métricas y el modelo como artifact
 
 ### `redes_neuronales`
 - `output_dim` se calcula automáticamente: `n_clases` para clasificación, `1` para regresión
