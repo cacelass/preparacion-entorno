@@ -3,7 +3,6 @@ validate_template.py — Fase 1 del CI.
 
 Renderiza todas las combinaciones con Jinja2 StrictUndefined y verifica
 que cada fichero .py generado pasa ast.parse() sin errores de sintaxis.
-No genera proyectos reales ni requiere uv/copier.
 """
 from __future__ import annotations
 
@@ -17,6 +16,9 @@ except ImportError:
     sys.exit("ERROR: pip install jinja2")
 
 BASE = Path(__file__).parent.parent.parent / "template"
+
+if not BASE.exists():
+    sys.exit(f"ERROR: template/ no encontrado en {BASE}. Verifica la estructura del repo.")
 
 STD = dict(
     project_slug="test_project", project_name="Test Project",
@@ -42,13 +44,12 @@ COMBOS: list[tuple[str, dict]] = [
                                  use_xgboost=True, use_lightgbm=True, use_catboost=True,
                                  use_monitoring=True)),
     ("sup+reg+ALL",         dict(ml_type="supervisado",      task_type="regresion",
-                                 use_mlflow=True, use_optuna=True, use_api=True,
-                                 use_monitoring=True)),
+                                 use_mlflow=True, use_optuna=True, use_api=True, use_monitoring=True)),
     ("nosup",               dict(ml_type="no_supervisado",   task_type="clasificacion")),
     ("nosup+ALL",           dict(ml_type="no_supervisado",   task_type="clasificacion",
                                  cluster_model="KMeans", use_api=True, use_optuna=True,
                                  use_monitoring=True, use_docker=True)),
-    ("nn+MLP+clf+AdamW",    dict(ml_type="redes_neuronales", task_type="clasificacion",
+    ("nn+MLP+clf",          dict(ml_type="redes_neuronales", task_type="clasificacion",
                                  nn_model="MLP",         optimizer_type="AdamW",   nn_loss_fn="Auto")),
     ("nn+MLP+reg+SGD+MSE",  dict(ml_type="redes_neuronales", task_type="regresion",
                                  nn_model="MLP",         optimizer_type="SGD",     nn_loss_fn="MSELoss")),
@@ -74,14 +75,12 @@ COMBOS: list[tuple[str, dict]] = [
                                  nn_model="Transformer",  optimizer_type="AdamW",   nn_loss_fn="MSELoss")),
     ("nn+MLP+reg+ALL",      dict(ml_type="redes_neuronales", task_type="regresion",
                                  nn_model="MLP",          optimizer_type="AdamW",   nn_loss_fn="Auto",
-                                 use_mlflow=True, use_optuna=True, use_api=True,
-                                 use_monitoring=True)),
+                                 use_mlflow=True, use_optuna=True, use_api=True, use_monitoring=True)),
     ("hibrido+clf",         dict(ml_type="hibrido",          task_type="clasificacion",
                                  use_shap=True, use_xgboost=True, use_lightgbm=True)),
     ("hibrido+reg",         dict(ml_type="hibrido",          task_type="regresion")),
     ("hibrido+reg+ALL",     dict(ml_type="hibrido",          task_type="regresion",
-                                 use_mlflow=True, use_optuna=True, use_api=True,
-                                 use_monitoring=True)),
+                                 use_mlflow=True, use_optuna=True, use_api=True, use_monitoring=True)),
 ]
 
 ALL_FILES = sorted([
@@ -93,8 +92,13 @@ ALL_FILES = sorted([
 ])
 
 env = Environment(loader=BaseLoader(), undefined=StrictUndefined, keep_trailing_newline=True)
-
 bugs: list[tuple[str, str, str]] = []
+
+print(f"BASE         : {BASE}")
+print(f"Combinaciones: {len(COMBOS)}")
+print(f"Ficheros     : {len(ALL_FILES)}")
+print(f"Checks totales: {len(COMBOS) * len(ALL_FILES)}")
+print()
 
 for label, combo in COMBOS:
     ctx = {**STD, **DEFAULTS, **combo}
@@ -104,12 +108,15 @@ for label, combo in COMBOS:
             rendered = env.from_string(raw).render(**ctx)
         except UndefinedError as exc:
             bugs.append((label, rel, f"UNDEF: {exc}"))
+            print(f"  ✗ UNDEF  [{label}] {rel}: {exc}")
             continue
         except TemplateSyntaxError as exc:
             bugs.append((label, rel, f"SYNTAX: {exc}"))
+            print(f"  ✗ SYNTAX [{label}] {rel}: {exc}")
             continue
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             bugs.append((label, rel, f"RENDER: {exc}"))
+            print(f"  ✗ RENDER [{label}] {rel}: {exc}")
             continue
 
         if rel.endswith(".py"):
@@ -119,23 +126,24 @@ for label, combo in COMBOS:
                 lines = rendered.splitlines()
                 ln = exc.lineno or 1
                 snippet = "\n".join(
-                    f"  {ln + i - 2}: {lines[max(0, ln + i - 3)]}"
-                    for i in range(5)
-                    if 0 <= ln + i - 3 < len(lines)
+                    f"    {ln+i-2}: {lines[max(0,ln+i-3)]}"
+                    for i in range(6)
+                    if 0 <= ln+i-3 < len(lines)
                 )
-                bugs.append((label, rel, f"PY_SYNTAX L{ln}: {exc.msg}\n{snippet}"))
+                msg = f"PY_SYNTAX L{ln}: {exc.msg}\n{snippet}"
+                bugs.append((label, rel, msg))
+                print(f"  ✗ PY_SYN [{label}] {rel}:\n{snippet}")
 
-total = len(COMBOS) * len(ALL_FILES)
-print(f"Combinaciones : {len(COMBOS)}")
-print(f"Ficheros      : {len(ALL_FILES)}")
-print(f"Checks totales: {total}")
-print(f"Bugs          : {len(bugs)}")
+print()
+print(f"Bugs encontrados: {len(bugs)}")
 
 if bugs:
-    print("\n--- BUGS ---")
+    print("\n" + "="*60)
+    print("RESUMEN DE BUGS:")
     for label, rel, msg in bugs:
-        print(f"\n  [{rel}]  combo={label}")
-        print(f"  {msg[:300]}")
+        print(f"\n  Combo : {label}")
+        print(f"  Fichero: {rel}")
+        print(f"  Error  : {msg[:400]}")
     sys.exit(1)
 
-print("\n✓ Plantilla válida — 0 bugs")
+print("✓ Plantilla válida — 0 bugs")
