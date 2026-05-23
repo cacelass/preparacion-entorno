@@ -3,21 +3,20 @@ name: CI
 on:
   push:
     branches: [main, develop]
+
   pull_request:
     branches: [main]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-  # ─── Fase 1: Render + AST sin generar proyectos reales ────────────────────
+  # ─────────────────────────────────────────────────────────────
+  # Fase 1 — Validación del template sin generar proyectos reales
+  # ─────────────────────────────────────────────────────────────
   validate-template:
     name: Render + AST (1180 checks)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          node-version: 24
 
       - uses: actions/setup-python@v5
         with:
@@ -27,26 +26,36 @@ jobs:
         run: pip install jinja2 pyyaml
 
       - name: Validar copier.yml (YAML válido)
-        run: python -c "
-import yaml, sys
-try:
-    yaml.safe_load(open('copier.yml'))
-    print('copier.yml OK')
-except Exception as e:
-    print(f'ERROR: {e}')
-    sys.exit(1)
-"
+        run: |
+          python - <<'PY'
+          import yaml
+          import sys
+
+          try:
+              with open("copier.yml") as f:
+                  yaml.safe_load(f)
+
+              print("copier.yml OK")
+
+          except Exception as e:
+              print(f"ERROR: {e}")
+              sys.exit(1)
+          PY
 
       - name: Render + AST — 20 combinaciones x 59 ficheros
         run: python .github/scripts/validate_template.py
 
-  # ─── Fase 2: Generar proyecto real y ejecutar smoke tests ─────────────────
+  # ─────────────────────────────────────────────────────────────
+  # Fase 2 — Generar proyectos reales y ejecutar smoke tests
+  # ─────────────────────────────────────────────────────────────
   smoke:
     name: smoke / ${{ matrix.label }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: validate-template
+
     strategy:
       fail-fast: false
+
       matrix:
         include:
           - label: sup-clf
@@ -91,16 +100,20 @@ except Exception as e:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          node-version: 24
 
       - uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Cache UV
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ matrix.label }}
 
       - name: Instalar copier y pyyaml
         run: pip install copier pyyaml
@@ -110,9 +123,12 @@ except Exception as e:
 
       - name: Generar proyecto con copier
         run: |
+          rm -rf /tmp/generated
+
           copier copy --trust --defaults \
             --data-file /tmp/copier-data.yml \
             . /tmp/generated
+
           echo "Generado OK — contenido:"
           ls /tmp/generated
 
@@ -124,6 +140,6 @@ except Exception as e:
         working-directory: /tmp/generated
         run: uv run pytest -m smoke --tb=short -q
 
-      - name: Lint
+      - name: Ruff lint
         working-directory: /tmp/generated
         run: uv run ruff check .
