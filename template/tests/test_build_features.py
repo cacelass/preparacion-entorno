@@ -14,6 +14,7 @@ from {{ project_slug }}.features.build_features import (
 )
 
 
+@pytest.mark.smoke
 def test_preprocess_data_returns_four_splits(df_with_target, patch_paths):
     """preprocess_data debe devolver (X_train, X_test, y_train, y_test)."""
     result = preprocess_data(df_with_target, target_col="target")
@@ -95,6 +96,7 @@ def test_process_input_after_preprocess(df_with_target, patch_paths):
 from {{ project_slug }}.features.build_features import preprocess_data
 
 
+@pytest.mark.smoke
 def test_preprocess_data_returns_ndarray(df_clustering, patch_paths):
     """preprocess_data debe devolver un numpy array escalado."""
     X = preprocess_data(df_clustering)
@@ -137,6 +139,7 @@ def test_preprocess_data_saves_processed_csv(df_clustering, patch_paths):
 from {{ project_slug }}.features.build_features import preprocess_data, process_input
 
 
+@pytest.mark.smoke
 def test_preprocess_data_returns_dataframes(df_with_target, patch_paths):
     """Para redes neuronales, preprocess_data debe devolver DataFrames."""
     X_train, X_test, y_train, y_test = preprocess_data(
@@ -180,6 +183,7 @@ from {{ project_slug }}.features.build_features import (
 )
 
 
+@pytest.mark.smoke
 def test_preprocess_data_pca_clf(df_with_target, patch_paths):
     """Estrategia pca_clf: debe guardar scaler.joblib y pca.joblib."""
     preprocess_data(df_with_target, target_col="target", strategy="pca_clf")

@@ -5,6 +5,8 @@ y que las funciones principales existen con las firmas esperadas.
 import pytest
 import inspect
 
+pytestmark = pytest.mark.smoke
+
 
 def test_import_data_module():
     from {{ project_slug }}.data import make_dataset

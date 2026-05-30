@@ -7,6 +7,7 @@ import pytest
 
 
 {% if ml_type == "supervisado" %}
+import pytest
 from {{ project_slug }}.models.train_model import (
     _build_models,
 {% if model_type == "todos" or model_type == "KNN" %}
@@ -33,6 +34,7 @@ def _make_Xy():
     return X, y
 
 
+@pytest.mark.smoke
 def test_build_models_returns_dict():
     models = _build_models()
     assert isinstance(models, dict)
@@ -131,6 +133,7 @@ def test_models_can_predict(patch_paths):
 
 
 {% if ml_type == "no_supervisado" %}
+import pytest
 from {{ project_slug }}.models.train_model import (
     _build_models,
     find_optimal_k,
@@ -146,6 +149,7 @@ def _make_X():
     return X
 
 
+@pytest.mark.smoke
 def test_build_models_returns_dict():
     models = _build_models(n_clusters=3)
     assert isinstance(models, dict)
@@ -226,6 +230,7 @@ BATCH      = 10
 
 # ─── Forward pass por arquitectura ─────────────────────────────────────────
 
+@pytest.mark.smoke
 def test_mlp_forward():
     model = MLP(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM, hidden_dims=[16, 8])
     out   = model(torch.randn(BATCH, INPUT_DIM))
@@ -279,7 +284,7 @@ def test_train_models_returns_dict(patch_paths):
         X_train, y_train,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
-        epochs=2, batch_size=16, checkpoint_every=0, val_split=0.2,
+        epochs=2, batch_size=16, checkpoint_every=0,
     )
     assert isinstance(trained, dict)
     assert MODEL_NAME in trained
@@ -291,7 +296,7 @@ def test_train_models_saves_pt(patch_paths):
         X_train, y_train,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
-        epochs=2, batch_size=16, checkpoint_every=0, val_split=0.2,
+        epochs=2, batch_size=16, checkpoint_every=0,
     )
     assert (patch_paths["MODELS_DIR"] / f"{MODEL_NAME}_final.pt").exists()
 
@@ -302,7 +307,7 @@ def test_load_model_after_train(patch_paths):
         X_train, y_train,
         input_dim=X_train.shape[1],
         output_dim=int(y_train.nunique()),
-        epochs=2, batch_size=16, checkpoint_every=0, val_split=0.2,
+        epochs=2, batch_size=16, checkpoint_every=0,
     )
     model = load_model(
         input_dim=X_train.shape[1],
@@ -313,6 +318,7 @@ def test_load_model_after_train(patch_paths):
 
 
 {% if ml_type == "hibrido" %}
+import pytest
 from {{ project_slug }}.models.train_model import (
     _build_models,
 {% if model_type == "todos" or model_type == "KNN" %}
@@ -339,6 +345,7 @@ def _make_Xy():
     return X, y
 
 
+@pytest.mark.smoke
 def test_build_models_returns_dict():
     models = _build_models(strategy="pca_clf")
     assert isinstance(models, dict)

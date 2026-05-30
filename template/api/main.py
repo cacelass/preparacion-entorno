@@ -113,7 +113,14 @@ def _load_artifacts() -> None:
     if load_path.exists():
         input_dim  = len(_state["feature_names"]) if _state["feature_names"] else 1
         output_dim_path = ARTIFACTS_DIR / "output_dim.joblib"
-        output_dim = int(joblib.load(output_dim_path)) if output_dim_path.exists() else 2
+        if output_dim_path.exists():
+            output_dim = int(joblib.load(output_dim_path))
+        else:
+{% if task_type == "regresion" %}
+            output_dim = 1   # regresión: una neurona de salida
+{% else %}
+            output_dim = 2   # clasificación binaria por defecto
+{% endif %}
         model = build_model(input_dim=input_dim, output_dim=output_dim)
         model.load_state_dict(
             torch.load(load_path, map_location="cpu", weights_only=True)

@@ -117,6 +117,14 @@ api = [
 ]
 {% endif %}
 
+{% if use_monitoring %}
+# Monitorización: drift detection y performance tracking
+monitoring = [
+    "evidently",
+    "scipy",
+]
+{% endif %}
+
 [tool.setuptools]
 packages = ["{{ project_slug }}"]
 
