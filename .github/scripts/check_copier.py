@@ -2,8 +2,9 @@
 check_copier.py — Valida que copier.yml es YAML válido y contiene las variables mínimas.
 """
 import sys
-import yaml
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).parent.parent.parent
 

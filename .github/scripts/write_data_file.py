@@ -10,8 +10,9 @@ Uso:
     python write_data_file.py "ml_type=supervisado task_type=clasificacion"
 """
 import sys
-import yaml
 from pathlib import Path
+
+import yaml
 
 # Campos comunes a todas las combinaciones
 BASE = {
