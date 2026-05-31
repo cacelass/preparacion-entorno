@@ -344,31 +344,29 @@ if __name__ == '__main__':
     main()
 
 {% elif ml_type == 'hibrido' %}
-"""
-Pipeline híbrido: combina técnicas no supervisadas y supervisadas.
-
-Estrategias disponibles (configura STRATEGY):
-
-  'pca_clf'        → PCA → clasificador supervisado
-                     Reduce dimensionalidad antes del modelado.
-                     Útil cuando hay muchas features correladas.
-
-  'umap_clf'       → UMAP → clasificador supervisado
-                     Reducción no lineal; mejor que PCA cuando las
-                     relaciones entre variables son complejas.
-
-  'kmeans_features'→ KMeans → distancias a centroides como nuevas
-                     features → clasificador supervisado.
-                     El clustering actúa como extractor de features.
-
-  'iso_feature'    → IsolationForest → anomaly score como feature extra
-                     → clasificador supervisado.
-                     Útil cuando la anomalía es predictiva del target.
-
-  'semi_supervisado'→ LabelSpreading sobre datos parcialmente etiquetados
-                     → propaga etiquetas → entrena clasificador.
-                     Útil cuando solo una parte del dataset tiene labels.
-"""
+# Pipeline híbrido: combina técnicas no supervisadas y supervisadas.
+#
+# Estrategias disponibles (configura STRATEGY):
+#
+#   'pca_clf'        → PCA → clasificador supervisado
+#                      Reduce dimensionalidad antes del modelado.
+#                      Útil cuando hay muchas features correladas.
+#
+#   'umap_clf'       → UMAP → clasificador supervisado
+#                      Reducción no lineal; mejor que PCA cuando las
+#                      relaciones entre variables son complejas.
+#
+#   'kmeans_features'→ KMeans → distancias a centroides como nuevas
+#                      features → clasificador supervisado.
+#                      El clustering actúa como extractor de features.
+#
+#   'iso_feature'    → IsolationForest → anomaly score como feature extra
+#                      → clasificador supervisado.
+#                      Útil cuando la anomalía es predictiva del target.
+#
+#   'semi_supervisado'→ LabelSpreading sobre datos parcialmente etiquetados
+#                      → propaga etiquetas → entrena clasificador.
+#                      Útil cuando solo una parte del dataset tiene labels.
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models

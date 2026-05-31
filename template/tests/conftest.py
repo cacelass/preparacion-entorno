@@ -1,6 +1,6 @@
 """
 conftest.py — Fixtures compartidas para todos los tests.
-Los fixtures se adaptan automáticamente al ml_type elegido en 
+Los fixtures se adaptan automáticamente al ml_type elegido en
 """
 import importlib
 import numpy as np

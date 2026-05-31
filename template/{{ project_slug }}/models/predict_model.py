@@ -452,7 +452,7 @@ def predict_proba_new(model_name: str, X_new) -> np.ndarray:
 #     return best_threshold, best_f1
 
 
-{% endif %}  {# end task_type == clasificacion #}
+{% endif %}{# end task_type == clasificacion #}
 
 
 # ---------------------------------------------------------------------------
@@ -1027,11 +1027,14 @@ def _plot_regression_scatter(y_true, y_pred, model_name: str):
     ax.scatter(y_true, y_pred, alpha=0.4, s=15, color="steelblue")
     lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
     ax.plot(lims, lims, "r--", lw=1.5, label="y = ŷ")
-    ax.set_xlabel("Real"); ax.set_ylabel("Predicho")
+    ax.set_xlabel("Real")
+    ax.set_ylabel("Predicho")
     ax.set_title(f"Predicho vs Real — {model_name}")
-    ax.legend(); fig.tight_layout()
+    ax.legend()
+    fig.tight_layout()
     path = FIGURES_DIR / f"scatter_{model_name}.png"
-    fig.savefig(path, dpi=150); plt.close(fig)
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
     print(f"    scatter_{model_name}.png guardado")
 
 
@@ -1051,7 +1054,8 @@ def _plot_residuals(y_true, y_pred, model_name: str):
 
     fig.tight_layout()
     path = FIGURES_DIR / f"residuos_{model_name}.png"
-    fig.savefig(path, dpi=150); plt.close(fig)
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
     print(f"    residuos_{model_name}.png guardado")
 {% endif %}
 
@@ -1073,6 +1077,7 @@ def _export_predictions(y_true, y_pred, proba, model_name: str, num_classes: int
 
 
 def _plot_confusion_matrix(y_true, y_pred, model_name, tb_writer=None):
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     cm   = confusion_matrix(y_true, y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     fig, ax = plt.subplots(figsize=(7, 6))

@@ -1,163 +1,38 @@
 [project]
-name = "{{ project_slug }}"
-version = "{{ project_version }}"
-description = "{{ project_description }}"
+name = "dskit"
+version = "1.8.2"
+description = "Template profesional para Data Science y AI Engineering"
 authors = [
-  { name = "{{ project_author_name }}" }
+  { name = "cacelass" }
 ]
 readme = "README.md"
-requires-python = ">= {{ python_version }}"
-license = { text = "{{ project_open_source_license if project_open_source_license != 'No license file' else '' }}" }
+requires-python = ">= 3.10"
+license = { text = "GPL-3.0" }
 dependencies = [
-    # ── Datos y computación ───────────────────────────────────────────────
-    "numpy",
-    "pandas",
-    "scipy",           # stats, tests de normalidad, clustering jerárquico
-    # ── ML core (usadas en todos los ml_type) ────────────────────────────
-    "scikit-learn",    # modelos, PCA, pipelines, métricas, preprocesado
-    "joblib",          # serialización de modelos y paralelismo
-    # ── Visualización ────────────────────────────────────────────────────
-    "matplotlib",
-    "seaborn",
-    "plotly",
-    "missingno",
-    # ── Notebooks ────────────────────────────────────────────────────────
-    "jupyter",
-    "jupyterlab",
-    # ── Utilidades ───────────────────────────────────────────────────────
-    "python-dotenv",
-    "loguru",          # logging estructurado
-    "rich",            # output de consola con color y tablas
-    "tqdm",            # barras de progreso
+    "copier",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "invoke",
-    "nbdime",
     "ruff",
     "pytest",
-    "pytest-cov",
-    "sphinx",
-    "snakeviz",
+    "jinja2",
 ]
-
-# ML supervisado: clasificación + regresión
-supervisado = [
-    "lightgbm",
-    "xgboost",
-{% if use_catboost or model_type == "CatBoost" %}
-    "catboost",
-{% endif %}
-    "statsmodels",
-    "imbalanced-learn",
-{% if use_shap %}
-    "shap",
-{% endif %}
-]
-
-{% if use_mlflow %}
-mlflow_tracking = [
-    "mlflow",
-]
-{% endif %}
-
-# ML no supervisado: clustering + reducción de dimensionalidad
-no_supervisado = [
-    "yellowbrick",    # SilhouetteVisualizer
-    "umap-learn",     # reducción de dimensionalidad no lineal (UMAP)
-    "hdbscan",        # clustering basado en densidad jerárquico
-]
-
-# Redes neuronales: deep learning con PyTorch
-redes_neuronales = [
-    "torch",
-    "torchvision",
-    "torchaudio",
-    "torchmetrics[visual]",
-    "tensorboard",
-    "polars",         # carga eficiente de datos con dtypes explícitos
-    "pyarrow",        # backend requerido por polars para conversión a pandas
-]
-
-# Modelos híbridos: combinan técnicas supervisadas y no supervisadas
-hibrido = [
-    "umap-learn",     # UMAP como alternativa a PCA (no lineal)
-    "lightgbm",       # clasificador final potente
-    "xgboost",        # clasificador final alternativo
-{% if use_catboost or model_type == "CatBoost" %}
-    "catboost",       # boosting nativo para variables categoricas
-{% endif %}
-    "imbalanced-learn",
-]
-
-{% if use_optuna %}
-# Optuna: optimizacion de hiperparametros
-optuna = [
-    "optuna",
-    "optuna-dashboard",  # UI web para explorar estudios (opcional)
-]
-{% endif %}
-
-{% if use_duckdb %}
-# DuckDB: queries SQL sobre CSV/Parquet/JSON sin servidor
-duckdb = [
-    "duckdb",
-    "pyarrow",   # necesario para leer/escribir Parquet con pandas y DuckDB
-]
-{% endif %}
-
-{% if use_api %}
-# API REST para servir el modelo entrenado
-api = [
-    "fastapi",
-    "uvicorn[standard]",
-    "pydantic>=2.0",
-    "httpx",   # cliente HTTP para tests de la API
-]
-{% endif %}
-
-{% if use_monitoring %}
-# Monitorización: drift detection y performance tracking
-monitoring = [
-    "evidently",
-    "scipy",
-]
-{% endif %}
-
-[tool.setuptools]
-packages = ["{{ project_slug }}"]
 
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts   = "-v --tb=short"
-markers   = [
-    "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
-]
 
 [tool.ruff]
 line-length = 100
-target-version = "py{{ python_version | replace('.', '') }}"
+target-version = "py312"
 exclude = [
-    "notebooks/",
+    "template/",
     ".venv",
     "dist",
 ]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = [
-    "E501",   # line too long (handled by line-length)
-    "I001",   # import sorting — templates can't guarantee alphabetical order
-    "F401",   # imported but unused — template imports are intentionally broad
-    "F811",   # redefinition of unused — pytest imported twice in some generated files
-    "F541",   # f-string without placeholders — happens after Jinja substitution
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*"           = ["F401", "F811", "E402"]
-"docs/*"            = ["E402", "W292"]
-"notebooks/*.ipynb" = ["E402", "F401", "I001", "W293"]
+ignore = ["E501"]

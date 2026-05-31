@@ -406,8 +406,11 @@ def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
 {% endif %}
     scores = {
         k: cross_val_score(
-            KNeighborsClassifier(n_neighbors=k) if "{{ task_type }}" == "clasificacion"
-            else KNeighborsRegressor(n_neighbors=k),
+{% if task_type == "clasificacion" %}
+            KNeighborsClassifier(n_neighbors=k),
+{% else %}
+            KNeighborsRegressor(n_neighbors=k),
+{% endif %}
             X_train, y_train, cv=5, scoring=scoring,
         ).mean()
         for k in k_range
