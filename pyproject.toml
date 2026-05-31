@@ -120,8 +120,8 @@ api = [
 {% if use_monitoring %}
 # Monitorización: drift detection y performance tracking
 monitoring = [
-    "evidently",   # drift detection + HTML reports
-    "scipy",       # stats KS/chi² (reforzado explícitamente)
+    "evidently",
+    "scipy",
 ]
 {% endif %}
 
@@ -140,8 +140,24 @@ markers   = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py{{ python_version | replace('.', '') }}"
+exclude = [
+    "notebooks/",
+    ".venv",
+    "dist",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # line too long (handled by line-length)
+    "I001",   # import sorting — templates can't guarantee alphabetical order
+    "F401",   # imported but unused — template imports are intentionally broad
+    "F811",   # redefinition of unused — pytest imported twice in some generated files
+    "F541",   # f-string without placeholders — happens after Jinja substitution
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*"           = ["F401", "F811", "E402"]
+"docs/*"            = ["E402", "W292"]
+"notebooks/*.ipynb" = ["E402", "F401", "I001", "W293"]

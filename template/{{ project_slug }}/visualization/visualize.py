@@ -211,7 +211,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.cluster.hierarchy as sch
 
-from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
 from {{ project_slug }}.utils.paths import FIGURES_DIR

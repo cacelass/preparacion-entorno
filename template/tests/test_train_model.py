@@ -7,7 +7,6 @@ import pytest
 
 
 {% if ml_type == "supervisado" %}
-import pytest
 from {{ project_slug }}.models.train_model import (
     _build_models,
 {% if model_type == "todos" or model_type == "KNN" %}
@@ -133,7 +132,6 @@ def test_models_can_predict(patch_paths):
 
 
 {% if ml_type == "no_supervisado" %}
-import pytest
 from {{ project_slug }}.models.train_model import (
     _build_models,
     find_optimal_k,
@@ -318,7 +316,6 @@ def test_load_model_after_train(patch_paths):
 
 
 {% if ml_type == "hibrido" %}
-import pytest
 from {{ project_slug }}.models.train_model import (
     _build_models,
 {% if model_type == "todos" or model_type == "KNN" %}

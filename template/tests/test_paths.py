@@ -3,7 +3,6 @@ test_paths.py — Tests para {{ project_slug }}/utils/paths.py
 Común a todos los ml_type.
 """
 from pathlib import Path
-import pytest
 from {{ project_slug }}.utils import paths
 
 

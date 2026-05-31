@@ -700,7 +700,7 @@ def try_model() -> None:
       - Haber ejecutado run_full_pipeline() al menos una vez para que
         existan los joblibs en artifacts/ y los modelos en models/.
     """
-    from {{ project_slug }}.utils.paths import ARTIFACTS_DIR, PROCESSED_DATA_DIR
+    from {{ project_slug }}.utils.paths import ARTIFACTS_DIR
     import pandas as pd
 
     # ── 1. Elegir modelo ────────────────────────────────────────────────
@@ -773,7 +773,7 @@ def try_model() -> None:
     print(f"  Cluster : {cluster}")
     if hasattr(model, "transform"):
         dists = model.transform(X_new)[0]
-        print(f"  Distancias a centroides:")
+        print("  Distancias a centroides:")
         for i, d in enumerate(dists):
             marker = " ←" if i == cluster else ""
             print(f"    Cluster {i}: {d:.4f}{marker}")

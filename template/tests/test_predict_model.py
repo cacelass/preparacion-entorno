@@ -12,7 +12,6 @@ from {{ project_slug }}.models.predict_model import (
     predict_new,
 {% if task_type == "clasificacion" %}
     predict_proba_new,
-    _plot_confusion_matrix,
 {% endif %}
 )
 from {{ project_slug }}.models.train_model import train_models
