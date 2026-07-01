@@ -1,5 +1,7 @@
 import pandas as pd
 from {{ project_slug }}.utils.paths import RAW_DATA_DIR
+import os
+import requests
 
 {% if use_duckdb %}
 # ---------------------------------------------------------------------------
@@ -209,6 +211,34 @@ def polars_to_pandas(df_polars) -> pd.DataFrame:
     return df_polars.to_pandas()
 
 {% endif %}
+
+def download_data(url: str, filename: str, params: dict | None = None, api_key_env: str | None = None) -> pd.DataFrame:
+    """
+    Descarga datos desde una API externa y los guarda en data/raw/.
+
+    Parameters
+    ----------
+    url : endpoint de la API
+    filename : nombre con el que se guardará el CSV en data/raw/
+    params : query params para la petición (opcional)
+    api_key_env : nombre de la variable de entorno con la API key (opcional)
+    """
+    headers = {}
+    if api_key_env:
+        key = os.environ.get(api_key_env)
+        if not key:
+            raise EnvironmentError(f"Falta la variable de entorno {api_key_env}")
+        headers["Authorization"] = f"Bearer {key}"
+
+    print(f"--> Descargando datos desde {url}...")
+    resp = requests.get(url, params=params, headers=headers, timeout=30)
+    resp.raise_for_status()
+
+    file_path = RAW_DATA_DIR / filename
+    df = pd.DataFrame(resp.json())  # o pd.read_csv si la API devuelve CSV
+    df.to_csv(file_path, index=False)
+    print(f"    Guardado en {file_path} — Shape: {df.shape}")
+    return df
 
 def load_data(filename: str = "<nombre>.csv") -> pd.DataFrame:
     """
