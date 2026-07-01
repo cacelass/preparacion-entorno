@@ -65,9 +65,11 @@ mlflow_tracking = [
 
 # ML no supervisado: clustering + reducción de dimensionalidad
 no_supervisado = [
-    "yellowbrick",    # SilhouetteVisualizer
-    "umap-learn",     # reducción de dimensionalidad no lineal (UMAP)
-    "hdbscan",        # clustering basado en densidad jerárquico
+    "yellowbrick",       # SilhouetteVisualizer
+    "umap-learn>=0.5.7", # reducción de dimensionalidad no lineal (UMAP)
+    "pynndescent>=0.5.12", # dependencia de umap-learn — pin explícito
+    "numba>=0.59",       # dependencia de pynndescent — evita resolver llvmlite antiguo
+    "hdbscan",           # clustering basado en densidad jerárquico
 ]
 
 # Redes neuronales: deep learning con PyTorch
@@ -83,9 +85,11 @@ redes_neuronales = [
 
 # Modelos híbridos: combinan técnicas supervisadas y no supervisadas
 hibrido = [
-    "umap-learn",     # UMAP como alternativa a PCA (no lineal)
-    "lightgbm",       # clasificador final potente
-    "xgboost",        # clasificador final alternativo
+    "umap-learn>=0.5.7",   # UMAP como alternativa a PCA (no lineal)
+    "pynndescent>=0.5.12", # dependencia de umap-learn — pin explícito
+    "numba>=0.59",         # dependencia de pynndescent — evita resolver llvmlite antiguo
+    "lightgbm",             # clasificador final potente
+    "xgboost",               # clasificador final alternativo
 {% if use_catboost or model_type == "CatBoost" %}
     "catboost",       # boosting nativo para variables categoricas
 {% endif %}
@@ -132,6 +136,7 @@ packages = ["{{ project_slug }}"]
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts   = "-v --tb=short"
