@@ -1,6 +1,7 @@
 {% if ml_type == "supervisado" %}
 import numpy as np
 import joblib
+from contextlib import nullcontext
 
 {% if task_type == "clasificacion" %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
@@ -438,7 +439,9 @@ def train_models(
 {% if use_mlflow %}
     MLflow: cada modelo se loguea como un run independiente dentro del
     experimento '{{ project_slug }}'. Los artifacts (.joblib) se registran
-    en el Model Registry bajo el nombre del modelo.
+    en el Model Registry bajo el nombre del modelo. fit, cross-validation,
+    el guardado en disco y el registro del modelo ocurren TODOS dentro del
+    mismo run — así el run queda con params + métricas + modelo juntos.
 {% endif %}
 
     Returns
@@ -469,8 +472,18 @@ def train_models(
 {% endif %}
         print(f"    [{name}] entrenando...")
 
+        # run_ctx es un run real de MLflow si use_mlflow está activo, o un
+        # context manager "vacío" (nullcontext) si no — así el cuerpo de abajo
+        # tiene SIEMPRE la misma indentación y fit/CV/guardado/log_model
+        # quedan dentro del mismo run, en vez de fuera de él.
 {% if use_mlflow %}
-        with mlflow.start_run(run_name=name):
+        run_ctx = mlflow.start_run(run_name=name)
+{% else %}
+        run_ctx = nullcontext()
+{% endif %}
+
+        with run_ctx:
+{% if use_mlflow %}
             # ── Parámetros ────────────────────────────────────────────────
             params = {}
             if hasattr(model, "get_params"):
@@ -481,35 +494,35 @@ def train_models(
             mlflow.log_param("model_name", name)
 {% endif %}
 
-        model.fit(X_train, y_train)
+            model.fit(X_train, y_train)
 
-        if cv_evaluate:
+            if cv_evaluate:
 {% if task_type == "clasificacion" %}
-            cv_score = cross_val_score(
-                model, X_train, y_train, cv=5, scoring="f1_weighted"
-            ).mean()
-            print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
+                cv_score = cross_val_score(
+                    model, X_train, y_train, cv=5, scoring="f1_weighted"
+                ).mean()
+                print(f"      F1_weighted 5-fold CV: {cv_score:.3f}")
 {% else %}
-            cv_score = -cross_val_score(
-                model, X_train, y_train, cv=5,
-                scoring="neg_root_mean_squared_error",
-            ).mean()
-            print(f"      RMSE 5-fold CV: {cv_score:.4f}")
+                cv_score = -cross_val_score(
+                    model, X_train, y_train, cv=5,
+                    scoring="neg_root_mean_squared_error",
+                ).mean()
+                print(f"      RMSE 5-fold CV: {cv_score:.4f}")
 {% endif %}
 
 {% if use_mlflow %}
-            mlflow.log_metric("cv_score", cv_score)
+                mlflow.log_metric("cv_score", cv_score)
 {% endif %}
 
-        joblib.dump(model, MODELS_DIR / f"{name}.joblib")
-        print(f"      Guardado → {name}.joblib")
+            joblib.dump(model, MODELS_DIR / f"{name}.joblib")
+            print(f"      Guardado → {name}.joblib")
 
 {% if use_mlflow %}
-        mlflow.sklearn.log_model(
-            model, artifact_path=name,
-            registered_model_name=f"{{ project_slug }}_{name}",
-        )
-        mlflow.log_artifact(str(MODELS_DIR / f"{name}.joblib"))
+            mlflow.sklearn.log_model(
+                model, artifact_path=name,
+                registered_model_name=f"{{ project_slug }}_{name}",
+            )
+            mlflow.log_artifact(str(MODELS_DIR / f"{name}.joblib"))
 {% endif %}
 
         trained[name] = model
