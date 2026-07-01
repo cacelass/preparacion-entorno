@@ -52,7 +52,8 @@ supervisado = [
     "statsmodels",
     "imbalanced-learn",
 {% if use_shap %}
-    "shap",
+    "shap>=0.46,<1.0",
+    "numba>=0.59",
 {% endif %}
 ]
 
