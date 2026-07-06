@@ -118,7 +118,9 @@ api = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic>=2.0",
-    "httpx",   # cliente HTTP para tests de la API
+    "httpx2",  # cliente HTTP para tests de la API — starlette.testclient (que usa FastAPI) deprecó 'httpx'
+               # en favor de 'httpx2' (fork mantenido por Pydantic); ver github.com/Kludex/starlette release notes.
+               # Si esto ha cambiado de nuevo cuando leas esto, verifica la documentación actual de Starlette/FastAPI.
 ]
 {% endif %}
 

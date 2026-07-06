@@ -2,8 +2,8 @@
 """
 test_api.py — Tests de la API REST de {{ project_name }}.
 
-Usa el cliente de test de FastAPI (httpx) para verificar los endpoints
-sin necesidad de levantar un servidor real.
+Usa el cliente de test de FastAPI (basado en httpx2 — ver pyproject.toml)
+para verificar los endpoints sin necesidad de levantar un servidor real.
 """
 import numpy as np
 import pandas as pd

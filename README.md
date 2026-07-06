@@ -1,6 +1,6 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-1.8.5-blue)
+![version](https://img.shields.io/badge/dskit-1.9.0-blue)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
 ![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
@@ -64,6 +64,7 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 - **TorchMetrics** en bucle de entrenamiento y evaluación NN (Accuracy/F1/Precision/Recall para clasificación, MAE/RMSE/R² para regresión)
 - **Early stopping** y **validation split** configurables en redes neuronales
 - **TensorBoard** integrado en redes neuronales (`make tb`)
+- **Sistema de agentes especializados** en `agents/` para changelog, releases, CI/CD, tests, dependencias, API y documentación
 - **`make smoke`** — tests de humo que verifican que el pipeline arranca sin errores
 - **`make profile`** — profiling con cProfile + snakeviz
 - **`make lock`** — regenera `uv.lock` tras cambios en dependencias
@@ -189,6 +190,12 @@ nombre_proyecto/
 │   └── monitor.py                ← check_drift, check_performance, run_monitoring
 ├── chat/                         ← (use_docker=true)
 │   └── app.py                    ← interfaz Gradio conectada al modelo
+├── agents/                       ← agentes especializados, docs y utilidades de release
+│   ├── README.md                 ← guía completa del sistema de agentes
+│   ├── agents/                   ← agentes concretos: git, docs, test, api...
+│   ├── tools/                    ← utilidades reutilizables por agente
+│   ├── prompts/                  ← fichas de comportamiento por agente
+│   └── workspace/                ← espacio de trabajo por agente
 ├── data/{raw,interim,processed,external}/
 ├── models/                       ← pesos .pt / .joblib + artifacts/
 │   └── artifacts/                ← scaler.joblib, encoders.joblib, output_dim.joblib…

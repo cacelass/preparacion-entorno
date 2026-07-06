@@ -5,6 +5,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.9.0] — 2026-07-06
+
+### Sistema de agentes y release automático
+
+- Se añadió y documentó la carpeta `agents/` como capa de agentes especializados para git, documentación, CI/CD, pruebas, dependencias, API, secretos, notebooks e instalación de agentes externos.
+- `GitAgent` ahora puede coordinar `update_changelog`, `bump_version`, `commit_with_changelog` y `tag_release` en un flujo único de release.
+- `BaseAgent` y `Orchestrator` mejoraron el ruteo determinista: además de escoger agente, ahora también resuelven la acción con alias y validación de argumentos.
+- Se documentó el nuevo workspace por agente y la colaboración entre agentes para evitar ciclos de import y duplicación de lógica.
+
+---
+
 ## [1.8.2] — 2026-05-22
 
 ### Corrección de bugs — auditoría completa
