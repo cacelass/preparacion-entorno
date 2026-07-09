@@ -12,8 +12,10 @@ uv run python -m agents run knowledge status
 
 ### `setup_vault` — Detecta o crea la bóveda de Obsidian
 Si ya existe una bóveda (`.obsidian/`), la reutiliza. Si no, crea `knowledge/`
-con un árbol adaptado: `papers/`, `code/`, `docs/`, `references/`, `media/` y
-un MOC raíz.
+con un árbol adaptado: `papers/`, `code/`, `docs/`, `references/`, `media/`, un
+MOC raíz y una vista `.base`. Las notas siguen las convenciones de
+[kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (Obsidian
+Flavored Markdown: properties, wikilinks, callouts) y Obsidian Bases.
 ```bash
 uv run python -m agents run knowledge setup_vault
 uv run python -m agents run knowledge setup_vault --vault_dir docs/vault
@@ -35,6 +37,16 @@ uv run python -m agents run knowledge summarize_parents --min_children 3 --top 1
 Lo llama el `git` agent antes de cada commit.
 ```bash
 uv run python -m agents run knowledge sync
+```
+
+## Cross-tool
+Los agentes son Python puro invocado por CLI (`python -m agents ...`): funcionan
+igual desde Claude Code, Codex, opencode o cualquier herramienta que ejecute
+shell. La bóveda que generan sigue el estándar Agent Skills de obsidian-skills,
+así que puede editarse con esas mismas herramientas tras instalar las skills:
+
+```bash
+npx skills add https://github.com/kepano/obsidian-skills
 ```
 
 ## Límite honesto

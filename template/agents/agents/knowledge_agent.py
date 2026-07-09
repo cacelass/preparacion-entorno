@@ -7,7 +7,10 @@ sincronía. Su razón de ser:
 
   1. Detecta si el proyecto ya tiene una bóveda de Obsidian; si no, ofrece
      crear una con una estructura de árbol adaptada al grafo (carpetas por
-     tipo de nodo: papers, code, docs, references, media).
+     tipo de nodo: papers, code, docs, references, media). Las notas siguen
+     las convenciones de github.com/kepano/obsidian-skills (Obsidian Flavored
+     Markdown: properties, wikilinks, callouts + vistas Obsidian Bases), para
+     que la bóveda sea óptima y editable desde Claude Code, Codex u opencode.
   2. Construye/actualiza el grafo con graphify y lo exporta a esa bóveda,
      fusionando ambos mundos.
   3. Resume cada NODO PADRE (hub) con un resumen de sus nodos hijo, incluyendo
@@ -158,25 +161,72 @@ class KnowledgeAgent(BaseAgent):
             )
 
         # Estructura de árbol: .obsidian (marca de bóveda) + carpetas por tipo.
+        # Cada nota sigue Obsidian Flavored Markdown (kepano/obsidian-skills):
+        # properties en el frontmatter, callouts y wikilinks.
         (target / ".obsidian").mkdir(parents=True, exist_ok=True)
         created_dirs = []
         for folder, purpose in _VAULT_TREE.items():
             path = target / folder
             path.mkdir(parents=True, exist_ok=True)
-            keep = path / "README.md"
-            if not keep.exists():
-                keep.write_text(f"# {folder}\n\n{purpose}\n", encoding="utf-8")
+            note = path / "README.md"
+            if not note.exists():
+                body = (
+                    f"> [!info] {folder}\n> {purpose}\n\n"
+                    f"Las notas de esta carpeta las genera `knowledge build` a "
+                    f"partir del grafo de graphify. Vuelve al índice: [[MOC]]."
+                )
+                note.write_text(
+                    GraphifyTool.obsidian_note(
+                        folder, tags=["knowledge", f"knowledge/{folder}"], body=body,
+                    ),
+                    encoding="utf-8",
+                )
             created_dirs.append(folder)
 
-        # MOC raíz: el índice de la bóveda desde el que se navega el árbol.
+        # MOC raíz: índice de la bóveda desde el que se navega el árbol.
         moc = target / "00-index" / "MOC.md"
         if not moc.exists():
+            tree_links = "\n".join(
+                f"- [[{f}/README|{f}]] — {p}" for f, p in _VAULT_TREE.items()
+            )
+            body = (
+                "> [!abstract] Mapa de contenido\n"
+                "> Bóveda generada por el `knowledge` agent de dskit. El grafo de "
+                "graphify se exporta aquí y se organiza en este árbol.\n\n"
+                f"{tree_links}\n\n"
+                "> [!tip] Poblar la bóveda\n"
+                "> Ejecuta `knowledge build` para volcar el grafo actual en estas "
+                "carpetas. Consulta [[Nodos del grafo]] para una vista de tabla.\n\n"
+                "Convención de notas: [[obsidian-skills]]."
+            )
             moc.write_text(
-                "# Mapa de contenido\n\n"
-                "Bóveda generada por el `knowledge` agent de dskit. El grafo de "
-                "graphify se exporta aquí y se organiza en este árbol:\n\n"
-                + "\n".join(f"- [[{f}/README|{f}]] — {p}" for f, p in _VAULT_TREE.items())
-                + "\n\n> Ejecuta `knowledge build` para poblar la bóveda con el grafo actual.\n",
+                GraphifyTool.obsidian_note(
+                    "Mapa de contenido", tags=["knowledge", "moc"],
+                    body=body, aliases=["MOC", "Índice"], cssclasses=["knowledge-moc"],
+                ),
+                encoding="utf-8",
+            )
+
+        # Vista de base de datos (.base) del grafo, y nota de convención.
+        base_file = target / "00-index" / "Nodos del grafo.base"
+        if not base_file.exists():
+            base_file.write_text(GraphifyTool.knowledge_base(), encoding="utf-8")
+        skills_note = target / "references" / "obsidian-skills.md"
+        if not skills_note.exists():
+            skills_note.write_text(
+                GraphifyTool.obsidian_note(
+                    "obsidian-skills", tags=["knowledge", "reference"],
+                    body=(
+                        "> [!quote] Convención de esta bóveda\n"
+                        "> Las notas siguen [Obsidian Flavored Markdown](https://github.com/kepano/obsidian-skills) "
+                        "(properties, wikilinks, embeds, callouts) y las vistas usan Obsidian Bases (`.base`).\n\n"
+                        "Para editar la bóveda con un agente (Claude Code, Codex, opencode) "
+                        "instala las skills:\n\n"
+                        "```bash\n"
+                        "npx skills add https://github.com/kepano/obsidian-skills\n"
+                        "```\n"
+                    ),
+                ),
                 encoding="utf-8",
             )
 

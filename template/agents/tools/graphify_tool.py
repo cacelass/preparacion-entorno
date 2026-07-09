@@ -338,6 +338,76 @@ class GraphifyTool:
         path.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
 
+    # -- Obsidian Flavored Markdown (convenciones kepano/obsidian-skills) ------
+    # Estas notas siguen la spec de github.com/kepano/obsidian-skills para que
+    # la bóveda sea óptima y editable por cualquier agente que tenga instaladas
+    # esas skills (Claude Code, Codex, opencode). Frontmatter con properties,
+    # wikilinks [[...]], callouts > [!type] y tags anidados.
+    @staticmethod
+    def obsidian_frontmatter(
+        title: str,
+        tags: list[str],
+        *,
+        aliases: list[str] | None = None,
+        cssclasses: list[str] | None = None,
+    ) -> str:
+        """Bloque de properties (YAML frontmatter) de una nota de Obsidian."""
+        lines = ["---", f"title: {title}"]
+        if tags:
+            lines.append("tags:")
+            lines += [f"  - {t}" for t in tags]
+        if aliases:
+            lines.append("aliases:")
+            lines += [f"  - {a}" for a in aliases]
+        if cssclasses:
+            lines.append("cssclasses:")
+            lines += [f"  - {c}" for c in cssclasses]
+        lines.append("---")
+        return "\n".join(lines)
+
+    @staticmethod
+    def obsidian_note(
+        title: str,
+        tags: list[str],
+        body: str,
+        *,
+        aliases: list[str] | None = None,
+        cssclasses: list[str] | None = None,
+    ) -> str:
+        """Nota completa: frontmatter + cuerpo en Obsidian Flavored Markdown."""
+        front = GraphifyTool.obsidian_frontmatter(
+            title, tags, aliases=aliases, cssclasses=cssclasses
+        )
+        return f"{front}\n\n{body.rstrip()}\n"
+
+    @staticmethod
+    def knowledge_base(*, name: str = "Nodos del grafo", tag: str = "knowledge") -> str:
+        """
+        Devuelve un archivo Obsidian Bases (`.base`, YAML) que muestra las notas
+        de la bóveda etiquetadas con ``tag`` como tabla y como tarjetas. Sigue
+        la spec obsidian-bases de kepano/obsidian-skills.
+        """
+        return (
+            "filters:\n"
+            "  and:\n"
+            f"    - 'file.hasTag(\"{tag}\")'\n"
+            "properties:\n"
+            "  file.name:\n"
+            "    displayName: Nota\n"
+            "  tags:\n"
+            "    displayName: Etiquetas\n"
+            "views:\n"
+            "  - type: table\n"
+            f"    name: \"{name}\"\n"
+            "    order:\n"
+            "      - file.name\n"
+            "      - tags\n"
+            "  - type: cards\n"
+            "    name: \"Tarjetas\"\n"
+            "    order:\n"
+            "      - file.name\n"
+        )
+
     # -- ejecución de graphify (subprocesos) ----------------------------------
     @staticmethod
     def run_cli(root: Path, args: list[str], *, timeout: int = 180) -> subprocess.CompletedProcess:

@@ -45,6 +45,13 @@ revisión de código, tests, dependencias y despliegue.
 | `knowledge` | Grafo de conocimiento (graphify) + Obsidian, cacheado; resume nodos padre con correlación |
 | `docsearch` | Busca/navega el grafo y poda referencias o nodos innecesarios |
 
+> **Cross-tool + Obsidian.** Todos los agentes son Python puro por CLI: funcionan
+> igual desde Claude Code, Codex, opencode o cualquier herramienta con shell. La
+> bóveda que genera `knowledge` sigue las convenciones de
+> [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (Obsidian
+> Flavored Markdown + Bases), instalables con
+> `npx skills add https://github.com/kepano/obsidian-skills`.
+
 ## GStack — Flujos autónomos (Git Stack)
 
 GStack encadena operaciones de múltiples agentes en una pila que se ejecuta

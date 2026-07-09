@@ -81,6 +81,37 @@ def test_save_graph_writes_backup(tmp_path: Path):
     assert "ref1" not in {n["id"] for n in saved["nodes"]}
 
 
+def test_obsidian_note_has_frontmatter_and_body():
+    note = GraphifyTool.obsidian_note(
+        "Mi Nota", tags=["knowledge", "knowledge/papers"],
+        body="> [!info] Hola\n> cuerpo", aliases=["Alias"], cssclasses=["c1"],
+    )
+    assert note.startswith("---\ntitle: Mi Nota\n")
+    assert "tags:\n  - knowledge\n  - knowledge/papers" in note
+    assert "aliases:\n  - Alias" in note
+    assert "cssclasses:\n  - c1" in note
+    assert "> [!info] Hola" in note
+
+
+def test_knowledge_base_is_valid_yaml():
+    base = GraphifyTool.knowledge_base()
+    yaml = __import__("yaml") if _has_yaml() else None
+    if yaml is not None:
+        parsed = yaml.safe_load(base)
+        assert parsed["views"][0]["type"] == "table"
+        assert 'file.hasTag("knowledge")' in parsed["filters"]["and"]
+    else:
+        assert "views:" in base and 'file.hasTag("knowledge")' in base
+
+
+def _has_yaml() -> bool:
+    try:
+        import yaml  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def test_detect_obsidian_vaults(tmp_path: Path):
     (tmp_path / "knowledge" / ".obsidian").mkdir(parents=True)
     (tmp_path / ".venv" / "junk" / ".obsidian").mkdir(parents=True)  # debe ignorarse
