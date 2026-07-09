@@ -6,10 +6,9 @@ Ejecutar: python main.py
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
 from {{ project_slug }}.models.train_model import train_models
-{% if task_type == "clasificacion" %}
-from {{ project_slug }}.models.predict_model import evaluate_models, DECISION_THRESHOLD, try_model
-{% else %}
 from {{ project_slug }}.models.predict_model import evaluate_models, try_model
+{% if task_type == "clasificacion" %}
+from {{ project_slug }}.models.predict_model import DECISION_THRESHOLD
 {% endif %}
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
@@ -128,10 +127,8 @@ def main():
     accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
         run_full_pipeline()
-{% if task_type == "clasificacion" %}
     elif accion == '1':
         try_model()
-{% endif %}
     else:
         print('Opción no válida. Ejecutando pipeline completo por defecto.')
         run_full_pipeline()
@@ -143,7 +140,11 @@ if __name__ == '__main__':
 {% elif ml_type == 'no_supervisado' %}
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
 from {{ project_slug }}.models.train_model import train_models, find_optimal_k
+{% else %}
+from {{ project_slug }}.models.train_model import train_models
+{% endif %}
 from {{ project_slug }}.models.predict_model import evaluate_models, plot_dendrogram, try_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
@@ -184,10 +185,12 @@ def run_full_pipeline() -> None:
     # Indica el umbral de corte tras ver el dendrograma:
     # viz_dendrogram(X, method='ward', color_threshold=50)
 
+{% if cluster_model == "todos" or cluster_model == "KMeans" %}
     print('\n7. Metricas para seleccion de k (Elbow + Silhouette + DB)...')
     metrics = find_optimal_k(X, k_range=range(2, 11))
     plot_elbow_and_silhouette(metrics)
 
+{% endif %}
     print(f'\n8. Entrenando modelos (k={N_CLUSTERS})...')
     models = train_models(X, n_clusters=N_CLUSTERS)
 
@@ -223,6 +226,7 @@ from {{ project_slug }}.models.predict_model import evaluate_models, try_model
 from {{ project_slug }}.visualization.visualize import (
     plot_distributions,
     plot_correlation_matrix,
+    plot_class_balance,
     plot_pca_variance,
 )
 from {{ project_slug }}.utils.paths import RUNS_DIR
@@ -253,6 +257,7 @@ _MODEL_INFO = {
     "LSTM":        "LSTM — dependencias temporales largas.",
     "GRU":         "GRU — como LSTM, más ligero y rápido.",
     "Transformer": "Transformer Encoder — relaciones globales, alta dimensionalidad.",
+    "ResNet":      "Red Residual — bloques con skip-connection para redes profundas.",
 }
 
 
@@ -272,6 +277,9 @@ def run_full_pipeline() -> None:
     print('\n2. EDA visual...')
     plot_distributions(df, target_col=TARGET_COL)
     plot_correlation_matrix(df)
+{% if task_type == "clasificacion" %}
+    plot_class_balance(df, target_col=TARGET_COL)
+{% endif %}
 
     print('\n3. Preprocesando...')
     X_train, X_test, y_train, y_test = preprocess_data(

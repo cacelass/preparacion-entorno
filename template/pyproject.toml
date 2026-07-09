@@ -59,7 +59,7 @@ supervisado = [
 
 {% if use_mlflow %}
 mlflow_tracking = [
-    "mlflow",
+    "mlflow>=2.10,<3.0",
 ]
 {% endif %}
 
@@ -75,8 +75,6 @@ no_supervisado = [
 # Redes neuronales: deep learning con PyTorch
 redes_neuronales = [
     "torch",
-    "torchvision",
-    "torchaudio",
     "torchmetrics[visual]",
     "tensorboard",
     "polars",         # carga eficiente de datos con dtypes explícitos
@@ -94,6 +92,10 @@ hibrido = [
     "catboost",       # boosting nativo para variables categoricas
 {% endif %}
     "imbalanced-learn",
+{% if use_shap %}
+    "shap>=0.46,<1.0",
+    "numba>=0.59",
+{% endif %}
 ]
 
 {% if use_optuna %}
@@ -118,9 +120,7 @@ api = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic>=2.0",
-    "httpx2",  # cliente HTTP para tests de la API — starlette.testclient (que usa FastAPI) deprecó 'httpx'
-               # en favor de 'httpx2' (fork mantenido por Pydantic); ver github.com/Kludex/starlette release notes.
-               # Si esto ha cambiado de nuevo cuando leas esto, verifica la documentación actual de Starlette/FastAPI.
+    "httpx>=0.27,<1.0",  # necesario para TestClient de FastAPI
 ]
 {% endif %}
 
@@ -131,6 +131,12 @@ monitoring = [
     "scipy",
 ]
 {% endif %}
+
+# Graphify: grafo de conocimiento del proyecto (github.com/anomalyco/graphify)
+# Requiere GEMINI_API_KEY en .env para extracción semántica vía Gemini
+graphify = [
+    "graphifyy[gemini]",
+]
 
 [tool.setuptools]
 packages = ["{{ project_slug }}"]

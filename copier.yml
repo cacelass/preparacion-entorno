@@ -73,13 +73,14 @@ use_mlflow:
 # --- Arquitectura de red neuronal (solo redes_neuronales) ---
 nn_model:
   type: str
-  help: "Arquitectura: MLP | CNN1D | LSTM | GRU | Transformer"
+  help: "Arquitectura: MLP | CNN1D | LSTM | GRU | Transformer | ResNet"
   choices:
     - MLP
     - CNN1D
     - LSTM
     - GRU
     - Transformer
+    - ResNet
   default: MLP
   when: "{{ ml_type == 'redes_neuronales' }}"
 
@@ -168,6 +169,11 @@ use_docker:
 
 # --- Explicabilidad ---
 
+use_graphify:
+  type: bool
+  help: "Añadir graphify (grafo de conocimiento del proyecto)? Genera graphify-out/ con grafo navegable de código y documentación."
+  default: false
+
 use_shap:
   type: bool
   help: "Añadir SHAP (explicabilidad de modelos)? Genera bar + beeswarm por modelo."
@@ -228,8 +234,12 @@ _message_before_copy: >-
   Generando proyecto '{{ project_name }}' ({{ ml_type }})...
 
 _tasks:
-  - "uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if use_api %} --extra api{% endif %}{% if use_duckdb %} --extra duckdb{% endif %}{% if use_optuna %} --extra optuna{% endif %}{% if use_monitoring %} --extra monitoring{% endif %} && uv run python -c 'import sklearn; print(\"scikit-learn OK\")' {% if ml_type == 'redes_neuronales' %}&& uv run python -c 'import torch; print(\"torch\", torch.__version__)' {% endif %}{% if use_optuna %}&& uv run python -c 'import optuna; print(\"optuna\", optuna.__version__)' {% endif %}{% if use_monitoring %}&& uv run python -c 'import evidently; print(\"evidently\", evidently.__version__)' {% endif %}"
+  - "uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if use_graphify %} --extra graphify{% endif %}{% if use_api %} --extra api{% endif %}{% if use_duckdb %} --extra duckdb{% endif %}{% if use_optuna %} --extra optuna{% endif %}{% if use_monitoring %} --extra monitoring{% endif %} && uv run python -c 'import sklearn; print(\"scikit-learn OK\")' {% if ml_type == 'redes_neuronales' %}&& uv run python -c 'import torch; print(\"torch\", torch.__version__)' {% endif %}{% if use_graphify %}&& uv run python -c 'import graphify; print(\"graphify\", graphify.__version__)' {% endif %}{% if use_optuna %}&& uv run python -c 'import optuna; print(\"optuna\", optuna.__version__)' {% endif %}{% if use_monitoring %}&& uv run python -c 'import evidently; print(\"evidently\", evidently.__version__)' {% endif %}"
 _exclude:
+  # Lo que los agentes generan en runtime (logs de auditoría, eventos de
+  # gstack, órdenes de trabajo...) nunca debe viajar del template al proyecto
+  # generado — solo .gitignore y README.md viven directamente en workspace/.
+  - "agents/workspace/*/"
   - "{% if not use_api %}api{% endif %}"
   - "{% if not use_api %}tests/test_api.py{% endif %}"
   - "{% if not use_optuna %}tuning{% endif %}"

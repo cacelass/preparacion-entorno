@@ -668,7 +668,7 @@ def _plot_clusters_pca(X, labels, model_name: str) -> None:
     print(f"    clusters_{model_name}_pca.png guardado")
 
 
-def load_models(model_names: list = None) -> dict:
+def load_models(model_names: list | None = None) -> dict:
     if model_names is None:
         model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
     models = {}
@@ -760,12 +760,11 @@ def try_model() -> None:
     # ── 4. Predecir cluster ────────────────────────────────────────────
     if hasattr(model, "predict"):
         cluster = model.predict(X_new)[0]
-    elif hasattr(model, "labels_"):
-        # Modelos sin predict (e.g. AgglomerativeClustering): asignar por centroide más cercano
-        centers = np.array([model.labels_])  # fallback básico
-        cluster = int(np.argmin(np.linalg.norm(X_new - centers, axis=1)))
     else:
-        print("El modelo no soporta predicción sobre muestras nuevas.")
+        # AgglomerativeClustering y similares no tienen .predict(): solo asignan
+        # labels_ a los datos de entrenamiento y no admiten muestras nuevas.
+        print(f"'{model_name}' no soporta predicción sobre muestras nuevas. "
+              "Usa KMeans para inferencia.")
         return
 
     print(f"\n{'='*50}")
@@ -1237,7 +1236,12 @@ def try_model() -> None:
         print("Selección inválida.")
         return
 
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    # Intentar carga segura primero; si el checkpoint incluye optimizador
+    # (full checkpoint), reintentar con weights_only=False
+    try:
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
+    except Exception:
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     # Soporte para dict {'model_state_dict': ...} o state_dict directo
     if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
         print(f"  Epoch guardada: {ckpt.get('epoch', '?')}  |  Loss: {ckpt.get('loss', '?')}")

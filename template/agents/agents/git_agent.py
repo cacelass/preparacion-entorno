@@ -2,20 +2,26 @@
 agents.agents.git_agent — Automatización de Git para este template.
 
 Conoce la estructura del proyecto: sabe que el código vive en
-`{{ project_slug }}/`, que los tests viven en `tests/` (y por tanto puede
+`{{ project_slug }}`, que los tests viven en `tests/` (y por tanto puede
 avisar si un commit toca código sin tocar tests), y que el CHANGELOG del
 proyecto sigue el formato Keep a Changelog (mismo que usa `CHANGELOG.md` en
 la raíz de este template).
+
+Al hacer commit, también detecta si el proyecto tiene `graphify-out/` (grafo
+de conocimiento, ver github.com/anomalyco/graphify) o `.obsidian/` (bóveda de
+Obsidian) y los actualiza automáticamente.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import date
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.exceptions import MissingDependencyError
 from agents.tools.git_tool import GitTool
+from agents.tools.process_tool import ProcessResult, run_command
 
 
 @register_agent
@@ -55,6 +61,8 @@ class GitAgent(BaseAgent):
             "prepare_pr_summary": self.prepare_pr_summary,
             "commit_with_changelog": self.commit_with_changelog,
             "tag_release": self.tag_release,
+            "create_branch": self.create_branch,
+            "merge_branch": self.merge_branch,
         }
 
     def _guard_repo(self, action: str) -> AgentResult | None:
@@ -291,9 +299,24 @@ class GitAgent(BaseAgent):
                 f"'git commit' falló: {commit_result.stderr.strip()}", warnings=warnings,
             )
 
+        graphify_warnings = self._update_graphify()
+        warnings.extend(graphify_warnings)
+
+        obsidian_warnings = self._sync_obsidian()
+        warnings.extend(obsidian_warnings)
+
+        extras = []
+        if changelog_result.success and changelog_result.data:
+            extras.append("CHANGELOG.md actualizado")
+        if not graphify_warnings:
+            extras.append("graphify actualizado")
+        if not obsidian_warnings:
+            extras.append("Obsidian indexado")
+        extras_str = f" ({', '.join(extras)})" if extras else ""
+
         return AgentResult(
             True, self.name, "commit_with_changelog",
-            f"Commit creado: '{message}'" + (" (con CHANGELOG.md actualizado)" if changelog_result.success and changelog_result.data else ""),
+            f"Commit creado: '{message}'{extras_str}",
             data={"stdout": commit_result.stdout, "changelog_updated": bool(changelog_result.success and changelog_result.data)},
             warnings=warnings,
         )
@@ -388,3 +411,148 @@ class GitAgent(BaseAgent):
             data={"version": version, "changelog_updated": commit_result.data.get("changelog_updated", False)},
             warnings=warnings,
         )
+
+    def create_branch(self, *, branch_name: str, base_branch: str | None = None) -> AgentResult:
+        """Crea una rama nueva a partir de main (o base_branch si se especifica)."""
+        guard = self._guard_repo("create_branch")
+        if guard:
+            return guard
+
+        if self.git.tag_exists(branch_name):
+            return AgentResult(False, self.name, "create_branch", f"La rama '{branch_name}' ya existe.")
+
+        base = base_branch or "main"
+        checkout = self._git("checkout", base)
+        if not checkout.ok:
+            return AgentResult(False, self.name, "create_branch", f"No se pudo cambiar a '{base}': {checkout.stderr.strip()}")
+
+        result = self._git("checkout", "-b", branch_name)
+        if not result.ok:
+            return AgentResult(False, self.name, "create_branch", f"No se pudo crear la rama: {result.stderr.strip()}")
+
+        return AgentResult(
+            True, self.name, "create_branch",
+            f"Rama '{branch_name}' creada desde '{base}' y activada.",
+            data={"branch": branch_name, "base": base},
+        )
+
+    def merge_branch(self, *, source_branch: str, target_branch: str | None = None) -> AgentResult:
+        """Fusiona source_branch en target_branch (o en la rama actual si no se especifica)."""
+        guard = self._guard_repo("merge_branch")
+        if guard:
+            return guard
+
+        target = target_branch or self.git.current_branch()
+        checkout = self._git("checkout", target)
+        if not checkout.ok:
+            return AgentResult(False, self.name, "merge_branch", f"No se pudo cambiar a '{target}': {checkout.stderr.strip()}")
+
+        result = self._git("merge", source_branch, "--no-ff")
+        if not result.ok:
+            return AgentResult(
+                False, self.name, "merge_branch",
+                f"Conflicto al fusionar '{source_branch}' en '{target}': {result.stderr.strip()}",
+            )
+
+        return AgentResult(
+            True, self.name, "merge_branch",
+            f"'{source_branch}' fusionado en '{target}' (--no-ff).",
+            data={"source": source_branch, "target": target},
+        )
+
+    def _load_dotenv(self) -> None:
+        """Carga .env si existe para que graphify vea GEMINI_API_KEY."""
+        env_path = self.ctx.root / ".env"
+        if env_path.exists():
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(env_path)
+            except ImportError:
+                pass
+
+    def _update_graphify(self) -> list[str]:
+        """
+        Si el proyecto tiene ``graphify-out/``, lanza ``graphify --update``
+        para re-extraer solo los archivos que cambiaron en el commit.
+
+        También verifica que GEMINI_API_KEY esté configurada para extracción
+        semántica (no bloqueante), y sugiere instalar el hook post-commit si
+        no está instalado.
+        """
+        self._load_dotenv()
+        graphify_out = self.ctx.root / "graphify-out"
+        if not graphify_out.exists():
+            return []
+
+        warnings: list[str] = []
+        py_cmd = graphify_out / ".graphify_python"
+        if not py_cmd.exists():
+            warnings.append("graphify-out/ existe pero .graphify_python no — no se puede actualizar el grafo.")
+            return warnings
+
+        python_bin = py_cmd.read_text(encoding="utf-8").strip()
+        if not python_bin:
+            warnings.append(".graphify_python está vacío — no se puede actualizar el grafo.")
+            return warnings
+
+        _gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not _gemini:
+            warnings.append(
+                "GEMINI_API_KEY no está configurada — graphify hará solo extracción "
+                "estructural (AST). Las relaciones semánticas requieren API key gratuita en ai.google.dev."
+            )
+
+        hook_result = run_command(
+            [python_bin, "-m", "graphify", "hook", "status"],
+            cwd=self.ctx.root, timeout=30,
+        )
+        if hook_result.ok and "not installed" in hook_result.stdout.lower():
+            warnings.append(
+                "El hook post-commit de graphify no está instalado. "
+                "Ejecuta 'graphify hook install' para que el grafo se actualice "
+                "automáticamente en cada commit incluso sin este agente."
+            )
+
+        result = run_command(
+            [python_bin, "-m", "graphify", str(self.ctx.root), "--update"],
+            cwd=self.ctx.root, timeout=120,
+        )
+        if result.ok:
+            print(f"    graphify: grafo actualizado ({result.stdout.strip()[:100]})")
+        else:
+            warnings.append(f"graphify --update falló: {result.stderr.strip()[:200]}")
+        return warnings
+
+    def _sync_obsidian(self) -> list[str]:
+        """
+        Si el proyecto tiene ``.obsidian/``, intenta añadir el estado actual
+        del proyecto a la bóveda de Obsidian. Usa obsidian-cli si está
+        disponible.
+        """
+        obsidian_dir = self.ctx.root / ".obsidian"
+        if not obsidian_dir.exists():
+            return []
+
+        warnings: list[str] = []
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["obsidian-cli", "index", str(self.ctx.root)],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                print(f"    obsidian: bóveda indexada ({result.stdout.strip()[:100]})")
+            else:
+                warnings.append(f"obsidian-cli index falló: {result.stderr.strip()[:200]}")
+        except FileNotFoundError:
+            warnings.append(
+                ".obsidian/ detectado pero obsidian-cli no está instalado. "
+                "Instálalo con: npm install -g @obsidian/cli"
+            )
+        except Exception as exc:
+            warnings.append(f"obsidian sync falló: {exc}")
+        return warnings
+
+    def _git(self, *args: str) -> ProcessResult:
+        """Atajo interno para comandos git directos."""
+        return run_command(["git", *args], cwd=self.ctx.root)

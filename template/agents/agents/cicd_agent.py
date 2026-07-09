@@ -17,6 +17,7 @@ import re
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.tools.cicd_tool import WORKFLOWS_DIR, CICDTool
+from agents.tools.schedule_tool import ScheduleTool
 
 
 @register_agent
@@ -29,6 +30,7 @@ class CICDAgent(BaseAgent):
         return {
             "validate_workflow": ["valida", "revisa el workflow", "comprueba"],
             "generate_workflow": ["genera", "crea el workflow", "añade ci"],
+            "validate_cron": ["cron", "schedule", "programar", "valida cron"],
         }
 
     def actions(self) -> dict:
@@ -36,6 +38,7 @@ class CICDAgent(BaseAgent):
             "validate_workflow": self.validate_workflow,
             "generate_workflow": self.generate_workflow,
             "list_workflows": self.list_workflows,
+            "validate_cron": self.validate_cron,
         }
 
     def list_workflows(self) -> AgentResult:
@@ -70,6 +73,20 @@ class CICDAgent(BaseAgent):
             success, self.name, "validate_workflow",
             f"{len(problems)} problema(s) encontrado(s) en '{filename}'." if problems else f"'{filename}' parece correcto.",
             data={"problems": problems, "referenced_make_targets": referenced_targets}, warnings=warnings,
+        )
+
+    def validate_cron(self, *, expression: str) -> AgentResult:
+        """Valida y describe una expresión cron (5 campos o alias @daily, @hourly...)."""
+        valid = ScheduleTool.validate(expression)
+        if not valid["valid"]:
+            return AgentResult(False, self.name, "validate_cron", valid["error"], data=valid)
+        human = ScheduleTool.to_human(expression)
+        summary = ScheduleTool.summary(expression)
+        next_runs = ScheduleTool.next_run(expression)
+        return AgentResult(
+            True, self.name, "validate_cron",
+            f"Expresión válida: {human}",
+            data={"expression": expression, "human": human, **summary, "next_runs": next_runs},
         )
 
     def generate_workflow(self, *, filename: str = "ci.yml", python_version: str | None = None, overwrite: bool = False) -> AgentResult:

@@ -23,7 +23,7 @@ class DependencyAgent(BaseAgent):
     )
     capabilities = [
         "dependencias", "paquetes obsoletos", "versiones desactualizadas", "vulnerabilidad",
-        "pypi", "actualizar dependencias", "uv lock",
+        "pypi", "actualizar dependencias",
     ]
 
     def action_aliases(self) -> dict:
