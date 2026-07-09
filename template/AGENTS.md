@@ -44,6 +44,8 @@ revisión de código, tests, dependencias y despliegue.
 | `schedule` | Valida, describe y calcula próximas ejecuciones de expresiones cron |
 | `knowledge` | Grafo de conocimiento (graphify) + Obsidian, cacheado; resume nodos padre con correlación |
 | `docsearch` | Busca/navega el grafo y poda referencias o nodos innecesarios |
+| `research` | Busca papers relacionados con el proyecto en arXiv/OpenAlex (sin API key) |
+| `supervisor` | Coordina workers que compiten: trabajan por separado, prueba ambos, elige el mejor y lo pule |
 
 > **Cross-tool + Obsidian.** Todos los agentes son Python puro por CLI: funcionan
 > igual desde Claude Code, Codex, opencode o cualquier herramienta con shell. La

@@ -62,7 +62,8 @@ agents/
 │   ├── code_analysis_tool.py · notebook_tool.py · agent_installer_tool.py
 │   ├── stats_tool.py · validate_tool.py · cache_tool.py · parallel_tool.py · schedule_tool.py
 │   ├── graphify_tool.py            # puente con graphify (grafo de conocimiento)
-├── agents/                          # los 22 agentes (+ plantilla de ejemplo)
+│   ├── research_tool.py            # búsqueda de papers (arXiv, OpenAlex)
+├── agents/                          # los 24 agentes (+ plantilla de ejemplo)
 │   ├── git_agent.py · data_agent.py · graph_agent.py · docker_agent.py
 │   ├── ml_agent.py · review_agent.py · documentation_agent.py
 │   ├── notebook_agent.py · installer_agent.py · cicd_agent.py
@@ -72,6 +73,8 @@ agents/
 │   ├── schedule_agent.py           # validación y descripción de cron
 │   ├── knowledge_agent.py          # grafo de conocimiento + Obsidian, cacheado
 │   ├── docsearch_agent.py          # búsqueda/navegación y poda del grafo
+│   ├── research_agent.py           # busca papers relacionados con el proyecto
+│   ├── supervisor_agent.py         # coordina workers que compiten (elige y pule)
 │   └── _template_agent.py            # plantilla — no se auto-registra (prefijo `_`)
 ├── external/                          # agentes de terceros / tuyos, fuera del núcleo
 │   ├── README.md
@@ -141,7 +144,7 @@ uv run python -m agents tools
   tiene. Solo hace falta la primera vez, en un proyecto sin este sistema —
   pregunta por ella si la necesitas.
 
-## Los 22 agentes
+## Los 24 agentes
 
 | Agente | Responsabilidad | Herramientas que usa |
 |---|---|---|
@@ -167,6 +170,8 @@ uv run python -m agents tools
 | `schedule` | Valida, describe en lenguaje natural y calcula próximas ejecuciones de expresiones cron. Alias: `@daily`, `@hourly`, `@weekly`, `@monthly`, `@yearly`. | `schedule_tool` |
 | `knowledge` | Grafo de conocimiento (graphify) + Obsidian, cacheado al máximo en `graphify-out/cache/`. Detecta o crea una bóveda con estructura de árbol (`setup_vault`), actualiza el grafo y lo exporta a Obsidian (`build`), resume cada **nodo padre** con la correlación estructural entre sus hijos (`summarize_parents`), y expone `sync` como punto único que el `git` agent llama antes de cada commit. | `graphify_tool`, `cache_tool` |
 | `docsearch` | Navega el grafo: búsqueda en lenguaje natural (`search`, delega en `graphify query`, cacheado), vecinos de un nodo (`neighbors`), listado de referencias (`list_references`) y **poda** de nodos/referencias innecesarios (`prune`, `dry_run=True` por defecto, deja `graph.json.bak`). | `graphify_tool`, `cache_tool` |
+| `research` | Busca **papers académicos** relacionados con el proyecto en fuentes abiertas sin API key (**arXiv**, **OpenAlex**): deriva las keywords del proyecto (README/pyproject/grafo), busca (`find_papers`/`search`) y rankea por relevancia léxica. Cacheado. | `research_tool`, `graphify_tool`, `cache_tool` |
+| `supervisor` | Coordina **workers que compiten**: los hace trabajar por separado, puntúa cada propuesta con una métrica determinista, elige la mejor y la **pule**. `research` (compite backends de papers en paralelo, fusiona lo mejor de ambos) y `compete` (genérico, enfrenta cualquier `{agent, action}`). | `research_tool` |
 
 Cada agente documenta en su propio docstring qué responsabilidades de la
 lista original están implementadas y cuáles quedan como extensión (p. ej.
