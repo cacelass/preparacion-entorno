@@ -254,11 +254,11 @@ class KnowledgeAgent(BaseAgent):
         warnings: list[str] = []
 
         try:
-            update = GraphifyTool.update(root)
+            built = GraphifyTool.build(root)
         except FileNotFoundError as exc:
             return AgentResult(False, self.name, "build", str(exc))
-        if update.returncode != 0:
-            warnings.append(f"graphify --update devolvió error: {update.stderr.strip()[:200]}")
+        if built.returncode != 0:
+            warnings.append(f"graphify build devolvió error: {built.stderr.strip()[:200]}")
 
         exported_to = None
         if export_obsidian:
@@ -325,8 +325,11 @@ class KnowledgeAgent(BaseAgent):
         if no_cache:
             summaries = _compute()
         else:
-            # Clave de caché ligada al tamaño del grafo: si cambia, recomputa.
-            cache_key = f"parents_{len(graph['nodes'])}_{len(graph['edges'])}_{min_children}_{top}"
+            # Clave de caché ligada al mtime de graph.json: cualquier rebuild lo
+            # cambia, así que nunca se sirve un resumen obsoleto (dos grafos
+            # distintos pueden tener el mismo nº de nodos/aristas).
+            mtime = int(GraphifyTool.graph_json(root).stat().st_mtime)
+            cache_key = f"parents_{mtime}_{min_children}_{top}"
             summaries = CacheTool.disk_cache(name=cache_key)(_compute)()
 
         if not summaries:

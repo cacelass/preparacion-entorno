@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import sys
 from pathlib import Path
 
 from agents.tools.graphify_tool import GraphifyTool
@@ -110,6 +112,35 @@ def _has_yaml() -> bool:
         return True
     except ImportError:
         return False
+
+
+def test_command_prefix_uses_marker_python_over_binary(tmp_path: Path):
+    # Con .graphify_python presente, el prefijo es `python -m graphify`, no el
+    # binario del PATH — invocarlo como `graphify -m graphify` sería inválido.
+    (tmp_path / "graphify-out").mkdir()
+    (tmp_path / "graphify-out" / ".graphify_python").write_text(sys.executable)
+    assert GraphifyTool.command_prefix(tmp_path) == [sys.executable, "-m", "graphify"]
+    assert GraphifyTool.is_available(tmp_path) is True
+
+
+def test_command_prefix_none_without_graphify(tmp_path: Path):
+    # Sin marcador y sin binario en el PATH, no está disponible.
+    if shutil.which("graphify") is not None:
+        return  # graphify instalado en este entorno — el caso None no aplica
+    assert GraphifyTool.command_prefix(tmp_path) is None
+    assert GraphifyTool.is_available(tmp_path) is False
+
+
+def test_prune_isolated_only_keeps_connected(tmp_path: Path):
+    graph = {
+        "nodes": [{"id": "a"}, {"id": "b"}, {"id": "lonely"}],
+        "edges": [{"source": "a", "target": "b"}],
+    }
+    pruned, stats = GraphifyTool.prune(graph, drop_isolated=True)
+    ids = {n["id"] for n in pruned["nodes"]}
+    assert "lonely" not in ids           # sin aristas → fuera
+    assert {"a", "b"} <= ids             # conectados → se quedan
+    assert stats["isolated_removed"] == 1
 
 
 def test_detect_obsidian_vaults(tmp_path: Path):

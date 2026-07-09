@@ -16,6 +16,8 @@ toca los archivos fuente del proyecto, solo la representación en el grafo.
 
 from __future__ import annotations
 
+import hashlib
+
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.tools.cache_tool import CacheTool
@@ -72,19 +74,27 @@ class DocSearchAgent(BaseAgent):
             )
         CacheTool.set_cache_dir(GraphifyTool.cache_dir(self.ctx.root))
 
-        def _run() -> dict:
+        def _run() -> str:
             proc = GraphifyTool.query(self.ctx.root, question, budget=budget)
-            return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+            if proc.returncode != 0:
+                # Lanza para NO cachear el fallo (un error transitorio de la
+                # consulta no debe quedar cacheado para siempre). El caller lo
+                # convierte en un AgentResult(success=False).
+                raise RuntimeError(proc.stderr.strip()[:200] or "graphify query devolvió error")
+            return proc.stdout.strip()
 
-        if no_cache:
-            out = _run()
-        else:
-            key = f"query_{abs(hash(question)) % 10_000_000}_{budget}"
-            out = CacheTool.disk_cache(name=key)(_run)()
+        try:
+            if no_cache:
+                answer = _run()
+            else:
+                # Clave estable con hashlib: hash() lleva PYTHONHASHSEED y cambia
+                # entre procesos, así que la caché en disco nunca acertaría entre
+                # invocaciones de la CLI.
+                digest = hashlib.md5(f"{question}|{budget}".encode()).hexdigest()[:16]
+                answer = CacheTool.disk_cache(name=f"query_{digest}")(_run)()
+        except RuntimeError as exc:
+            return AgentResult(False, self.name, "search", f"graphify query falló: {exc}")
 
-        if out["returncode"] != 0:
-            return AgentResult(False, self.name, "search", f"graphify query falló: {out['stderr'].strip()[:200]}")
-        answer = out["stdout"].strip()
         return AgentResult(
             True, self.name, "search",
             answer or "graphify query no devolvió texto.",

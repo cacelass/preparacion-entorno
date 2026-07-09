@@ -57,24 +57,41 @@ class GraphifyTool:
     @staticmethod
     def resolve_python(root: Path) -> str | None:
         """
-        Devuelve el intérprete que graphify dejó anotado en
-        ``graphify-out/.graphify_python`` (escrito por el skill /graphify).
-        Si no existe, intenta el binario ``graphify`` del PATH. Devuelve None
-        si graphify no está disponible — el que llama decide qué avisar.
+        Devuelve el intérprete de Python que graphify dejó anotado en
+        ``graphify-out/.graphify_python`` (escrito por el skill /graphify), o
+        None si el marcador no existe o apunta a algo inexistente. NO cae al
+        binario ``graphify``: eso no es un intérprete y no sirve para
+        ``python -m graphify`` (ver ``command_prefix``).
         """
         marker = GraphifyTool.out_dir(root) / ".graphify_python"
         if marker.exists():
             candidate = marker.read_text(encoding="utf-8").strip()
             if candidate and Path(candidate).exists():
                 return candidate
+        return None
+
+    @staticmethod
+    def command_prefix(root: Path) -> list[str] | None:
+        """
+        Prefijo correcto para invocar graphify:
+          - si hay intérprete anotado → ``[python, "-m", "graphify"]``
+          - si no, pero hay binario ``graphify`` en el PATH → ``[graphify]``
+          - si no hay ninguno → None.
+
+        Distinguir ambos importa: ``graphify -m graphify ...`` (binario con
+        ``-m``) es un comando inválido — ese era el bug de mezclar los dos.
+        """
+        python_bin = GraphifyTool.resolve_python(root)
+        if python_bin is not None:
+            return [python_bin, "-m", "graphify"]
         binary = shutil.which("graphify")
         if binary:
-            return binary
+            return [binary]
         return None
 
     @staticmethod
     def is_available(root: Path) -> bool:
-        return GraphifyTool.resolve_python(root) is not None
+        return GraphifyTool.command_prefix(root) is not None
 
     # -- Obsidian -------------------------------------------------------------
     @staticmethod
@@ -85,21 +102,26 @@ class GraphifyTool:
         Devuelve las raíces de bóveda encontradas (no los ``.obsidian``).
 
         No desciende dentro de ``.git``, ``.venv``, ``node_modules`` ni
-        ``graphify-out`` — buscar ahí solo produciría ruido.
+        ``graphify-out``: se podan del recorrido (con ``os.walk``, no
+        ``rglob``, que sí entraría en ellos), porque esto corre en cada commit
+        y esos árboles pueden ser enormes.
         """
+        import os
+
         skip = {".git", ".venv", "venv", "node_modules", "graphify-out",
                 "__pycache__", ".mypy_cache", ".ruff_cache"}
         vaults: list[Path] = []
         root = root.resolve()
-        for dotobs in root.rglob(".obsidian"):
-            if not dotobs.is_dir():
-                continue
-            rel_parts = dotobs.relative_to(root).parts
-            if any(part in skip for part in rel_parts[:-1]):
-                continue
-            if len(rel_parts) > max_depth:
-                continue
-            vaults.append(dotobs.parent)
+        for dirpath, dirnames, _ in os.walk(root):
+            if ".obsidian" in dirnames:
+                vaults.append(Path(dirpath))
+            rel = Path(dirpath).relative_to(root)
+            depth = 0 if rel == Path(".") else len(rel.parts)
+            # Poda in situ: no descender a skip, a .obsidian, ni más allá de max_depth.
+            dirnames[:] = [
+                d for d in dirnames
+                if d not in skip and d != ".obsidian" and (depth + 1) <= max_depth
+            ]
         return sorted(set(vaults))
 
     # -- lectura del grafo ----------------------------------------------------
@@ -207,13 +229,19 @@ class GraphifyTool:
         nodes: dict[str, dict[str, Any]],
         *,
         top: int = 5,
+        max_children: int = 200,
     ) -> list[dict[str, Any]]:
         """
         Pares de hijos más "correlacionados", medido por Jaccard de sus
         vecindarios (excluyendo al padre común). Determinista: mide relación
         estructural, no semántica.
+
+        El coste es O(k²) en el nº de hijos ``k``; en un hub gigante (miles de
+        vecinos) eso explota. Se limita a los ``max_children`` hijos de mayor
+        grado — los más informativos para la correlación — de forma
+        determinista, para acotar el trabajo sin depender del orden de entrada.
         """
-        children = list(children)
+        children = sorted(children, key=lambda c: (-len(adj.get(c, set())), c))[:max_children]
         pairs: list[tuple[float, str, str]] = []
         for i in range(len(children)):
             for j in range(i + 1, len(children)):
@@ -309,11 +337,14 @@ class GraphifyTool:
             for e in kept_edges:
                 connected.add(str(e.get("source", e.get("from", ""))))
                 connected.add(str(e.get("target", e.get("to", ""))))
-            before = len(kept_nodes)
-            kept_nodes = [n for n in kept_nodes if str(n.get("id")) in connected]
-            removed_ids |= {str(n.get("id")) for n in graph.get("nodes", [])
-                            if str(n.get("id")) not in connected and n not in kept_nodes}
-            isolated_removed = before - len(kept_nodes)
+            # Aislado = superviviente de la poda por tipo/id que no aparece en
+            # ninguna arista restante. Se calcula sobre kept_nodes (no sobre
+            # todos los nodos) con un set de ids: O(n), sin comparar dicts.
+            isolated_ids = {str(n.get("id")) for n in kept_nodes
+                            if str(n.get("id")) not in connected}
+            kept_nodes = [n for n in kept_nodes if str(n.get("id")) not in isolated_ids]
+            removed_ids |= isolated_ids
+            isolated_removed = len(isolated_ids)
         else:
             isolated_removed = 0
 
@@ -412,17 +443,29 @@ class GraphifyTool:
     @staticmethod
     def run_cli(root: Path, args: list[str], *, timeout: int = 180) -> subprocess.CompletedProcess:
         """
-        Lanza ``<python> -m graphify <args>`` en la raíz del proyecto. El que
-        llama inspecciona ``returncode``, ``stdout`` y ``stderr``.
+        Lanza graphify con el prefijo correcto (intérprete + ``-m graphify`` o
+        el binario del PATH) en la raíz del proyecto. El que llama inspecciona
+        ``returncode``, ``stdout`` y ``stderr``.
         """
-        python_bin = GraphifyTool.resolve_python(root)
-        if python_bin is None:
+        prefix = GraphifyTool.command_prefix(root)
+        if prefix is None:
             raise FileNotFoundError(
                 "graphify no está disponible (ni .graphify_python ni binario en PATH). "
                 "Ejecuta el skill /graphify una vez para instalarlo."
             )
-        cmd = [python_bin, "-m", "graphify", *args]
+        cmd = [*prefix, *args]
         return subprocess.run(cmd, cwd=str(root), capture_output=True, text=True, timeout=timeout)
+
+    @staticmethod
+    def build(root: Path, *, timeout: int = 300) -> subprocess.CompletedProcess:
+        """
+        Construye/actualiza el grafo. Si ya existe ``graph.json`` usa
+        ``--update`` (solo archivos nuevos/cambiados); si no, hace un build
+        completo — ``--update`` sin grafo previo no tiene manifest del que
+        partir.
+        """
+        args = [str(root), "--update"] if GraphifyTool.graph_exists(root) else [str(root)]
+        return GraphifyTool.run_cli(root, args, timeout=timeout)
 
     @staticmethod
     def update(root: Path, *, timeout: int = 180) -> subprocess.CompletedProcess:
