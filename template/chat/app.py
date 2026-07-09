@@ -425,14 +425,16 @@ async def process_message(msg: str, session: dict) -> str:
                 "Coloca el dataset en la raiz del proyecto o en `data/raw/` y escribe `train` de nuevo."
             )
         try:
-            proc = subprocess.Popen(
-                [sys.executable, "main.py"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,   # evita deadlock por pipe lleno
-                stderr=subprocess.DEVNULL,
-                cwd=str(PROJECT_DIR),
-                text=True,
-            )
+            log_path = PROJECT_DIR / "training.log"
+            with open(log_path, "w") as log_f:
+                proc = subprocess.Popen(
+                    [sys.executable, "main.py"],
+                    stdin=subprocess.PIPE,
+                    stdout=log_f,
+                    stderr=subprocess.STDOUT,
+                    cwd=str(PROJECT_DIR),
+                    text=True,
+                )
             # Enviar "0" al prompt interactivo y desacoplar (background)
             proc.stdin.write("0\n")
             proc.stdin.flush()

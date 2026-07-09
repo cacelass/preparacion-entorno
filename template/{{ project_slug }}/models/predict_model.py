@@ -668,7 +668,7 @@ def _plot_clusters_pca(X, labels, model_name: str) -> None:
     print(f"    clusters_{model_name}_pca.png guardado")
 
 
-def load_models(model_names: list = None) -> dict:
+def load_models(model_names: list | None = None) -> dict:
     if model_names is None:
         model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
     models = {}
@@ -1237,7 +1237,12 @@ def try_model() -> None:
         print("Selección inválida.")
         return
 
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    # Intentar carga segura primero; si el checkpoint incluye optimizador
+    # (full checkpoint), reintentar con weights_only=False
+    try:
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
+    except Exception:
+        ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     # Soporte para dict {'model_state_dict': ...} o state_dict directo
     if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
         print(f"  Epoch guardada: {ckpt.get('epoch', '?')}  |  Loss: {ckpt.get('loss', '?')}")

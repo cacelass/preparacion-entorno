@@ -1,3 +1,18 @@
+{% macro load_models_macro() %}
+def load_models(model_names: list | None = None) -> dict:
+    """Carga modelos desde disco."""
+    if model_names is None:
+        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
+    models = {}
+    for name in model_names:
+        path = MODELS_DIR / f"{name}.joblib"
+        if path.exists():
+            models[name] = joblib.load(path)
+            print(f"    Cargado: {name}")
+        else:
+            print(f"    ⚠ No encontrado: {path}")
+    return models
+{% endmacro %}
 {% if ml_type == "supervisado" %}
 import numpy as np
 import joblib
@@ -102,9 +117,9 @@ def _build_models() -> dict:
 {% endif %}
 {% if model_type == "todos" or model_type == "DecisionTree" %}
     DecisionTree       → caja blanca. Regularizar con max_depth y min_samples_leaf.
+{% endif %}
 {% if model_type == "todos" or model_type == "SVM" %}
     SVM                → margen máximo con kernel RBF. Incluye escalado interno.
-{% endif %}
 {% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto con feature importances.
@@ -531,19 +546,7 @@ def train_models(
     return trained
 
 
-def load_models(model_names: list = None) -> dict:
-    """Carga modelos desde disco."""
-    if model_names is None:
-        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
-    models = {}
-    for name in model_names:
-        path = MODELS_DIR / f"{name}.joblib"
-        if path.exists():
-            models[name] = joblib.load(path)
-            print(f"    Cargado: {name}")
-        else:
-            print(f"    No encontrado: {path}")
-    return models
+{{ load_models_macro() }}
 
 
 {% elif ml_type == "no_supervisado" %}
@@ -714,31 +717,7 @@ def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
 
 {% endif %}
 
-def load_models(model_names: list = None) -> dict:
-    """
-    Carga modelos desde disco.
-
-    Parameters
-    ----------
-    model_names : lista de nombres sin extensión.
-                  Si None, carga todos los .joblib disponibles en models/.
-
-    Returns
-    -------
-    dict : {nombre_modelo: modelo_cargado}
-    """
-    if model_names is None:
-        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
-
-    models = {}
-    for name in model_names:
-        path = MODELS_DIR / f"{name}.joblib"
-        if path.exists():
-            models[name] = joblib.load(path)
-            print(f"    Cargado: {name}")
-        else:
-            print(f"    ⚠ No encontrado: {path}")
-    return models
+{{ load_models_macro() }}
 
 
 {% elif ml_type == "redes_neuronales" %}
@@ -1028,17 +1007,131 @@ class TransformerClassifier(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# ResNet — Red Residual con bloques FC
+# ---------------------------------------------------------------------------
+class _ResidualBlock(nn.Module):
+    """Bloque residual para datos tabulares: Linear → BN → ReLU → Linear → BN → skip."""
+    def __init__(self, dim: int, dropout: float = 0.2):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.BatchNorm1d(dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+            nn.BatchNorm1d(dim),
+        )
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(x + self.block(x))
+
+
+class ResNet(nn.Module):
+    """
+    Red residual con bloques FC apilados, conexiones skip y normalización.
+
+    Cuándo usarla:
+      - Más profunda que MLP (10+ capas) sin degradación.
+      - Datos tabulares donde MLP se estanca al añadir capas.
+      - Aprendizaje de representaciones más ricas que MLP simple.
+
+    Arquitectura:
+      Linear(input_dim→hidden_dim) → BN → ReLU → Dropout →
+      N × ResidualBlock(hidden_dim) →
+      Linear(hidden_dim→output_dim)
+
+    Parameters
+    ----------
+    input_dim      : número de features de entrada
+    output_dim     : número de clases (clasificación) o 1 (regresión)
+    hidden_dim     : tamaño interno de los bloques residuales
+    num_blocks     : número de bloques residuales apilados
+    dropout        : dropout en bloques residuales
+    """
+    def __init__(self, input_dim, output_dim, hidden_dim=128, num_blocks=4, dropout=0.2):
+        super().__init__()
+        layers = [nn.Linear(input_dim, hidden_dim), nn.BatchNorm1d(hidden_dim), nn.ReLU(), nn.Dropout(dropout)]
+        for _ in range(num_blocks):
+            layers.append(_ResidualBlock(hidden_dim, dropout=dropout))
+        layers.append(nn.Linear(hidden_dim, output_dim))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+
+# ---------------------------------------------------------------------------
+# Autoencoder — Codificación/decodificación no supervisada
+# ---------------------------------------------------------------------------
+class Autoencoder(nn.Module):
+    """
+    Autoencoder profundo para representación no supervisada y detección de anomalías.
+
+    Cuándo usarla:
+      - Reducción de dimensionalidad no lineal (alternativa a PCA/UMAP).
+      - Detección de anomalías (alto error de reconstrucción = outlier).
+      - Pre-entrenamiento no supervisado antes de fine-tuning supervisado.
+      - Generación de features para modelos downstream.
+
+    Arquitectura:
+      Encoder: input_dim → 256 → 128 → 64 → 32 (latent)
+      Decoder: 32 → 64 → 128 → 256 → input_dim
+
+    Parameters
+    ----------
+    input_dim  : número de features de entrada (= salida de reconstrucción)
+    output_dim : se ignora (la salida es la reconstrucción = input_dim)
+    latent_dim : dimensión del espacio latente
+    """
+    def __init__(self, input_dim, output_dim=None, latent_dim=32):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Linear(64, latent_dim),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Linear(128, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Linear(256, input_dim),
+        )
+
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
+
+    def encode(self, x):
+        """Devuelve la representación latente."""
+        return self.encoder(x)
+
+
+# ---------------------------------------------------------------------------
 # Fábrica de modelos — selección por copier
 # ---------------------------------------------------------------------------
 def _build_model(input_dim: int, output_dim: int) -> nn.Module:
     """
     Devuelve la arquitectura seleccionada en nn_model.
 
-    MLP         → datos tabulares sin estructura temporal.
-    CNN1D       → patrones locales entre features (señales, sensores).
-    LSTM        → dependencias temporales largas.
-    GRU         → como LSTM pero más ligero.
-    Transformer → relaciones globales, alta dimensionalidad.
+    MLP          → datos tabulares sin estructura temporal.
+    CNN1D        → patrones locales entre features (señales, sensores).
+    LSTM         → dependencias temporales largas.
+    GRU          → como LSTM pero más ligero.
+    Transformer  → relaciones globales, alta dimensionalidad.
+    ResNet       → redes profundas con conexiones residuales.
     """
 {% if nn_model == "MLP" %}
     return MLP(input_dim=input_dim, output_dim=output_dim,
@@ -1054,6 +1147,9 @@ def _build_model(input_dim: int, output_dim: int) -> nn.Module:
 {% elif nn_model == "Transformer" %}
     return TransformerClassifier(input_dim=input_dim, output_dim=output_dim,
                                  d_model=64, nhead=4, num_layers=2, dim_ff=256, dropout=0.1)
+{% elif nn_model == "ResNet" %}
+    return ResNet(input_dim=input_dim, output_dim=output_dim,
+                  hidden_dim=128, num_blocks=6, dropout=0.2)
 {% endif %}
 
 
@@ -1323,6 +1419,8 @@ def load_model(input_dim: int, output_dim: int, weights_path: str = None):
 
 def load_checkpoint(input_dim: int, output_dim: int, checkpoint_path: str):
     """Carga un checkpoint para continuar el entrenamiento."""
+    # Necesario weights_only=False: el checkpoint incluye optimizer_state_dict
+    # y metadatos (epoch, loss) que no se pueden cargar con weights_only=True
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model      = _build_model(input_dim=input_dim, output_dim=output_dim).to(device)
 {% set _opt2 = optimizer_type if optimizer_type is defined else 'AdamW' %}
@@ -1625,29 +1723,5 @@ def train_models(
     return trained
 
 
-def load_models(model_names: list = None) -> dict:
-    """
-    Carga modelos desde disco.
-
-    Parameters
-    ----------
-    model_names : lista de nombres sin extensión, e.g. ["RandomForest", "KNN"].
-                  Si None, carga todos los .joblib disponibles en models/.
-
-    Returns
-    -------
-    dict : {nombre_modelo: modelo_cargado}
-    """
-    if model_names is None:
-        model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
-
-    models = {}
-    for name in model_names:
-        path = MODELS_DIR / f"{name}.joblib"
-        if path.exists():
-            models[name] = joblib.load(path)
-            print(f"    Cargado: {name}")
-        else:
-            print(f"    ⚠ No encontrado: {path}")
-    return models
+{{ load_models_macro() }}
 {% endif %}

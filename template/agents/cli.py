@@ -70,6 +70,13 @@ def build_parser() -> argparse.ArgumentParser:
     ask_p = subparsers.add_parser("ask", help="Rutea una petición en lenguaje natural al agente más relevante.")
     ask_p.add_argument("query")
 
+    pipeline_p = subparsers.add_parser("pipeline", help="Ejecuta un pipeline predefinido (develop|fix|release|cycle|analyze|data).")
+    pipeline_p.add_argument("name", choices=["develop", "fix", "release", "cycle", "analyze", "data"])
+    pipeline_p.add_argument("params", nargs=argparse.REMAINDER, help="--version 1.0.0 --filename data.csv")
+
+    doctor_p = subparsers.add_parser("doctor", help="Diagnóstico completo del proyecto: entorno, código, tests, datos.")
+    doctor_p.add_argument("--fix", action="store_true", help="Intenta corregir problemas automáticamente (usa auto_fix pipeline)")
+
     subparsers.add_parser("tools", help="Lista las herramientas registradas.")
 
     return parser
@@ -103,6 +110,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "ask":
         result = orchestrator.dispatch(args.query)
         _print_result(result)
+        return 0 if result.success else 1
+
+    if args.command == "pipeline":
+        from agents.gstack.pipelines import run_pipeline
+        pipe_kwargs = _parse_kwargs(args.params)
+        result = run_pipeline(args.name, **pipe_kwargs)
+        print(result.summary)
+        return 0 if result.success else 1
+
+    if args.command == "doctor":
+        if args.fix:
+            from agents.gstack.pipelines import auto_fix
+            result = auto_fix(auto_commit=True)
+        else:
+            from agents.gstack.pipelines import auto_analyze
+            result = auto_analyze()
+        print(result.summary)
         return 0 if result.success else 1
 
     if args.command == "tools":

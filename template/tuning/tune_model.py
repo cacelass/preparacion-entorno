@@ -357,6 +357,13 @@ def _objective_nn(trial, X_train, y_train, input_dim: int, output_dim: int):
     model = TransformerClassifier(input_dim=input_dim, output_dim=output_dim,
                                   d_model=d_model, nhead=nhead,
                                   num_layers=num_layers, dropout=dropout)
+{% elif nn_model == "ResNet" %}
+    hidden_dim  = trial.suggest_int("hidden_dim",  64, 256, step=32)
+    num_blocks  = trial.suggest_int("num_blocks",   2,  10)
+    dropout     = trial.suggest_float("dropout",    0.0, 0.4)
+    from {{ project_slug }}.models.train_model import ResNet
+    model = ResNet(input_dim=input_dim, output_dim=output_dim,
+                   hidden_dim=hidden_dim, num_blocks=num_blocks, dropout=dropout)
 {% endif %}
 
     device = torch.device("cuda" if torch.cuda.is_available() else

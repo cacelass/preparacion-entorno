@@ -4,6 +4,12 @@ Sistema de agentes especializados, tipo plugin, integrado en el template
 `dskit`. Cada proyecto generado con Copier a partir de este template incluye
 esta carpeta completa y funcional desde el primer commit.
 
+> 📄 **Novedad:** `AGENTS.md` en la raíz del proyecto — documentación rápida.
+> **`agents/gstack/`** — flujos autónomos con auto-commit entre pasos, result passing,
+> branching condicional y event logging.
+> **`agents/helpers.py`** — `delegate_to()` para colaboración entre agentes.
+> **Nuevo agente:** `doctor` — diagnóstico integral del proyecto.
+
 ## Filosofía
 
 - **No es un chatbot.** Cada agente ejecuta tareas reales con herramientas
@@ -36,11 +42,16 @@ esta carpeta completa y funcional desde el primer commit.
 agents/
 ├── __init__.py            # API pública: Orchestrator, BaseAgent, AgentResult...
 ├── __main__.py             # permite `python -m agents ...`
-├── cli.py                  # CLI (list / describe / run / ask / tools)
+├── cli.py                  # CLI (list / describe / run / ask / tools / pipeline / doctor)
 ├── config.py                # lee .copier-answers.yml -> ProjectConfig
 ├── context.py                # SharedContext: rutas + config + workspace por agente
+├── helpers.py                # delegate_to(): colaboración entre agentes
 ├── orchestrator.py            # rutea lenguaje natural -> agente + acción
 ├── exceptions.py               # jerarquía de excepciones propia
+├── gstack/                       # flujos autónomos con auto-commit, result passing, branching
+│   ├── __init__.py               # GStack, pipelines predefinidos
+│   ├── stack.py                  # Cola + ejecución secuencial + conditional run_if + event log
+│   └── pipelines.py              # auto_develop, auto_release, auto_fix, auto_analyze...
 ├── core/
 │   ├── base_agent.py            # BaseAgent, AgentResult, best_action()
 │   └── registry.py               # @register_agent + auto-descubrimiento
@@ -49,10 +60,21 @@ agents/
 │   ├── data_io_tool.py · dataframe_analysis_tool.py · sklearn_tool.py
 │   ├── vision_tool.py · duckdb_tool.py · sqlite_tool.py · rest_tool.py
 │   ├── code_analysis_tool.py · notebook_tool.py · agent_installer_tool.py
-├── agents/                          # los 9 agentes iniciales (+ plantilla de ejemplo)
+│   ├── stats_tool.py · validate_tool.py · cache_tool.py · parallel_tool.py · schedule_tool.py
+│   ├── graphify_tool.py            # puente con graphify (grafo de conocimiento)
+│   ├── research_tool.py            # búsqueda de papers (arXiv, OpenAlex)
+├── agents/                          # los 24 agentes (+ plantilla de ejemplo)
 │   ├── git_agent.py · data_agent.py · graph_agent.py · docker_agent.py
 │   ├── ml_agent.py · review_agent.py · documentation_agent.py
-│   ├── notebook_agent.py · installer_agent.py
+│   ├── notebook_agent.py · installer_agent.py · cicd_agent.py
+│   ├── test_agent.py · dependency_agent.py · secrets_agent.py · mlflow_agent.py
+│   ├── api_agent.py · env_agent.py · make_agent.py · refactor_agent.py
+│   ├── doctor_agent.py             # diagnóstico integral del proyecto
+│   ├── schedule_agent.py           # validación y descripción de cron
+│   ├── knowledge_agent.py          # grafo de conocimiento + Obsidian, cacheado
+│   ├── docsearch_agent.py          # búsqueda/navegación y poda del grafo
+│   ├── research_agent.py           # busca papers relacionados con el proyecto
+│   ├── supervisor_agent.py         # coordina workers que compiten (elige y pule)
 │   └── _template_agent.py            # plantilla — no se auto-registra (prefijo `_`)
 ├── external/                          # agentes de terceros / tuyos, fuera del núcleo
 │   ├── README.md
@@ -95,6 +117,19 @@ uv run python -m agents run dependency check_outdated
 uv run python -m agents run data eda_report --filename dataset.csv --target-col target
 uv run python -m agents run installer install_from_git --repo_url usuario/repo
 uv run python -m agents ask "revisa el Dockerfile"
+
+# Pipelines autónomos
+uv run python -m agents pipeline develop
+uv run python -m agents pipeline fix
+uv run python -m agents pipeline release --version 1.0.0
+uv run python -m agents pipeline analyze
+uv run python -m agents pipeline data --filename dataset.csv
+
+# Doctor: diagnóstico + auto-fix
+uv run python -m agents doctor
+uv run python -m agents doctor --fix
+
+# Herramientas
 uv run python -m agents tools
 ```
 
@@ -109,7 +144,7 @@ uv run python -m agents tools
   tiene. Solo hace falta la primera vez, en un proyecto sin este sistema —
   pregunta por ella si la necesitas.
 
-## Los 15 agentes iniciales
+## Los 24 agentes
 
 | Agente | Responsabilidad | Herramientas que usa |
 |---|---|---|
@@ -128,6 +163,15 @@ uv run python -m agents tools
 | `secrets` | Escanea el proyecto en busca de secretos hardcodeados. Usa `detect-secrets` si está instalado; si no, un heurístico propio mucho más limitado (avisado explícitamente) | `secrets_tool` |
 | `mlflow` | Lista runs del experimento (`project_slug`, misma convención que `train_model.py`), encuentra el mejor por métrica, avisa si el run más reciente empeoró. Solo aplica con `use_mlflow=true` | `mlflow_tool` |
 | `api` | Cruza endpoints `@app.get/post(...)` declarados en `api/main.py` contra los documentados en su docstring, y hace un smoke test real con `TestClient`. Solo aplica con `use_api=true` | `api_tool` |
+| `env` | Gestiona el entorno de desarrollo: verifica versión de Python, sincroniza dependencias con `uv sync`, `uv lock --check`, añade dependencias con `uv add`. Sin dependencias de red externas (usa el binario `uv` del proyecto) | `process_tool` |
+| `make` | Valida y gestiona el Makefile: verifica targets, chequea la cadena del pipeline (`pipeline → predict → train → features → data`), sugiere nuevos targets según la configuración del proyecto (api, monitoring, optuna, mlflow) | `process_tool` |
+| `refactor` | Refactoriza código automáticamente: corrige mutables como argumento por defecto, `except:` → `except Exception:`, añade `-> None` a funciones públicas sin tipo de retorno, y detecta `weights_only=False` con sugerencia de corrección. Usa `dry_run=True` por defecto para revisión previa | `code_analysis_tool` |
+| `doctor` | Diagnóstico integral del proyecto: python, git, estructura, tests, datos, dependencias, uso de disco. Ofrece `checkup` (todas las verificaciones), `disk_usage`, `summary`. | `process_tool` |
+| `schedule` | Valida, describe en lenguaje natural y calcula próximas ejecuciones de expresiones cron. Alias: `@daily`, `@hourly`, `@weekly`, `@monthly`, `@yearly`. | `schedule_tool` |
+| `knowledge` | Grafo de conocimiento (graphify) + Obsidian, cacheado al máximo en `graphify-out/cache/`. Detecta o crea una bóveda con estructura de árbol (`setup_vault`), actualiza el grafo y lo exporta a Obsidian (`build`), resume cada **nodo padre** con la correlación estructural entre sus hijos (`summarize_parents`), y expone `sync` como punto único que el `git` agent llama antes de cada commit. | `graphify_tool`, `cache_tool` |
+| `docsearch` | Navega el grafo: búsqueda en lenguaje natural (`search`, delega en `graphify query`, cacheado), vecinos de un nodo (`neighbors`), listado de referencias (`list_references`) y **poda** de nodos/referencias innecesarios (`prune`, `dry_run=True` por defecto, deja `graph.json.bak`). | `graphify_tool`, `cache_tool` |
+| `research` | Busca **papers académicos** relacionados con el proyecto en fuentes abiertas sin API key (**arXiv**, **OpenAlex**): deriva las keywords del proyecto (README/pyproject/grafo), busca (`find_papers`/`search`) y rankea por relevancia léxica. Cacheado. | `research_tool`, `graphify_tool`, `cache_tool` |
+| `supervisor` | Coordina **workers que compiten**: los hace trabajar por separado, puntúa cada propuesta con una métrica determinista, elige la mejor y la **pule**. `research` (compite backends de papers en paralelo, fusiona lo mejor de ambos) y `compete` (genérico, enfrenta cualquier `{agent, action}`). | `research_tool` |
 
 Cada agente documenta en su propio docstring qué responsabilidades de la
 lista original están implementadas y cuáles quedan como extensión (p. ej.
@@ -150,6 +194,12 @@ el mismo: import perezoso (dentro del método, no a nivel de módulo, para
 evitar ciclos de import) + instanciar el otro agente con `context=self.ctx`
 + llamar a `.run("accion", **kwargs)`. No hace falta un mecanismo especial
 de orquestación entre agentes — son objetos Python normales.
+
+El mismo `commit_with_changelog` delega además en `KnowledgeAgent.sync()`
+(import perezoso) justo después del commit: pone al día el grafo de graphify
+y lo exporta a la bóveda de Obsidian, para que grafo, bóveda y commit queden
+siempre alineados. Si graphify no está instalado o falla, el commit no se ve
+afectado — la sincronización se omite con un warning.
 
 ## Cómo extender el sistema
 

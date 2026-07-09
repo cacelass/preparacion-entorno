@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'chore: snapshot of pre-existing uncommitted work-in-progress *)"
+    ]
+  }
+}
