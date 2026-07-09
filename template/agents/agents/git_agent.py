@@ -2,20 +2,26 @@
 agents.agents.git_agent — Automatización de Git para este template.
 
 Conoce la estructura del proyecto: sabe que el código vive en
-`{{ project_slug }}/`, que los tests viven en `tests/` (y por tanto puede
+`{{ project_slug }}`, que los tests viven en `tests/` (y por tanto puede
 avisar si un commit toca código sin tocar tests), y que el CHANGELOG del
 proyecto sigue el formato Keep a Changelog (mismo que usa `CHANGELOG.md` en
 la raíz de este template).
+
+Al hacer commit, también detecta si el proyecto tiene `graphify-out/` (grafo
+de conocimiento, ver github.com/anomalyco/graphify) o `.obsidian/` (bóveda de
+Obsidian) y los actualiza automáticamente.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import date
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.exceptions import MissingDependencyError
 from agents.tools.git_tool import GitTool
+from agents.tools.process_tool import ProcessResult, run_command
 
 
 @register_agent
@@ -55,6 +61,8 @@ class GitAgent(BaseAgent):
             "prepare_pr_summary": self.prepare_pr_summary,
             "commit_with_changelog": self.commit_with_changelog,
             "tag_release": self.tag_release,
+            "create_branch": self.create_branch,
+            "merge_branch": self.merge_branch,
         }
 
     def _guard_repo(self, action: str) -> AgentResult | None:
@@ -291,9 +299,22 @@ class GitAgent(BaseAgent):
                 f"'git commit' falló: {commit_result.stderr.strip()}", warnings=warnings,
             )
 
+        sync_result = self._sync_knowledge()
+        warnings.extend(sync_result.warnings)
+
+        extras = []
+        if changelog_result.success and changelog_result.data:
+            extras.append("CHANGELOG.md actualizado")
+        if sync_result.success and not sync_result.data.get("skipped"):
+            if sync_result.data.get("graph"):
+                extras.append("graphify actualizado")
+            if sync_result.data.get("obsidian"):
+                extras.append("Obsidian indexado")
+        extras_str = f" ({', '.join(extras)})" if extras else ""
+
         return AgentResult(
             True, self.name, "commit_with_changelog",
-            f"Commit creado: '{message}'" + (" (con CHANGELOG.md actualizado)" if changelog_result.success and changelog_result.data else ""),
+            f"Commit creado: '{message}'{extras_str}",
             data={"stdout": commit_result.stdout, "changelog_updated": bool(changelog_result.success and changelog_result.data)},
             warnings=warnings,
         )
@@ -388,3 +409,98 @@ class GitAgent(BaseAgent):
             data={"version": version, "changelog_updated": commit_result.data.get("changelog_updated", False)},
             warnings=warnings,
         )
+
+    def create_branch(self, *, branch_name: str, base_branch: str | None = None) -> AgentResult:
+        """Crea una rama nueva a partir de main (o base_branch si se especifica)."""
+        guard = self._guard_repo("create_branch")
+        if guard:
+            return guard
+
+        if self.git.tag_exists(branch_name):
+            return AgentResult(False, self.name, "create_branch", f"La rama '{branch_name}' ya existe.")
+
+        base = base_branch or "main"
+        checkout = self._git("checkout", base)
+        if not checkout.ok:
+            return AgentResult(False, self.name, "create_branch", f"No se pudo cambiar a '{base}': {checkout.stderr.strip()}")
+
+        result = self._git("checkout", "-b", branch_name)
+        if not result.ok:
+            return AgentResult(False, self.name, "create_branch", f"No se pudo crear la rama: {result.stderr.strip()}")
+
+        return AgentResult(
+            True, self.name, "create_branch",
+            f"Rama '{branch_name}' creada desde '{base}' y activada.",
+            data={"branch": branch_name, "base": base},
+        )
+
+    def merge_branch(self, *, source_branch: str, target_branch: str | None = None) -> AgentResult:
+        """Fusiona source_branch en target_branch (o en la rama actual si no se especifica)."""
+        guard = self._guard_repo("merge_branch")
+        if guard:
+            return guard
+
+        target = target_branch or self.git.current_branch()
+        checkout = self._git("checkout", target)
+        if not checkout.ok:
+            return AgentResult(False, self.name, "merge_branch", f"No se pudo cambiar a '{target}': {checkout.stderr.strip()}")
+
+        result = self._git("merge", source_branch, "--no-ff")
+        if not result.ok:
+            return AgentResult(
+                False, self.name, "merge_branch",
+                f"Conflicto al fusionar '{source_branch}' en '{target}': {result.stderr.strip()}",
+            )
+
+        return AgentResult(
+            True, self.name, "merge_branch",
+            f"'{source_branch}' fusionado en '{target}' (--no-ff).",
+            data={"source": source_branch, "target": target},
+        )
+
+    def _load_dotenv(self) -> None:
+        """Carga .env si existe para que graphify vea GEMINI_API_KEY."""
+        env_path = self.ctx.root / ".env"
+        if env_path.exists():
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(env_path)
+            except ImportError:
+                pass
+
+    def _sync_knowledge(self) -> AgentResult:
+        """
+        Antes de cerrar un commit, pone al día el grafo de conocimiento
+        (graphify) y la bóveda de Obsidian, delegando en el `knowledge` agent
+        — un único punto de verdad para esa lógica (ver Filosofía en
+        `agents/README.md`: los agentes pueden ayudarse entre sí).
+
+        Import perezoso para no cargar graphify/knowledge en cada uso de
+        `GitAgent` que no sea un commit. Nunca hace fallar el commit: si algo
+        va mal, devuelve un AgentResult con warnings.
+        """
+        self._load_dotenv()
+
+        _gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        gemini_warning = [] if _gemini else [
+            "GEMINI_API_KEY no está configurada — graphify hará solo extracción "
+            "estructural (AST). Las relaciones semánticas requieren API key gratuita en ai.google.dev."
+        ]
+
+        try:
+            from agents.agents.knowledge_agent import KnowledgeAgent
+            result = KnowledgeAgent(context=self.ctx).sync()
+            result.warnings = gemini_warning + list(result.warnings)
+            if result.success and not result.data.get("skipped"):
+                print(f"    knowledge: {result.message}")
+            return result
+        except Exception as exc:  # noqa: BLE001 — un fallo aquí no debe tumbar el commit
+            return AgentResult(
+                True, self.name, "sync",
+                f"Sincronización de grafo/Obsidian omitida: {exc}",
+                data={"skipped": True}, warnings=gemini_warning,
+            )
+
+    def _git(self, *args: str) -> ProcessResult:
+        """Atajo interno para comandos git directos."""
+        return run_command(["git", *args], cwd=self.ctx.root)

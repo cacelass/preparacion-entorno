@@ -9,10 +9,34 @@ workflow de CI, que si tienen que vivir en una ruta fija para funcionar).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.exceptions import MissingDependencyError, ToolExecutionError
 from agents.tools.pytest_tool import PytestTool
+
+
+_TEST_SKELETON = '''"""
+Tests para {module_path}.
+"""
+import pytest
+{imports}
+
+{class_def}
+    """Test básico para {module_name}."""
+
+    def test_{module_name}_exists(self):
+        """Verifica que el módulo se pueda importar."""
+        try:
+            {import_call}
+        except ImportError as exc:
+            pytest.fail(f"No se pudo importar: {{exc}}")
+
+    def test_{module_name}_smoke(self, tmp_path):
+        """Test de humo — verifica que las funciones principales existan."""
+        pass
+'''
 
 
 @register_agent
@@ -20,14 +44,15 @@ class TestAgent(BaseAgent):
     __test__ = False  # pytest recolecta por defecto clases 'Test*' — esta no lo es, es un agente.
 
     name = "test"
-    description = "Ejecuta pytest, resume fallos y cobertura, y detecta módulos sin test aparente por convención de nombres."
-    capabilities = ["test", "tests", "pytest", "cobertura", "coverage", "corre los tests"]
+    description = "Ejecuta pytest, resume fallos y cobertura, detecta módulos sin test y genera esqueletos de test."
+    capabilities = ["test", "tests", "pytest", "cobertura", "coverage", "corre los tests", "generar test"]
 
     def action_aliases(self) -> dict:
         return {
             "run_smoke_tests": ["smoke", "humo", "tests marcados"],
             "coverage_report": ["cobertura", "coverage"],
             "list_untested_modules": ["sin probar", "sin test", "modulos sin cubrir"],
+            "generate_test_skeletons": ["generar test", "crear test", "esqueleto", "skeleton"],
         }
 
     def actions(self) -> dict:
@@ -36,6 +61,7 @@ class TestAgent(BaseAgent):
             "run_smoke_tests": self.run_smoke_tests,
             "coverage_report": self.coverage_report,
             "list_untested_modules": self.list_untested_modules,
+            "generate_test_skeletons": self.generate_test_skeletons,
         }
 
     def _run_and_summarize(self, *, markers: str | None) -> AgentResult:
@@ -128,4 +154,49 @@ class TestAgent(BaseAgent):
             f"{len(untested)} de {len(module_stems)} módulo(s) sin test homónimo aparente.",
             data=untested,
             warnings=["Heurística por nombre de archivo, no mide cobertura real — ver docstring del método."] if untested else [],
+        )
+
+    def generate_test_skeletons(self, *, dry_run: bool = False) -> AgentResult:
+        """
+        Genera esqueletos de test para módulos sin test aparente.
+
+        Crea `tests/test_<modulo>.py` para cada módulo en `{{ project_slug }}/`
+        que no tenga un `tests/test_<modulo>.py` correspondiente. Los esqueletos
+        incluyen un test de importación y un test de humo básico.
+        """
+        result = self.list_untested_modules()
+        untested: list[str] = result.data or []
+        if not untested:
+            return AgentResult(True, self.name, "generate_test_skeletons", "Todos los módulos tienen test aparente.", data=[])
+
+        if not self.ctx.tests_dir.exists():
+            self.ctx.tests_dir.mkdir(parents=True)
+
+        created: list[str] = []
+        for module_stem in untested:
+            test_path = self.ctx.tests_dir / f"test_{module_stem}.py"
+            if test_path.exists():
+                continue
+
+            module_path = f"{self.ctx.config.project_slug}.{module_stem}"
+            module_name = module_stem.replace("_", " ").title().replace(" ", "")
+
+            content = _TEST_SKELETON.format(
+                module_path=module_path,
+                imports=f"from {module_path} import ...",
+                class_def=f"class Test{module_name}:",
+                module_name=module_name,
+                import_call=f"import {module_path}",
+            )
+
+            if not dry_run:
+                test_path.write_text(content, encoding="utf-8")
+                created.append(str(test_path.relative_to(self.ctx.root)))
+
+        dry_msg = " [dry-run]" if dry_run else ""
+        return AgentResult(
+            True, self.name, "generate_test_skeletons",
+            f"{len(created)}/{len(untested)} esqueleto(s) de test creado(s).{dry_msg}",
+            data={"created": created, "untested": untested, "dry_run": dry_run},
+            warnings=[] if created else [f"No se creó ningún test (dry_run={dry_run}). Usa dry_run=False para generarlos."],
         )

@@ -131,6 +131,12 @@ secrets/
 # --- Sphinx ---
 docs/_build/
 
+# --- Graphify ---
+graphify-out/
+# Caché del knowledge agent (contenido derivado, voluminoso — nunca versionar,
+# aunque algún día decidas versionar el resto de graphify-out/).
+graphify-out/cache/
+
 # --- Misc ---
 *.manifest
 *.spec

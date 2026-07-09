@@ -37,12 +37,20 @@ from agents.tools.process_tool import run_command
 from agents.tools.registry import register_tool
 
 _AWS_KEY_RE = re.compile(r"AKIA[0-9A-Z]{16}")
+_GITHUB_TOKEN_RE = re.compile(r"gh[ps]_[0-9a-zA-Z]{36}")
+_OPENAI_TOKEN_RE = re.compile(r"sk-[A-Za-z0-9]{32,}")
+_GITLAB_TOKEN_RE = re.compile(r"glpat-[0-9a-zA-Z\-_]{20,}")
+_SLACK_TOKEN_RE = re.compile(r"xox[baprs]-[0-9a-zA-Z]{10,}")
+_JWT_RE = re.compile(r"eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+")
+_URL_PASSWORD_RE = re.compile(r"https?://[^:]+:[^@]+@")
 _PRIVATE_KEY_RE = re.compile(r"-----BEGIN (RSA |EC |OPENSSH |DSA |)?PRIVATE KEY-----")
 _ASSIGNMENT_RE = re.compile(
     r"(?i)(?:^|[^a-z0-9])(api[_-]?key|secret|password|passwd|token|access[_-]?key)\s*[:=]\s*['\"]([^'\"]{8,})['\"]"
 )
-_ENTROPY_THRESHOLD = 4.3  # empírico: strings aleatorias base64/hex superan esto; palabras normales no
+_ENTROPY_THRESHOLD = 4.3
 _MIN_LENGTH_FOR_ENTROPY_CHECK = 20
+
+_FALSE_POSITIVE_VALUES = {"your_key_here", "your_secret", "changeme", "password123", "test", "example", "dummy", "placeholder"}
 
 _SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build"}
 
@@ -56,7 +64,7 @@ class SecretFinding:
 
 
 def shannon_entropy(s: str) -> float:
-    """Entropía de Shannon en bits/símbolo — más alta = más 'aleatorio'. Cálculo estándar, sin librerías."""
+    """Entropía de Shannon en bits/símbolo — más alta = más 'aleatorio'."""
     if not s:
         return 0.0
     counts = {ch: s.count(ch) for ch in set(s)}
@@ -73,8 +81,6 @@ class SecretsTool:
     @staticmethod
     def scan_with_detect_secrets(root: Path) -> list[SecretFinding]:
         result = run_command(["detect-secrets", "scan", "--all-files", "."], cwd=root, timeout=120)
-        # detect-secrets escribe el JSON a stdout incluso si no es un repo git
-        # perfecto (avisa por stderr) — se intenta parsear igualmente.
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:
@@ -90,7 +96,7 @@ class SecretsTool:
         return findings
 
     @staticmethod
-    def scan_with_heuristic(root: Path, *, extensions: tuple[str, ...] = (".py", ".env", ".yml", ".yaml", ".json", ".cfg", ".ini")) -> list[SecretFinding]:
+    def scan_with_heuristic(root: Path, *, extensions: tuple[str, ...] = (".py", ".env", ".yml", ".yaml", ".json", ".cfg", ".ini", ".toml", ".sh")) -> list[SecretFinding]:
         findings = []
         for path in root.rglob("*"):
             if not path.is_file() or path.suffix.lower() not in extensions:
@@ -105,12 +111,26 @@ class SecretsTool:
             relative = str(path.relative_to(root))
             for i, line in enumerate(lines, start=1):
                 if _AWS_KEY_RE.search(line):
-                    findings.append(SecretFinding(relative, i, "AWS Access Key (patrón)", "heuristico-propio"))
+                    findings.append(SecretFinding(relative, i, "AWS Access Key (patrón AKIA)", "heuristico-propio"))
                 if _PRIVATE_KEY_RE.search(line):
                     findings.append(SecretFinding(relative, i, "Cabecera de clave privada PEM", "heuristico-propio"))
+                if _GITHUB_TOKEN_RE.search(line):
+                    findings.append(SecretFinding(relative, i, "Token de GitHub (ghp_/ghs_)", "heuristico-propio"))
+                if _OPENAI_TOKEN_RE.search(line):
+                    findings.append(SecretFinding(relative, i, "Token de OpenAI (sk-)", "heuristico-propio"))
+                if _GITLAB_TOKEN_RE.search(line):
+                    findings.append(SecretFinding(relative, i, "Token de GitLab (glpat-)", "heuristico-propio"))
+                if _SLACK_TOKEN_RE.search(line):
+                    findings.append(SecretFinding(relative, i, "Token de Slack (xox*)", "heuristico-propio"))
+                if _JWT_RE.search(line):
+                    findings.append(SecretFinding(relative, i, "Posible JWT (formato eyJ.*)", "heuristico-propio"))
+                if _URL_PASSWORD_RE.search(line):
+                    findings.append(SecretFinding(relative, i, "URL con credenciales embebidas", "heuristico-propio"))
                 match = _ASSIGNMENT_RE.search(line)
                 if match:
                     value = match.group(2)
+                    if value.lower() in _FALSE_POSITIVE_VALUES:
+                        continue
                     if len(value) >= _MIN_LENGTH_FOR_ENTROPY_CHECK and shannon_entropy(value) >= _ENTROPY_THRESHOLD:
                         findings.append(SecretFinding(
                             relative, i, f"Asignación de '{match.group(1)}' con valor de alta entropía", "heuristico-propio"
