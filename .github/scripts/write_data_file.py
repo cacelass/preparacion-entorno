@@ -44,6 +44,7 @@ BASE = {
 }
 
 # Parsear argumentos de la forma "key=val key=val"
+raw = " ".join(sys.argv[1:])
 overrides: dict = {}
 VALID_KEYS = {"ml_type", "task_type", "model_type", "cluster_model", "nn_model",
               "optimizer_type", "nn_loss_fn", "use_mlflow", "use_optuna", "use_duckdb",
@@ -52,7 +53,7 @@ VALID_KEYS = {"ml_type", "task_type", "model_type", "cluster_model", "nn_model",
               "project_author_name", "project_author_email", "project_description",
               "project_open_source_license", "python_version", "project_version"}
 
-for token in sys.argv[1:]:
+for token in raw.split():
     if "=" in token:
         k, v = token.split("=", 1)
         if k not in VALID_KEYS:
