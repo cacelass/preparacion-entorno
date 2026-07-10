@@ -17,7 +17,7 @@ project_slug:
   default: "{{ project_name | lower | replace(' ', '_') | replace('-', '_') }}"
   help: "Nombre del paquete Python (generado automaticamente, no cambiar)"
   validator: >-
-    {% if not (project_slug | string | match('^[a-z][a-z0-9_]*$')) %}
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9_]*$')) %}
     El slug solo puede contener letras minusculas, numeros y _
     {% elif project_slug in ['mlflow', 'optuna', 'sklearn', 'torch', 'numpy', 'pandas', 'scipy', 'fastapi', 'duckdb', 'xgboost', 'lightgbm', 'shap', 'joblib', 'pytest', 'ruff', 'uv'] %}
     El nombre '{{ project_slug }}' colisiona con una libreria Python. Elige otro nombre de proyecto.

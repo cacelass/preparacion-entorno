@@ -75,7 +75,7 @@ jobs:
 
       - name: Generar proyecto con copier
         run: |
-          copier copy --trust --defaults \
+          copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file /tmp/copier-data.yml \
             . /tmp/generated
           ls /tmp/generated
