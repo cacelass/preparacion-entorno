@@ -135,7 +135,7 @@ monitoring = [
 # Graphify: grafo de conocimiento del proyecto (github.com/anomalyco/graphify)
 # Requiere GEMINI_API_KEY en .env para extracción semántica vía Gemini
 graphify = [
-    "graphifyy[gemini]",
+    "graphify[gemini]",
 ]
 
 [tool.setuptools]
@@ -154,7 +154,7 @@ markers   = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "{{ 'py' + python_version | replace('.', '') }}"
 exclude = [
     "notebooks/",
     ".venv",

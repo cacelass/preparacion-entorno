@@ -69,7 +69,18 @@ def run_full_pipeline() -> None:
 {% endif %}
     models = train_models(X_train, y_train, tune_knn=True, cv_evaluate=True)
 
-    print('\n5. Evaluando...')
+{% if use_optuna %}
+    step_eval = 6
+    step_shap = 7
+    step_imp  = 8
+    step_pca  = 9
+{% else %}
+    step_eval = 5
+    step_shap = 6
+    step_imp  = 7
+    step_pca  = 8
+{% endif %}
+    print(f'\n{step_eval}. Evaluando...')
 {% if task_type == "clasificacion" %}
     df_results = evaluate_models(
         models, X_train, y_train, X_test, y_test, threshold=THRESHOLD
@@ -88,22 +99,16 @@ def run_full_pipeline() -> None:
         feature_names = [f'feature_{i}' for i in range(X_train.shape[1])]
 
 {% if use_shap %}
-    print('\n6. SHAP — explicabilidad de modelos...')
+    print(f'\n{step_shap}. SHAP — explicabilidad de modelos...')
     from {{ project_slug }}.models.predict_model import explain_models
     explain_models(models, X_train, feature_names=feature_names)
-
-    print('\n7. Importancia de variables...')
-{% else %}
-    print('\n6. Importancia de variables...')
 {% endif %}
+
+    print(f'\n{step_imp}. Importancia de variables...')
     plot_feature_importance(models, feature_names)
 
     if USE_PCA is not None:
-{% if use_shap %}
-        print('\n8. Varianza explicada por PCA...')
-{% else %}
-        print('\n7. Varianza explicada por PCA...')
-{% endif %}
+        print(f'\n{step_pca}. Varianza explicada por PCA...')
         import joblib
         from {{ project_slug }}.utils.paths import ARTIFACTS_DIR
         try:
@@ -114,12 +119,13 @@ def run_full_pipeline() -> None:
 
     print('\n' + '=' * 60)
     print('Pipeline completado.')
+    if not df_results.empty:
 {% if task_type == "clasificacion" %}
-    best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
+        best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
 {% else %}
-    best = df_results.sort_values('RMSE_test', ascending=True).iloc[0]
+        best = df_results.sort_values('RMSE_test', ascending=True).iloc[0]
 {% endif %}
-    print(f'Mejor modelo: {best.to_dict()}')
+        print(f'Mejor modelo: {best.to_dict()}')
 
 
 def main():
@@ -300,7 +306,7 @@ def run_full_pipeline() -> None:
     output_dim = 1   # regresión → una neurona de salida
 {% else %}
     input_dim  = X_train.shape[1]
-    output_dim = int(y_train.nunique())
+    output_dim = int(pd.Series(y_train).nunique())
 {% endif %}
     print(f'   input_dim={input_dim}  output_dim={output_dim}')
 
@@ -476,12 +482,13 @@ def run_full_pipeline() -> None:
 
     print('\n' + '=' * 60)
     print('Pipeline completado.')
+    if not df_results.empty:
 {% if task_type == "clasificacion" %}
-    best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
+        best = df_results.sort_values('Acc_test', ascending=False).iloc[0]
 {% else %}
-    best = df_results.sort_values('RMSE_test', ascending=True).iloc[0]
+        best = df_results.sort_values('RMSE_test', ascending=True).iloc[0]
 {% endif %}
-    print(f'Mejor modelo: {best.to_dict()}')
+        print(f'Mejor modelo: {best.to_dict()}')
 
 
 def main():

@@ -42,7 +42,6 @@ uv.lock
 htmlcov/
 coverage.xml
 nosetests.xml
-pytest_cache/
 .pytest_cache/
 
 # --- Datos - ignorar archivos, conservar estructura de carpetas ---

@@ -14,7 +14,6 @@ Endpoints:
 """
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -117,9 +116,9 @@ def _load_artifacts() -> None:
             output_dim = int(joblib.load(output_dim_path))
         else:
 {% if task_type == "regresion" %}
-            output_dim = 1   # regresión: una neurona de salida
+            output_dim = 1
 {% else %}
-            output_dim = 2   # clasificación binaria por defecto
+            output_dim = len(joblib.load(ARTIFACTS_DIR / "target_encoder.joblib").classes_) if (ARTIFACTS_DIR / "target_encoder.joblib").exists() else 2
 {% endif %}
         model = build_model(input_dim=input_dim, output_dim=output_dim)
         model.load_state_dict(
@@ -158,12 +157,16 @@ def _preprocess_input(features: dict[str, Any]) -> np.ndarray:
             continue
         if col in df.columns:
             try:
-                df[col] = enc.transform(df[col].astype(str))
-            except ValueError:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Valor desconocido en feature '{col}': {df[col].iloc[0]}",
-                )
+                encoded = enc.transform(df[[col]].astype(str))
+                df[col] = encoded
+            except (ValueError, AttributeError):
+                try:
+                    df[col] = enc.transform(df[col].astype(str))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Valor desconocido en feature '{col}': {df[col].iloc[0]}",
+                    )
 
     # Scaler
     if _state["scaler"] is not None:
@@ -304,7 +307,13 @@ def predict(request: PredictRequest) -> PredictResponse:
         probs  = torch.softmax(logits, dim=-1)
         pred   = int(probs.argmax(dim=-1).item())
         prob   = float(probs.max().item())
-    return PredictResponse(prediction=pred, probability=prob, model_name=model_name)
+    label: str | None = None
+    if _state["target_encoder"] is not None:
+        try:
+            label = str(_state["target_encoder"].inverse_transform([pred])[0])
+        except Exception:
+            label = str(pred)
+    return PredictResponse(prediction=pred, probability=prob, label=label, model_name=model_name)
 {% else %}
         pred = float(logits.squeeze().item())
     return PredictResponse(prediction=pred, model_name=model_name)

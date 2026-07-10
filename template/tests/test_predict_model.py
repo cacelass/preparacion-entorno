@@ -25,9 +25,13 @@ def _make_data():
     X, y = make_classification(
         n_samples=160, n_features=4, n_classes=2, random_state=42
     )
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42
+    )
     scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-    return train_test_split(X, y, test_size=0.25, random_state=42)
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+    return X_train, X_test, y_train, y_test
 {% else %}
     from sklearn.datasets import make_regression
     from sklearn.model_selection import train_test_split
@@ -35,9 +39,13 @@ def _make_data():
     X, y = make_regression(
         n_samples=160, n_features=4, noise=0.1, random_state=42
     )
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42
+    )
     scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-    return train_test_split(X, y, test_size=0.25, random_state=42)
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+    return X_train, X_test, y_train, y_test
 {% endif %}
 
 
@@ -141,9 +149,9 @@ def test_predict_proba_new_shape(patch_paths):
     assert np.allclose(proba.sum(axis=1), 1.0, atol=1e-5)
 
 
-def test_predict_proba_new_raises_for_no_proba(patch_paths):
+def test_predict_proba_new_raises_for_no_model(patch_paths):
     """predict_proba_new debe fallar si el modelo no existe."""
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         predict_proba_new("ModeloSinProba", np.zeros((5, 4)))
 
 

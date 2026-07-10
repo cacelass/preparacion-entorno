@@ -58,13 +58,13 @@ def test_check_drift_devuelve_columnas_correctas(patch_paths):
         assert col in result.columns
 
 
-def test_check_drift_threshold_bajo_detecta_mas(patch_paths):
-    """Threshold bajo debe detectar más drift que threshold alto."""
+def test_check_drift_threshold_alto_detecta_mas(patch_paths):
+    """Threshold alto (p-value más laxo) debe detectar más drift que threshold bajo."""
     from monitoring.monitor import check_drift
     ref, curr = _make_ref_curr(with_drift=False)
-    strict = check_drift(ref, curr, threshold=0.5)
-    lenient = check_drift(ref, curr, threshold=0.001)
-    assert strict["drift_detected"].sum() >= lenient["drift_detected"].sum()
+    lenient = check_drift(ref, curr, threshold=0.5)
+    strict = check_drift(ref, curr, threshold=0.001)
+    assert lenient["drift_detected"].sum() >= strict["drift_detected"].sum()
 
 
 def test_check_drift_categorica(patch_paths):

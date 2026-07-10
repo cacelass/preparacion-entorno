@@ -102,9 +102,23 @@ class ReviewAgent(BaseAgent):
                     })
 
             # weights_only=False
-            if isinstance(node, ast.Call):
-                func_name = ast.unparse(node.func) if hasattr(ast, "unparse") else ""
-                if "torch.load" in func_name or "torch" in func_name:
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                attr_parts = []
+                try:
+                    if hasattr(ast, "unparse"):
+                        attr_parts = ast.unparse(node.func).split(".")
+                    else:
+                        n = node.func
+                        while isinstance(n, ast.Attribute):
+                            attr_parts.append(n.attr)
+                            n = n.value
+                        if isinstance(n, ast.Name):
+                            attr_parts.append(n.id)
+                        attr_parts.reverse()
+                except Exception:
+                    pass
+                func_name = ".".join(attr_parts)
+                if func_name == "torch.load":
                     for kw in node.keywords:
                         if kw.arg == "weights_only" and isinstance(kw.value, ast.Constant) and kw.value.value is False:
                             findings.append({

@@ -22,8 +22,6 @@ Uso básico
 
 Uso con auto-commit (cada paso genera un commit automático):
 ----------------------------------------------------------------
-    from agents.gstack import auto_commit
-
     stack = GStack(auto_commit=True)
     stack.push("data", "eda_report", filename="dataset.csv")
     stack.push("ml", "check_overfitting")

@@ -30,6 +30,25 @@ un agente puede PEDIR trabajo a otro, nunca hacerlo él mismo. Ejemplo real:
 
 Todo recurso no listado en ningún `owns` es de solo lectura para todos.
 Además, cada agente posee implícitamente `agents/workspace/<su_nombre>/`.
+
+El vault Obsidian como contexto compartido
+------------------------------------------
+El vault (`vault/`) es la memoria compartida del equipo. Cualquier agente
+puede LEERLO, pero solo `knowledge` lo ESCRIBE. El vault contiene:
+
+- `00_META/IA_index.md` — punto de entrada: metadata del proyecto, estructura
+  del vault, modelo de datos. TODO agente debería leerlo al activarse.
+- `01_PROYECTO/` — documentación del proyecto (agentes, arquitectura,
+  modelos, roadmap). `ml` y `data` lo consultan frecuentemente.
+- `02_DATOS/` — documentación de datos (features, fuentes). Dueño: `data`.
+- `04_VISUALIZACIONES/grafo_conocimiento.md` — visualización del grafo.
+  Dueño: `knowledge`.
+- `05_AGENTES/` — fichas de cada agente con su contrato expandido. TODO
+  agente tiene su ficha aquí, actualizada por `knowledge`.
+
+Regla: si un agente necesita contexto sobre el proyecto, primero lee
+`vault/00_META/IA_index.md`. Si necesita contexto sobre otro agente, lee
+`vault/05_AGENTES/<Agent>.md`.
 """
 
 from __future__ import annotations
@@ -67,6 +86,8 @@ CONTRACTS: dict[str, Contract] = {
             "descomponer un encargo en pasos y asignar cada paso al agente responsable",
             "detectar qué información falta y devolver las preguntas ANTES de ejecutar nada",
             "ejecutar la orden de trabajo aprobada (via GStack) y resumir qué debe verificar el humano",
+            "leer vault/00_META/IA_index.md para obtener contexto del proyecto y la topología de agentes",
+            "consultar vault/05_AGENTES/<Agent>.md para decidir a quién delegar cada paso",
         ),
         cannot=(
             "ejecutar ninguna acción de dominio él mismo → siempre delega en el agente dueño",
@@ -89,6 +110,61 @@ CONTRACTS: dict[str, Contract] = {
         ),
         owns=(),
         collaborates=(),
+    ),
+
+    "supervisor": Contract(
+        role="Coordina workers en COMPETICIÓN: lanza N variantes de una tarea y arbitra cuál gana.",
+        can=(
+            "lanzar propuestas que compiten (p. ej. búsquedas de papers en paralelo) y elegir la mejor",
+        ),
+        cannot=(
+            "orquestar un encargo secuencial paso a paso → plan (él delega a dueños, no arbitra)",
+            "hacer el trabajo de los workers él mismo — solo coordina y evalúa",
+        ),
+        needs=("la tarea a poner en competición y el criterio de evaluación",),
+        collaborates=("research",),
+    ),
+
+    # ── Conocimiento e investigación ─────────────────────────────────────
+    "knowledge": Contract(
+        role="Dueño del grafo de conocimiento y la bóveda Obsidian: los construye y mantiene al día.",
+        can=(
+            "construir/reconstruir el grafo (graphify), crear la bóveda, resumir nodos padre, sync",
+            "poblar vault/05_AGENTES/ con fichas individuales de cada agente desde contracts.py",
+            "actualizar vault/04_VISUALIZACIONES/grafo_conocimiento.md tras cada build del grafo",
+        ),
+        cannot=(
+            "buscar o navegar por el grafo → docsearch",
+            "buscar papers nuevos → research (knowledge los indexa cuando ya existen)",
+        ),
+        owns=(
+            "graphify-out/ (construcción y sync del grafo)",
+            "vault/ (bóveda Obsidian del proyecto — todo vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)",
+        ),
+        collaborates=("docsearch", "research"),
+    ),
+    "docsearch": Contract(
+        role="Buscador del grafo de conocimiento: consulta, navega vecinos y poda nodos irrelevantes.",
+        can=(
+            "buscar en el grafo, listar vecinos/referencias, podar nodos innecesarios (con backup)",
+            "buscar en vault/00_META/ y vault/05_AGENTES/ como fuente secundaria de contexto",
+        ),
+        cannot=(
+            "construir o reconstruir el grafo → knowledge",
+            "buscar fuera del grafo (papers nuevos, web) → research",
+        ),
+        needs=("la consulta o el nodo del que partir",),
+        owns=("graphify-out/ (poda de nodos, con .bak)",),
+        collaborates=("knowledge",),
+    ),
+    "research": Contract(
+        role="Investigador externo: busca papers (arXiv/OpenAlex) relacionados con el proyecto. Solo lee.",
+        can=("extraer keywords del proyecto, buscar papers y rankearlos (necesita internet)",),
+        cannot=(
+            "indexar papers en el grafo o la bóveda → knowledge",
+            "decidir qué paper adoptar — presenta candidatos, el humano (o supervisor) elige",
+        ),
+        collaborates=("knowledge", "supervisor"),
     ),
 
     # ── Código y calidad ─────────────────────────────────────────────────
@@ -133,25 +209,29 @@ CONTRACTS: dict[str, Contract] = {
         role="Analista de datos: EDA y calidad de datasets. Lee data/, escribe solo en su workspace.",
         can=(
             "EDA: constantes, cardinalidad, missing, outliers, correlaciones, fuga de información",
+            "documentar hallazgos en vault/02_DATOS/ (features.md, fuentes.md) via knowledge",
         ),
         cannot=(
-            "modificar los datasets de data/ — los informes van a su workspace",
+            "modificar los datasets de data/ — los informes van a su workspace o al vault via knowledge",
             "entrenar o evaluar modelos → ml",
             "auditar figuras → graph",
         ),
         needs=("filename del dataset", "target_col para análisis de fuga/correlación con el target"),
-        collaborates=(),
+        collaborates=("knowledge",),  # delega escritura de hallazgos al vault
     ),
     "ml": Contract(
         role="Analista de modelos entrenados: inspecciona .joblib, importancias, overfitting.",
-        can=("inspeccionar modelos guardados, comparar modelos, analizar estudios de Optuna",),
+        can=(
+            "inspeccionar modelos guardados, comparar modelos, analizar estudios de Optuna",
+            "documentar resultados en vault/01_PROYECTO/modelos.md via knowledge",
+        ),
         cannot=(
             "entrenar modelos — eso es del pipeline (make train), no de un agente",
             "analizar datasets crudos → data",
             "consultar experimentos MLflow → mlflow",
         ),
         needs=("métricas de train/test para juzgar overfitting — no las inventa",),
-        collaborates=("mlflow",),
+        collaborates=("mlflow", "knowledge"),
     ),
     "mlflow": Contract(
         role="Consulta el tracking de experimentos MLflow (solo con use_mlflow=true).",

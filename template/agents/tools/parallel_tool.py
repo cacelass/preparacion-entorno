@@ -65,5 +65,7 @@ class ParallelTool:
         """Divide un iterable en n_chunks aproximadamente iguales."""
         items = list(iterable)
         n = len(items)
+        if n_chunks <= 0:
+            return [items]
         chunk_size = (n + n_chunks - 1) // n_chunks
         return [items[i:i + chunk_size] for i in range(0, n, chunk_size)]

@@ -81,7 +81,8 @@ def evaluate_models(
 {% endif %}
 
 {% if task_type == "clasificacion" %}
-        if threshold != 0.5 and hasattr(model, "predict_proba"):
+        n_classes = len(np.unique(y_test))
+        if threshold != 0.5 and hasattr(model, "predict_proba") and n_classes == 2:
             proba_test   = model.predict_proba(X_test)[:, 1]
             y_pred_test  = (proba_test >= threshold).astype(int)
             proba_train  = model.predict_proba(X_train)[:, 1]
@@ -755,6 +756,10 @@ def try_model() -> None:
             except ValueError:
                 X_new_df[col] = 0
 
+    # Alinear columnas con feature_names del entrenamiento
+    if "feature_names" in locals() and len(feature_names) == scaler.n_features_in_:
+        X_new_df = X_new_df[feature_names]
+
     X_new = scaler.transform(X_new_df)
 
     # ── 4. Predecir cluster ────────────────────────────────────────────
@@ -1287,7 +1292,11 @@ def try_model() -> None:
     # Necesitamos el modelo instanciado — importamos desde train_model
     try:
         from {{ project_slug }}.models.train_model import build_model
-        num_classes = len(set(pd.read_csv(PROCESSED_DATA_DIR / "y_train.csv").iloc[:, 0]))
+        output_dim_path = ARTIFACTS_DIR / "output_dim.joblib"
+        if output_dim_path.exists():
+            num_classes = joblib.load(output_dim_path)
+        else:
+            num_classes = len(set(pd.read_csv(PROCESSED_DATA_DIR / "y_train.csv").iloc[:, 0]))
         model = build_model(input_dim=X_new.shape[1], output_dim=num_classes).to(device)
         model.load_state_dict(state_dict)
     except Exception as e:

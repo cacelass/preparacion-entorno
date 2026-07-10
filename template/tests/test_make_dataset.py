@@ -25,9 +25,9 @@ def test_load_data_reads_csv(patch_paths):
 
 
 def test_load_data_raises_on_missing_file(patch_paths):
-    """load_data debe lanzar una excepción si el archivo no existe."""
+    """load_data debe lanzar FileNotFoundError si el archivo no existe."""
     from {{ project_slug }}.data.make_dataset import load_data
-    with pytest.raises(Exception):
+    with pytest.raises(FileNotFoundError):
         load_data("no_existe.csv")
 
 

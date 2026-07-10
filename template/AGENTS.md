@@ -44,6 +44,10 @@ revisión de código, tests, dependencias y despliegue.
 | `schedule` | Valida, describe y calcula próximas ejecuciones de expresiones cron |
 | `plan` | **Jefe de proyecto**: encargo → preguntas → delegación → qué verificar |
 | `audit` | **Auditor del equipo**: mide uso, éxito y duración; propone mejoras |
+| `supervisor` | Coordina workers en competición y arbitra la mejor propuesta |
+| `knowledge` | Construye y mantiene el grafo de conocimiento + bóveda Obsidian |
+| `docsearch` | Busca/navega el grafo de conocimiento, poda nodos irrelevantes |
+| `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |
 
 ## Roles y límites — `agents/contracts.py`
 
@@ -168,3 +172,23 @@ agents/
 - `agents/README.md` — documentación completa del sistema de agentes
 - `agents/prompts/` — fichas de cada agente
 - `CHANGELOG.md` — historial de cambios del template
+
+## Vault Obsidian — memoria compartida del equipo
+
+El directorio `vault/` contiene una bóveda Obsidian que funciona como memoria
+compartida del equipo de agentes. Cualquier agente puede leerla, pero solo
+`knowledge` la escribe.
+
+```
+vault/
+├── 00_META/IA_index.md         ← Punto de entrada: metadata + topología del equipo
+├── 01_PROYECTO/                ← Documentación del proyecto (arquitectura, modelos, roadmap)
+├── 02_DATOS/                   ← Documentación de datos (features, fuentes)
+├── 04_VISUALIZACIONES/         ← Grafo de conocimiento (regenerado por graphify)
+└── 05_AGENTES/                 ← Fichas individuales de cada agente (generadas desde contracts.py)
+```
+
+Los agentes usan el vault como fuente de contexto: `plan` consulta
+`05_AGENTES/<Agent>.md` para decidir a quién delegar; `data` y `ml` delegan
+la escritura de hallazgos en `knowledge` para mantener `02_DATOS/` y
+`01_PROYECTO/modelos.md` actualizados.

@@ -17,7 +17,7 @@ from agents.exceptions import MissingDependencyError, ToolExecutionError
 from agents.tools.pytest_tool import PytestTool
 
 
-_TEST_SKELETON = '''"""
+{% raw %}_TEST_SKELETON = '''"""
 Tests para {module_path}.
 """
 import pytest
@@ -36,7 +36,7 @@ import pytest
     def test_{module_name}_smoke(self, tmp_path):
         """Test de humo — verifica que las funciones principales existan."""
         pass
-'''
+'''{% endraw %}
 
 
 @register_agent

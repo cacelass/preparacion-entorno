@@ -111,6 +111,29 @@ python main.py
 
 Consulta el archivo `ayuda` para más detalles.
 
+{% if graphify_mode == "graphify + obsidian vault" %}
+
+---
+
+## Obsidian Vault
+
+El proyecto incluye un vault de Obsidian en `vault/` con estructura por dominios:
+
+| Carpeta | Propósito |
+|---------|-----------|
+| `00_META/` | Índice general + plantillas para nuevas notas |
+| `01_PROYECTO/` | Visión general, objetivos, decisiones |
+| `02_DATOS/` | Documentación de datasets |
+| `03_MODELOS/` | Experimentos, hiperparámetros, resultados |
+| `04_VISUALIZACIONES/` | Análisis visual y gráficos |
+| `05_AGENTES/` | Grafo de conocimiento generado por graphify |
+| `06_OBSERVACIONES/` | Hallazgos y notas diarias |
+| `07_REFERENCIAS/` | Papers y documentación externa |
+
+Abre `vault/` como carpeta en Obsidian para explorar y documentar el proyecto.
+
+{% endif %}
+
 ---
 
 Template generado con https://github.com/cacelass/dskit

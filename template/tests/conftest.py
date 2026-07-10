@@ -113,7 +113,7 @@ def patch_paths(monkeypatch, tmp_path):
 {% if use_api %}
         "api.main",
 {% endif %}
-{% if use_docker %}
+{% if use_docker | default(false) %}
         "chat.app",
 {% endif %}
     ]

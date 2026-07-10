@@ -79,7 +79,7 @@ def test_feature_engineering_returns_dataframe(sample_df):
 
 def test_process_input_requires_scaler(df_with_target, patch_paths):
     """process_input debe fallar si no existe el scaler (no entrenado aún)."""
-    with pytest.raises(Exception):
+    with pytest.raises((FileNotFoundError, AttributeError, RuntimeError)):
         process_input(df_with_target.drop(columns=["target"]))
 
 

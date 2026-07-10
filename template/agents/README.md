@@ -198,7 +198,7 @@ uv run python -m agents tools
   tiene. Solo hace falta la primera vez, en un proyecto sin este sistema —
   pregunta por ella si la necesitas.
 
-## Los 22 agentes
+## Los 26 agentes
 
 Los ROLES (qué puede, qué no puede, qué necesita, qué posee) están en
 `agents/contracts.py` — esta tabla resume la responsabilidad y las
@@ -208,6 +208,10 @@ herramientas de cada uno.
 |---|---|---|
 | `plan` | **Jefe de proyecto**: encargo → orden de trabajo → preguntas → delegación → resumen de qué verificar. No ejecuta nada de dominio él mismo. | Orchestrator, GStack |
 | `audit` | **Auditor del equipo**: uso, tasa de éxito y duración por agente/acción, fallos recientes, sugerencias de mejora con datos. | `agents/audit.py` (log JSONL) |
+| `supervisor` | Coordina workers en **competición**: lanza N variantes de una tarea y arbitra cuál gana (secuencial → `plan`). | agente `research` |
+| `knowledge` | Dueño del grafo de conocimiento y la bóveda Obsidian: construir, resumir nodos padre, sync. | `graphify_tool` |
+| `docsearch` | Busca/navega el grafo de conocimiento y poda nodos irrelevantes (con backup). | `graphify_tool` |
+| `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto y los rankea. Necesita internet. | `research_tool` |
 | `git` | Conventional Commits, changelog, release notes, breaking changes, resumen de PR, **commit+changelog en un paso** (`commit_with_changelog`), **release completo** (`tag_release`: versión + changelog + CI/CD + commit + tag) | `git_tool` |
 | `data` | EDA: constantes, cardinalidad, missing, outliers, fuga de información, correlaciones | `data_io_tool`, `dataframe_analysis_tool` |
 | `graph` | Audita `reports/figures/`: figuras vacías, aspect ratio inusual | `vision_tool` |

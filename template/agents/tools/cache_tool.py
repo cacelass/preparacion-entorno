@@ -19,28 +19,39 @@ import joblib
 from agents.tools.registry import register_tool
 
 
-_DEFAULT_CACHE_DIR = Path(".cache")
+def _md5(*args, **kwargs) -> str:
+    try:
+        return hashlib.md5(*args, usedforsecurity=False, **kwargs).hexdigest()
+    except TypeError:
+        return hashlib.md5(*args, **kwargs).hexdigest()
+
+
+def _cache_dir() -> Path:
+    return CacheTool._instance_cache_dir if CacheTool._instance_cache_dir is not None else Path(".cache")
 
 
 def _cache_path(func_name: str, args: tuple, kwargs: dict) -> Path:
-    key = hashlib.md5(
+    key = _md5(
         json.dumps((func_name, args, sorted(kwargs.items())), sort_keys=True, default=str).encode()
-    ).hexdigest()
-    return _DEFAULT_CACHE_DIR / f"{func_name}_{key}.joblib"
+    )
+    return _cache_dir() / f"{func_name}_{key}.joblib"
 
 
 @register_tool("cache")
 class CacheTool:
+
+    _instance_cache_dir: Path | None = None
+
     @staticmethod
     def set_cache_dir(path: str | Path) -> None:
-        """Cambia el directorio de caché global."""
-        global _DEFAULT_CACHE_DIR
-        _DEFAULT_CACHE_DIR = Path(path)
-        _DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        """Cambia el directorio de caché para este CacheTool."""
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        CacheTool._instance_cache_dir = path
 
     @staticmethod
     def get_cache_dir() -> str:
-        return str(_DEFAULT_CACHE_DIR)
+        return str(_cache_dir())
 
     @staticmethod
     def clear(name: str | None = None) -> int:
@@ -48,10 +59,11 @@ class CacheTool:
         Limpia archivos de caché. name=None → todo, name="func_name" → solo esa función.
         Devuelve número de archivos eliminados.
         """
-        if not _DEFAULT_CACHE_DIR.exists():
+        cache_dir = _cache_dir()
+        if not cache_dir.exists():
             return 0
         removed = 0
-        for f in _DEFAULT_CACHE_DIR.iterdir():
+        for f in cache_dir.iterdir():
             if f.suffix == ".joblib" and (name is None or f.name.startswith(f"{name}_")):
                 f.unlink()
                 removed += 1
@@ -82,7 +94,8 @@ class CacheTool:
                     else:
                         return joblib.load(path)
                 result = func(*args, **kwargs)
-                _DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                cache_dir = _cache_dir()
+                cache_dir.mkdir(parents=True, exist_ok=True)
                 joblib.dump(result, path)
                 return result
             return wrapper
@@ -106,9 +119,9 @@ class CacheTool:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 nonlocal hits, misses
-                key = hashlib.md5(
+                key = _md5(
                     json.dumps((func.__name__, args, sorted(kwargs.items())), sort_keys=True, default=str).encode()
-                ).hexdigest()
+                )
                 if key in cache:
                     hits += 1
                     return cache[key]

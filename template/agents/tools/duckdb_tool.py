@@ -44,4 +44,5 @@ class DuckDBTool:
     def describe_file(path: Path) -> Any:
         """Perfil rápido de un CSV/Parquet vía DESCRIBE de DuckDB (tipos inferidos, no estadísticas)."""
         reader = "read_parquet" if path.suffix.lower() == ".parquet" else "read_csv_auto"
-        return DuckDBTool.query(f"DESCRIBE SELECT * FROM {reader}('{path.as_posix()}')")
+        safe_path = path.as_posix().replace("'", "''")
+        return DuckDBTool.query(f"DESCRIBE SELECT * FROM {reader}('{safe_path}')")

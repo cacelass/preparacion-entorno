@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONUTF8: "1"
 
 jobs:
   validate-template:
@@ -83,10 +83,9 @@ jobs:
       - name: Smoke tests
         working-directory: /tmp/generated
         run: |
-          uv run pytest -m smoke --tb=short -q
-          code=$?
-          [ $code -eq 5 ] && echo "No smoke tests — OK" && exit 0
-          exit $code
+          uv run pytest -m smoke --tb=short -q && rc=0 || rc=$?
+          [ $rc -eq 5 ] && echo "No smoke tests — OK" && exit 0
+          exit $rc
 
       - name: Lint
         working-directory: /tmp/generated

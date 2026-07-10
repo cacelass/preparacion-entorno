@@ -19,7 +19,7 @@ def auto_analyze(*, auto_commit: bool = True) -> StackResult:
     Analiza el proyecto actual sin modificarlo: revisa código, datos,
     dependencias y entorno. Ideal como diagnóstico rápido.
     """
-    stack = GStack(auto_commit=False, commit_on_error=False)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=False)
     stack.push("env", "info")
     stack.push("env", "check_python_version")
     stack.push("git", "analyze_diff")

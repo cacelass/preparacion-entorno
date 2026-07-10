@@ -418,7 +418,7 @@ class GitAgent(BaseAgent):
         if guard:
             return guard
 
-        if self.git.tag_exists(branch_name):
+        if self._git("rev-parse", "--verify", f"refs/heads/{branch_name}", check=False).ok:
             return AgentResult(False, self.name, "create_branch", f"La rama '{branch_name}' ya existe.")
 
         base = base_branch or "main"

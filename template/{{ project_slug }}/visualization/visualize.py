@@ -169,12 +169,16 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
     ax2.axhline(95, color="red",    linestyle="--", lw=1.5, label="95%")
     ax2.axhline(99, color="orange", linestyle="--", lw=1.5, label="99%")
 
-    idx_95 = int(np.argmax(cumvar >= 0.95))
-    idx_99 = int(np.argmax(cumvar >= 0.99))
-    ax2.axvline(idx_95 + 1, color="red",    lw=1, linestyle=":")
-    ax2.axvline(idx_99 + 1, color="orange", lw=1, linestyle=":")
-    ax2.annotate(f"d={idx_95+1}", xy=(idx_95+1, cumvar[idx_95]*100),
-                 xytext=(idx_95+2, cumvar[idx_95]*100 - 5), fontsize=9, color="red")
+    has_95 = np.any(cumvar >= 0.95)
+    has_99 = np.any(cumvar >= 0.99)
+    if has_95:
+        idx_95 = int(np.argmax(cumvar >= 0.95))
+        ax2.axvline(idx_95 + 1, color="red",    lw=1, linestyle=":")
+        ax2.annotate(f"d={idx_95+1}", xy=(idx_95+1, cumvar[idx_95]*100),
+                     xytext=(idx_95+2, cumvar[idx_95]*100 - 5), fontsize=9, color="red")
+    if has_99:
+        idx_99 = int(np.argmax(cumvar >= 0.99))
+        ax2.axvline(idx_99 + 1, color="orange", lw=1, linestyle=":")
     ax2.set_xlabel("Número de componentes")
     ax2.set_ylabel("Varianza acumulada (%)")
     ax2.set_title("Varianza explicada acumulada")
@@ -185,7 +189,10 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "pca_variance.png", dpi=150)
     plt.close(fig)
-    print(f"    pca_variance.png guardado  (95% varianza con d={idx_95+1} componentes)")
+    if has_95:
+        print(f"    pca_variance.png guardado  (95% varianza con d={idx_95+1} componentes)")
+    else:
+        print(f"    pca_variance.png guardado  (no se alcanza 95% de varianza)")
 
 
 def plot_pairplot(df: pd.DataFrame, target_col: str, max_features: int = 6) -> None:
@@ -329,10 +336,12 @@ def plot_pca_variance(X, n_components: int = None) -> None:
     ax.plot(range(1, len(cumvar) + 1), cumvar, "bo-", lw=2, markersize=5)
     ax.axhline(0.95, color="red",    linestyle="--", lw=1.5, label="95% varianza")
     ax.axhline(0.99, color="orange", linestyle="--", lw=1.5, label="99% varianza")
-    idx_95 = int(np.argmax(cumvar >= 0.95))
-    ax.axvline(idx_95 + 1, color="red", lw=1, linestyle=":")
-    ax.annotate(f"d={idx_95+1}", xy=(idx_95+1, cumvar[idx_95]),
-                xytext=(idx_95+3, cumvar[idx_95] - 0.05), fontsize=10)
+    has_95 = np.any(cumvar >= 0.95)
+    if has_95:
+        idx_95 = int(np.argmax(cumvar >= 0.95))
+        ax.axvline(idx_95 + 1, color="red", lw=1, linestyle=":")
+        ax.annotate(f"d={idx_95+1}", xy=(idx_95+1, cumvar[idx_95]),
+                    xytext=(idx_95+3, cumvar[idx_95] - 0.05), fontsize=10)
     ax.set_xlabel("Número de componentes")
     ax.set_ylabel("Varianza explicada acumulada")
     ax.set_title("PCA — varianza explicada")
@@ -341,7 +350,10 @@ def plot_pca_variance(X, n_components: int = None) -> None:
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "pca_variance.png", dpi=150)
     plt.close(fig)
-    print(f"    pca_variance.png guardado  (d para 95%: {idx_95+1})")
+    if has_95:
+        print(f"    pca_variance.png guardado  (d para 95%: {idx_95+1})")
+    else:
+        print(f"    pca_variance.png guardado  (no se alcanza 95% de varianza)")
 
 
 def plot_umap(X, labels=None, model_name: str = "UMAP") -> None:
@@ -497,8 +509,10 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
     ax.plot(range(1, len(cumvar) + 1), cumvar * 100, "b-o", lw=2, markersize=4)
     ax.axhline(95, color="red",    linestyle="--", lw=1.5, label="95%")
     ax.axhline(99, color="orange", linestyle="--", lw=1.5, label="99%")
-    idx_95 = int(np.argmax(cumvar >= 0.95))
-    ax.axvline(idx_95 + 1, color="red", lw=1, linestyle=":")
+    has_95 = np.any(cumvar >= 0.95)
+    if has_95:
+        idx_95 = int(np.argmax(cumvar >= 0.95))
+        ax.axvline(idx_95 + 1, color="red", lw=1, linestyle=":")
     ax.set_xlabel("Componentes")
     ax.set_ylabel("Varianza acumulada (%)")
     ax.set_title("PCA — varianza explicada")
@@ -507,7 +521,10 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "pca_variance.png", dpi=150)
     plt.close(fig)
-    print(f"    pca_variance.png guardado  (95% con d={idx_95+1})")
+    if has_95:
+        print(f"    pca_variance.png guardado  (95% con d={idx_95+1})")
+    else:
+        print(f"    pca_variance.png guardado  (no se alcanza 95% de varianza)")
 
 
 def plot_training_history(train_losses, val_losses=None, train_accs=None,
@@ -663,10 +680,12 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
     ax2.plot(range(1, n + 1), cumvar * 100, "b-o", lw=2, markersize=4)
     ax2.axhline(95, color="red",    linestyle="--", lw=1.5, label="95%")
     ax2.axhline(99, color="orange", linestyle="--", lw=1.5, label="99%")
-    idx_95 = int(np.argmax(cumvar >= 0.95))
-    ax2.axvline(idx_95 + 1, color="red", lw=1, linestyle=":")
-    ax2.annotate(f"d={idx_95+1}", xy=(idx_95+1, cumvar[idx_95]*100),
-                 xytext=(idx_95+2, cumvar[idx_95]*100 - 5), fontsize=9, color="red")
+    has_95 = np.any(cumvar >= 0.95)
+    if has_95:
+        idx_95 = int(np.argmax(cumvar >= 0.95))
+        ax2.axvline(idx_95 + 1, color="red", lw=1, linestyle=":")
+        ax2.annotate(f"d={idx_95+1}", xy=(idx_95+1, cumvar[idx_95]*100),
+                     xytext=(idx_95+2, cumvar[idx_95]*100 - 5), fontsize=9, color="red")
     ax2.set_xlabel("Componentes")
     ax2.set_ylabel("Varianza acumulada (%)")
     ax2.set_title("Varianza acumulada")
@@ -676,7 +695,10 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "pca_variance.png", dpi=150)
     plt.close(fig)
-    print(f"    pca_variance.png guardado  (95% con d={idx_95+1})")
+    if has_95:
+        print(f"    pca_variance.png guardado  (95% con d={idx_95+1})")
+    else:
+        print(f"    pca_variance.png guardado  (no se alcanza 95% de varianza)")
 
 
 def plot_umap(X, labels=None, model_name: str = "UMAP") -> None:

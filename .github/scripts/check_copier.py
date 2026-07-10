@@ -14,6 +14,10 @@ except Exception as e:
     print(f"ERROR: copier.yml no es YAML válido: {e}")
     sys.exit(1)
 
+if not isinstance(cfg, dict):
+    print("ERROR: copier.yml está vacío o no es un diccionario YAML válido")
+    sys.exit(1)
+
 REQUIRED = [
     "project_name", "project_slug", "project_author_name", "project_author_email",
     "ml_type", "task_type", "nn_model", "optimizer_type", "nn_loss_fn",

@@ -84,14 +84,14 @@ class ValidateTool:
                 entry["statistic"] = float(stat)
                 entry["pvalue"] = float(p)
             else:
-                ref_counts = ref.value_counts(normalize=True)
-                cur_counts = cur.value_counts(normalize=True)
+                ref_counts = ref.value_counts(normalize=False)
+                cur_counts = cur.value_counts(normalize=False)
                 all_cats = list(set(ref_counts.index) | set(cur_counts.index))
-                ref_props = [ref_counts.get(c, 0) for c in all_cats]
-                cur_props = [cur_counts.get(c, 0) for c in all_cats]
+                ref_freq = [ref_counts.get(c, 0) for c in all_cats]
+                cur_freq = [cur_counts.get(c, 0) for c in all_cats]
                 if len(all_cats) < 2:
                     continue
-                _, p = _stats.chisquare(cur_props, f_exp=ref_props)
+                _, p = _stats.chisquare(cur_freq, f_exp=ref_freq)
                 entry["test"] = "chisquare"
                 entry["pvalue"] = float(p)
             entry["drift"] = entry["pvalue"] < threshold

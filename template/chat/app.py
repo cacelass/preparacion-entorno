@@ -207,11 +207,8 @@ def predict_one(features: dict[str, Any]) -> dict[str, Any]:
 {% elif ml_type == 'no_supervisado' %}
     model_name = list(_state["models"].keys())[0]
     model      = _state["models"][model_name]
-    # AgglomerativeClustering y DBSCAN no tienen .predict(); usamos fit_predict
     if hasattr(model, "predict"):
         cluster = int(model.predict(X)[0])
-    elif hasattr(model, "fit_predict"):
-        cluster = int(model.fit_predict(X)[0])
     else:
         return {"error": f"El modelo '{model_name}' no soporta prediccion en nuevos datos."}
     return {"cluster": cluster, "model": model_name}

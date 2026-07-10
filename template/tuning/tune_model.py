@@ -29,7 +29,6 @@ import optuna
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import StandardScaler
 
 from {{ project_slug }}.utils.paths import ARTIFACTS_DIR, REPORTS_DIR
 
@@ -455,7 +454,6 @@ def _objective_nn(trial, X_train, y_train, input_dim: int, output_dim: int):
 _OBJECTIVES = {"{{ nn_model }}": _objective_nn}
 
 {% elif ml_type == "no_supervisado" %}
-
 def _objective_kmeans(trial, X):
     from sklearn.cluster import KMeans
     from sklearn.metrics import silhouette_score
@@ -472,8 +470,7 @@ _OBJECTIVES = {
 {% endif %}
 }
 
-{% endif %}
-
+{% endif %}  {# end ml_type branches #}
 
 # ---------------------------------------------------------------------------
 # Motor principal de tuning

@@ -55,6 +55,7 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 | `use_mlflow` | Tracking de experimentos, artifacts y Model Registry | `make mlflow` |
 | `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
 | `use_docker` | Docker + interfaz de chat Gradio | `make chat` |
+| `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | automático |
 | `use_shap` | SHAP values — importancia de features | automático |
 | `use_xgboost` | XGBoost (supervisado/híbrido) | automático |
 | `use_lightgbm` | LightGBM (supervisado/híbrido) | automático |
@@ -125,6 +126,7 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `use_lightgbm` | true/false | supervisado, hibrido | Añade LightGBM |
 | `use_catboost` | true/false | supervisado, hibrido | Añade CatBoost |
 | `use_shap` | true/false | supervisado, hibrido | SHAP values |
+| `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | siempre | Grafo de conocimiento + vault Obsidian opcional |
 | `use_mlflow` | true/false | siempre | MLflow tracking |
 | `use_monitoring` | true/false | siempre | Drift + performance monitoring |
 | `use_optuna` | true/false | siempre | HPO con Optuna |
@@ -190,6 +192,16 @@ nombre_proyecto/
 │   └── monitor.py                ← check_drift, check_performance, run_monitoring
 ├── chat/                         ← (use_docker=true)
 │   └── app.py                    ← interfaz Gradio conectada al modelo
+├── vault/                        ← (graphify_mode = "graphify + obsidian vault")
+│   ├── .obsidian/                ← configuración del vault
+│   ├── 00_META/                  ← templates + índice
+│   ├── 01_PROYECTO/
+│   ├── 02_DATOS/
+│   ├── 03_MODELOS/
+│   ├── 04_VISUALIZACIONES/
+│   ├── 05_AGENTES/
+│   ├── 06_OBSERVACIONES/
+│   └── 07_REFERENCIAS/
 ├── agents/                       ← agentes especializados, docs y utilidades de release
 │   ├── README.md                 ← guía completa del sistema de agentes
 │   ├── agents/                   ← agentes concretos: git, docs, test, api...

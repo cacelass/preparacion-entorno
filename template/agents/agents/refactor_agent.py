@@ -66,30 +66,48 @@ class RefactorAgent(BaseAgent):
             except (SyntaxError, UnicodeDecodeError):
                 continue
 
-            new_source = source
+            new_lines = source.splitlines(keepends=True)
+            modified = False
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
-                for i, arg in enumerate(node.args.args + node.args.kwonlyargs):
-                    default_idx = i - len(node.args.args) - len(node.args.kwonlyargs)
-                    if default_idx >= 0:
+                n_args = len(node.args.args)
+                for i, default in enumerate(node.args.defaults):
+                    if not isinstance(default, (ast.List, ast.Dict, ast.Set)):
                         continue
-                    if i < len(node.args.defaults):
-                        default = node.args.defaults[i]
-                        if isinstance(default, (ast.List, ast.Dict, ast.Set)):
-                            lineno = default.lineno
-                            col = default.col_offset
-                            end_lineno = default.end_lineno or lineno
-                            end_col = default.end_col_offset or (col + 1)
+                    arg_idx = n_args - len(node.args.defaults) + i
+                    if arg_idx < 0:
+                        continue
+                    arg_name = node.args.args[arg_idx].arg
+                    start_line = default.lineno - 1
+                    end_line = (default.end_lineno or default.lineno) - 1
+                    default_text = source[default.col_offset:(default.end_col_offset or default.col_offset + 1)]
+                    if start_line == end_line:
+                        line = new_lines[start_line]
+                        new_lines[start_line] = line.replace(default_text, "None", 1)
+                    else:
+                        lines_content = new_lines[start_line:end_line + 1]
+                        full_text = "".join(lines_content)
+                        col = default.col_offset
+                        eoc = default.end_col_offset or (col + 1)
+                        new_full = full_text[:col] + "None" + full_text[eoc:]
+                        new_lines[start_line:end_line + 1] = [new_full]
+                    # add guard after signature
+                    body_start = node.body[0].lineno - 1
+                    indent = " " * (node.col_offset + 4)
+                    guard = f"{indent}if {arg_name} is None:\n{indent}    {arg_name} = {default_text}\n"
+                    new_lines.insert(body_start, guard)
+                    modified = True
 
-                            lines = new_source.splitlines(keepends=True)
-                            # Marcar para reemplazo
-                            changes.append(self._apply_and_commit(
-                                path, "", "", "mutable_default"
-                            ))
-
-            if not dry_run and changes:
-                pass  # cada fix individual necesita edición precisa
+            new_source = "".join(new_lines)
+            if new_source != source:
+                if not dry_run:
+                    path.write_text(new_source, encoding="utf-8")
+                changes.append({
+                    "file": str(path.relative_to(self.ctx.root)),
+                    "kind": "mutable_default",
+                    "changed": True,
+                })
 
         return AgentResult(
             True, self.name, "fix_mutable_defaults",
@@ -124,7 +142,8 @@ class RefactorAgent(BaseAgent):
 
                 old_line = line.rstrip("\n")
                 new_line = f"{indent}except Exception:\n"
-                new_source = new_source.replace(old_line, new_line.rstrip("\n"))
+                lines[lineno - 1] = new_line
+                new_source = "".join(lines)
 
             if new_source != source and not dry_run:
                 path.write_text(new_source, encoding="utf-8")
@@ -167,7 +186,8 @@ class RefactorAgent(BaseAgent):
 
                 old_line = line.rstrip("\n")
                 new_line = old_line[:colon_pos] + " -> None" + old_line[colon_pos:]
-                new_source = new_source.replace(old_line, new_line)
+                lines[def_line - 1] = new_line
+                new_source = "".join(lines)
 
             if new_source != source and not dry_run:
                 path.write_text(new_source, encoding="utf-8")

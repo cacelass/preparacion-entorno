@@ -52,6 +52,10 @@ class PredictResponse(BaseModel):
         None,
         description="Probabilidad de la clase predicha (softmax)",
     )
+    label: str | None = Field(
+        None,
+        description="Etiqueta original de la clase (si se usó LabelEncoder)",
+    )
 {% endif %}
     model_name: str = Field(..., description="Arquitectura de red usada")
 {% endif %}

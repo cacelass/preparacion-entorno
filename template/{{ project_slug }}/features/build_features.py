@@ -286,11 +286,17 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
     for col in cat_cols:
         if col in encoders:
-            # Usar el mismo encoder del entrenamiento → mismo mapping de clases
             le = encoders[col]
-            df_new[col] = le.transform(df_new[col].astype(str))
+            try:
+                df_new[col] = le.transform(df_new[col].astype(str))
+            except ValueError:
+                unseen = set(df_new[col].astype(str)) - set(le.classes_)
+                print(f"  ⚠ Categorías no vistas en '{col}': {unseen}. Asignando '{le.classes_[0]}'.")
+                df_new[col] = df_new[col].astype(str).map(
+                    lambda x: x if x in le.classes_ else le.classes_[0]
+                )
+                df_new[col] = le.transform(df_new[col].astype(str))
         else:
-            # Fallback: re-fit (puede diferir del entrenamiento si hay categorías nuevas)
             le = LabelEncoder()
             df_new[col] = le.fit_transform(df_new[col].astype(str))
 
@@ -426,7 +432,16 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
     # Codificar categóricas con encoders guardados del entrenamiento
     for col in cat_cols:
         if col in encoders:
-            df[col] = encoders[col].transform(df[col].astype(str))
+            try:
+                df[col] = encoders[col].transform(df[col].astype(str))
+            except ValueError:
+                le = encoders[col]
+                unseen = set(df[col].astype(str)) - set(le.classes_)
+                print(f"  ⚠ Categorías no vistas en '{col}': {unseen}. Asignando '{le.classes_[0]}'.")
+                df[col] = df[col].astype(str).map(
+                    lambda x: x if x in le.classes_ else le.classes_[0]
+                )
+                df[col] = le.transform(df[col].astype(str))
         else:
             le = LabelEncoder()
             df[col] = le.fit_transform(df[col].astype(str))
@@ -557,18 +572,33 @@ def process_input(df_new: pd.DataFrame) -> "np.ndarray":
     encoders = joblib.load(ARTIFACTS_DIR / "encoders.joblib") if (ARTIFACTS_DIR / "encoders.joblib").exists() else {}
 
     df_new = df_new.copy()
-    df_new = _apply_logcols(df_new, LOGCOLS)
 
     cat_cols = df_new.select_dtypes(exclude=[np.number]).columns
+    num_cols = df_new.select_dtypes(include=[np.number]).columns
+
+    for col in cat_cols:
+        df_new[col] = df_new[col].fillna(df_new[col].mode()[0])
+
+    df_new[num_cols] = df_new[num_cols].fillna(df_new[num_cols].mean())
+
+    df_new = _apply_logcols(df_new, LOGCOLS)
+
     for col in cat_cols:
         if col in encoders:
-            df_new[col] = encoders[col].transform(df_new[col].astype(str))
+            try:
+                df_new[col] = encoders[col].transform(df_new[col].astype(str))
+            except ValueError:
+                le = encoders[col]
+                unseen = set(df_new[col].astype(str)) - set(le.classes_)
+                print(f"  ⚠ Categorías no vistas en '{col}': {unseen}. Asignando '{le.classes_[0]}'.")
+                df_new[col] = df_new[col].astype(str).map(
+                    lambda x: x if x in le.classes_ else le.classes_[0]
+                )
+                df_new[col] = le.transform(df_new[col].astype(str))
         else:
             le = LabelEncoder()
             df_new[col] = le.fit_transform(df_new[col].astype(str))
 
-    num_cols = df_new.select_dtypes(include=[np.number]).columns
-    df_new[num_cols] = df_new[num_cols].fillna(df_new[num_cols].mean())
     X = scaler.transform(df_new)
     pca_path = ARTIFACTS_DIR / "pca.joblib"
     if pca_path.exists():
@@ -910,11 +940,24 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
 
     df = _apply_logcols(df, LOGCOLS)
 
+    # Imputar nulos en categóricas antes de codificar
+    cat_cols = df.select_dtypes(include=["object", "category"]).columns
+    for col in cat_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else "desconocido")
+
     for col, le in encoders.items():
         if col == "__target__":
             continue
         if col in df.columns:
-            df[col] = le.transform(df[col].astype(str))
+            try:
+                df[col] = le.transform(df[col].astype(str))
+            except ValueError:
+                unseen = set(df[col].astype(str)) - set(le.classes_)
+                print(f"  ⚠ Categorías no vistas en '{col}': {unseen}. Asignando '{le.classes_[0]}'.")
+                df[col] = df[col].astype(str).map(
+                    lambda x: x if x in le.classes_ else le.classes_[0]
+                )
+                df[col] = le.transform(df[col].astype(str))
 
     X_scaled = scaler.transform(df).astype(np.float32)
 

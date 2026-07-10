@@ -58,7 +58,9 @@ def parse_dependency_name(spec: str) -> str:
     spec = spec.split(";")[0].strip()  # descarta markers de entorno (; python_version >= "3.10")
     spec = spec.split("[")[0]  # descarta extras: paquete[extra]
     match = _DEPENDENCY_SPEC_RE.match(spec)
-    return normalize_package_name(match.group(1) if match else spec.strip())
+    if not match:
+        raise ValueError(f"No se pudo extraer nombre de paquete de: '{spec}'")
+    return normalize_package_name(match.group(1))
 
 
 def parse_pyproject_dependencies(pyproject_text: str) -> list[str]:

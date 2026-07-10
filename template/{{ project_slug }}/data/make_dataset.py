@@ -235,7 +235,12 @@ def download_data(url: str, filename: str, params: dict | None = None, api_key_e
     resp.raise_for_status()
 
     file_path = RAW_DATA_DIR / filename
-    df = pd.DataFrame(resp.json())  # o pd.read_csv si la API devuelve CSV
+    content_type = resp.headers.get("Content-Type", "")
+    if "json" in content_type:
+        df = pd.DataFrame(resp.json())
+    else:
+        import io
+        df = pd.read_csv(io.StringIO(resp.text))
     df.to_csv(file_path, index=False)
     print(f"    Guardado en {file_path} — Shape: {df.shape}")
     return df

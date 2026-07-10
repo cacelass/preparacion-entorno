@@ -40,18 +40,28 @@ BASE = {
     "use_lightgbm": False,
     "use_catboost": False,
     "use_monitoring": False,
+    "graphify_mode": "no",
 }
 
 # Parsear argumentos de la forma "key=val key=val"
-raw = " ".join(sys.argv[1:])
 overrides: dict = {}
-for token in raw.split():
+VALID_KEYS = {"ml_type", "task_type", "model_type", "cluster_model", "nn_model",
+              "optimizer_type", "nn_loss_fn", "use_mlflow", "use_optuna", "use_duckdb",
+              "use_api", "use_docker", "use_shap", "use_xgboost", "use_lightgbm",
+               "use_catboost", "use_monitoring", "graphify_mode", "project_slug", "project_name",
+              "project_author_name", "project_author_email", "project_description",
+              "project_open_source_license", "python_version", "project_version"}
+
+for token in sys.argv[1:]:
     if "=" in token:
         k, v = token.split("=", 1)
+        if k not in VALID_KEYS:
+            print(f"AVISO: clave desconocida '{k}' será ignorada")
+            continue
         # Convertir booleanos
-        if v.lower() == "true":
+        if v.lower() in ("true", "yes", "on", "1"):
             v = True
-        elif v.lower() == "false":
+        elif v.lower() in ("false", "no", "off", "0"):
             v = False
         overrides[k] = v
 

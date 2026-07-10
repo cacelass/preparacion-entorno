@@ -5,6 +5,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.9.1] — 2026-07-10
+
+### Obsidian Vault + Graphify
+
+- `use_graphify` y `use_obsidian` fusionadas en una sola variable `graphify_mode` con opciones: `no` · `solo graphify` · `graphify + obsidian vault`.
+- Cuando se elige `graphify + obsidian vault`, se genera `vault/` con estructura por dominios (00_META..07_REFERENCIAS), plantillas Obsidian en `00_META/templates/`, índice con wikilinks, y configuración `.obsidian/`.
+- Las plantillas usan `{% raw %}...{% endraw %}` para evitar colisión entre Jinja2 y `{{title}}`/`{{date}}` de Obsidian.
+- `_tasks` valida que graphify se importa correctamente cuando `graphify_mode != "no"`.
+
+### Bugfixes
+
+- `template/.copier-answers.yml` eliminado — pisaba el archivo que Copier genera automáticamente, dejándolo vacío.
+- `test_agent.py`: `{{exc}}` escapado con `{% raw %}` para Jinja2.
+- `check_copier.py`, `write_data_file.py`, `validate_template.py`: sincronizados con `use_obsidian` y `use_graphify`.
+- Dockerfile, docker-compose.yml, .dockerignore movidos de raíz a `template/` (Copier nunca los procesaba por `_subdirectory: template`).
+
+---
+
 ## [1.9.0] — 2026-07-06
 
 ### Sistema de agentes y release automático

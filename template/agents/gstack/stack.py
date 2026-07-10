@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -176,7 +176,7 @@ class GStack:
             log_dir = self._ctx.agent_workspace("gstack")
             log_path = log_dir / "events.jsonl"
             entry = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "index": index,
                 "agent": step.agent,
                 "action": step.action,
@@ -184,7 +184,7 @@ class GStack:
                 "message": result.message,
                 "warnings": result.warnings,
             }
-            with open(log_path, "a") as f:
+            with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception:
             pass
@@ -198,7 +198,8 @@ class GStack:
             changed = git.changed_files(staged=False)
             if not changed:
                 return
-            git.add("-A")
+            for f in changed:
+                git.add(str(f))
             if step.auto_commit_message:
                 msg = step.auto_commit_message
             else:

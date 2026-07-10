@@ -24,7 +24,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -152,21 +151,28 @@ def check_performance(
 
     if baseline_path.exists():
         baseline = json.loads(baseline_path.read_text())
-        delta = {
-            name: round(current[name] - baseline.get(name, current[name]), 4)
-            for name in current
-        }
+        delta = {}
+        for name in current:
+            if name in baseline:
+                delta[name] = round(current[name] - baseline[name], 4)
+            else:
+                delta[name] = None
         print(f"\n  {'Métrica':<15} {'Actual':>10} {'Baseline':>10} {'Delta':>10}")
         print(f"  {'-'*47}")
         for name in current:
             d = delta[name]
+            d_str = f"{d:>+10.4f}" if d is not None else "      N/A"
+            b_str = f"{baseline[name]:>10.4f}" if name in baseline else "      N/A"
+            if d is not None:
 {% if task_type == "clasificacion" %}
-            flag = " ⚠" if d < -0.05 else ""
+                flag = " ⚠" if d < -0.05 else ""
 {% else %}
-            flag = " ⚠" if name in ("rmse", "mae") and d > 0.05 * abs(baseline.get(name, 1)) else ""
-            flag = flag or (" ⚠" if name == "r2" and d < -0.05 else "")
+                flag = " ⚠" if name in ("rmse", "mae") and d > 0.05 * abs(baseline.get(name, 1)) else ""
+                flag = flag or (" ⚠" if name == "r2" and d < -0.05 else "")
 {% endif %}
-            print(f"  {name:<15} {current[name]:>10.4f} {baseline.get(name, 'N/A'):>10} {d:>+10.4f}{flag}")
+            else:
+                flag = ""
+            print(f"  {name:<15} {current[name]:>10.4f} {b_str:>10} {d_str:>10}{flag}")
         result = {"current": current, "baseline": baseline, "delta": delta}
     else:
         print("\n  Baseline no encontrado. Guardando métricas actuales como baseline...")
@@ -289,6 +295,9 @@ def run_monitoring(
     # Drift detection
     print(f"\n  Analizando drift (threshold p < {threshold})...")
     drift_df = check_drift(reference, current, threshold=threshold)
+    if drift_df.empty or "drift_detected" not in drift_df.columns:
+        print("  No se detectaron features comunes para análisis de drift.")
+        return
     n_drift  = int(drift_df["drift_detected"].sum())
     print(f"  Features analizadas: {len(drift_df)}")
     print(f"  Features con drift:  {n_drift}")

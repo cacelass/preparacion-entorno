@@ -33,6 +33,7 @@ DEFAULTS = dict(
     use_optuna=False, use_duckdb=False, use_api=False, use_docker=False,
     use_shap=False, use_xgboost=False, use_lightgbm=False,
     use_catboost=False, use_monitoring=False,
+    graphify_mode="no",
 )
 
 COMBOS: list[tuple[str, dict]] = [
@@ -103,7 +104,7 @@ print()
 for label, combo in COMBOS:
     ctx = {**STD, **DEFAULTS, **combo}
     for rel in ALL_FILES:
-        raw = (BASE / rel).read_text(errors="ignore")
+        raw = (BASE / rel).read_text(errors="replace")
         try:
             rendered = env.from_string(raw).render(**ctx)
         except UndefinedError as exc:
@@ -126,9 +127,9 @@ for label, combo in COMBOS:
                 lines = rendered.splitlines()
                 ln = exc.lineno or 1
                 snippet = "\n".join(
-                    f"    {ln+i-2}: {lines[max(0,ln+i-3)]}"
+                    f"    {ln+i-1}: {lines[ln+i-1]}"
                     for i in range(6)
-                    if 0 <= ln+i-3 < len(lines)
+                    if ln+i-1 < len(lines)
                 )
                 msg = f"PY_SYNTAX L{ln}: {exc.msg}\n{snippet}"
                 bugs.append((label, rel, msg))

@@ -425,17 +425,19 @@ class DataAgent(BaseAgent):
             n_plots = min(len(num_cols), 9)
             fig, axes = plt.subplots(n_plots, 2, figsize=(14, 3 * n_plots))
             if n_plots == 1:
-                axes = [axes]
+                axes_2d = axes.reshape(1, 2)
+            else:
+                axes_2d = axes
             for i, col in enumerate(num_cols[:n_plots]):
-                ax_hist = axes[i][0] if n_plots > 1 else axes[0]
-                ax_box  = axes[i][1] if n_plots > 1 else axes[1]
+                ax_hist = axes_2d[i, 0]
+                ax_box  = axes_2d[i, 1]
                 sns.histplot(df[col].dropna(), kde=True, ax=ax_hist)
                 ax_hist.set_title(f"{col} — Histograma")
                 sns.boxplot(y=df[col].dropna(), ax=ax_box)
                 ax_box.set_title(f"{col} — Boxplot")
             for j in range(i + 1, n_plots):
-                fig.delaxes(axes[j][0] if n_plots > 1 else axes[j])
-                fig.delaxes(axes[j][1] if n_plots > 1 else axes[j])
+                fig.delaxes(axes_2d[j, 0])
+                fig.delaxes(axes_2d[j, 1])
             fig.tight_layout()
             dist_path = out_dir / f"{path.stem}_distributions.png"
             fig.savefig(dist_path, dpi=100, bbox_inches="tight")

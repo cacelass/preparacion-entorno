@@ -1,5 +1,5 @@
 .PHONY: setup install-deps \
-        data features train predict \
+        data features train predict pipeline \
         test smoke lint format lock \
         lab notebook tb \
         docs \
