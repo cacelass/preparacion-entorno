@@ -67,7 +67,6 @@ class RefactorAgent(BaseAgent):
                 continue
 
             new_lines = source.splitlines(keepends=True)
-            modified = False
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
@@ -97,7 +96,6 @@ class RefactorAgent(BaseAgent):
                     indent = " " * (node.col_offset + 4)
                     guard = f"{indent}if {arg_name} is None:\n{indent}    {arg_name} = {default_text}\n"
                     new_lines.insert(body_start, guard)
-                    modified = True
 
             new_source = "".join(new_lines)
             if new_source != source:
@@ -140,7 +138,6 @@ class RefactorAgent(BaseAgent):
                 line = lines[lineno - 1]
                 indent = line[:len(line) - len(line.lstrip())]
 
-                old_line = line.rstrip("\n")
                 new_line = f"{indent}except Exception:\n"
                 lines[lineno - 1] = new_line
                 new_source = "".join(lines)

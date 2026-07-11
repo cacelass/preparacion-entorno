@@ -71,12 +71,10 @@ def run_full_pipeline() -> None:
 
 {% if use_optuna %}
     step_eval = 6
-    step_shap = 7
     step_imp  = 8
     step_pca  = 9
 {% else %}
     step_eval = 5
-    step_shap = 6
     step_imp  = 7
     step_pca  = 8
 {% endif %}
@@ -99,6 +97,7 @@ def run_full_pipeline() -> None:
         feature_names = [f'feature_{i}' for i in range(X_train.shape[1])]
 
 {% if use_shap %}
+    step_shap = {% if use_optuna %}7{% else %}6{% endif %}
     print(f'\n{step_shap}. SHAP — explicabilidad de modelos...')
     from {{ project_slug }}.models.predict_model import explain_models
     explain_models(models, X_train, feature_names=feature_names)

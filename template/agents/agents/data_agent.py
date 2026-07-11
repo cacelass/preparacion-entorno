@@ -331,7 +331,6 @@ class DataAgent(BaseAgent):
         if len(num_cols) >= 2:
             for i, c1 in enumerate(num_cols[:10]):
                 for c2 in num_cols[i + 1:10]:
-                    pair = (c1, c2)
                     clean = df[[c1, c2]].dropna()
                     if len(clean) >= 10:
                         corr = StatsTool.correlation(clean[c1].values, clean[c2].values)
