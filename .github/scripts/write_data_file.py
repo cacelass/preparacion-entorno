@@ -59,8 +59,10 @@ for token in raw.split():
         if k not in VALID_KEYS:
             print(f"AVISO: clave desconocida '{k}' será ignorada")
             continue
-        # Convertir booleanos
-        if v.lower() in ("true", "yes", "on", "1"):
+        # Convertir booleanos (excepto campos que son strings enum)
+        if k in ("graphify_mode",):
+            pass  # mantener como string
+        elif v.lower() in ("true", "yes", "on", "1"):
             v = True
         elif v.lower() in ("false", "no", "off", "0"):
             v = False
