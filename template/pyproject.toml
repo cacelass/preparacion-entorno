@@ -157,7 +157,7 @@ markers   = [
 ]
 
 [tool.ruff]
-line-length = 120
+line-length = 165
 target-version = "{{ 'py' + python_version | replace('.', '') }}"
 exclude = [
     "notebooks/",
