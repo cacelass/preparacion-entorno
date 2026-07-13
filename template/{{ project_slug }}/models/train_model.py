@@ -334,13 +334,13 @@ def _build_models() -> dict:
 {% if model_type == "todos" or model_type == "AdaBoost" %}
 {% if use_optuna %}
     models["AdaBoost"] = AdaBoostClassifier(**{
-        "n_estimators": 200, "learning_rate": 0.1, "algorithm": "SAMME.R",
+        "n_estimators": 200, "learning_rate": 0.1,
         "random_state": 42,
         **_best.get("AdaBoost", {}),
     })
 {% else %}
     models["AdaBoost"] = AdaBoostClassifier(
-        n_estimators=200, learning_rate=0.1, algorithm="SAMME.R",
+        n_estimators=200, learning_rate=0.1,
         random_state=42,
     )
 {% endif %}
