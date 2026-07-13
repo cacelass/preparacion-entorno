@@ -12,14 +12,14 @@
 | LogisticRegression | ✅ | ❌ | ✅✅ | ⚠️ | ✅ | ✅ | |
 | KNN | ❌ | ✅ | ❌ | ⚠️ | ❌ | ❌ | |
 | DecisionTree | ❌ | ✅ | ✅✅ | ✅ | ❌ | ✅ | |
-| SVM (RBF) | ❌ | ✅ | ❌ | ⚠️ | ✅ | ❌ | Cortes & Vapnik 1995 |
-| RandomForest | ❌ | ✅ | ⚠️ | ✅ | ✅ | ✅ | Breiman 2001 |
-| ExtraTrees | ❌ | ✅ | ⚠️ | ✅ | ✅ | ✅ | Geurts et al. 2006 |
-| GradientBoosting | ❌ | ✅ | ❌ | ⚠️ | ✅ | ⚠️ | Friedman 2001 |
-| AdaBoost | ❌ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | Freund & Schapire 1997 |
-| XGBoost | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | Chen & Guestrin 2016 |
-| LightGBM | ❌ | ✅ | ❌ | ✅ | ✅ | ✅✅ | Ke et al. 2017 |
-| CatBoost | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | Prokhorenkova et al. 2018 |
+| SVM (RBF) | ❌ | ✅ | ❌ | ⚠️ | ✅ | ❌ | [[07_REFERENCIAS/svm\|Cortes & Vapnik 1995]] |
+| RandomForest | ❌ | ✅ | ⚠️ | ✅ | ✅ | ✅ | [[07_REFERENCIAS/random_forest\|Breiman 2001]] |
+| ExtraTrees | ❌ | ✅ | ⚠️ | ✅ | ✅ | ✅ | [[07_REFERENCIAS/extra_trees\|Geurts et al. 2006]] |
+| GradientBoosting | ❌ | ✅ | ❌ | ⚠️ | ✅ | ⚠️ | [[07_REFERENCIAS/gradient_boosting\|Friedman 2001]] |
+| AdaBoost | ❌ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | [[07_REFERENCIAS/adaboost\|Freund & Schapire 1997]] |
+| XGBoost | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | [[07_REFERENCIAS/xgboost\|Chen & Guestrin 2016]] |
+| LightGBM | ❌ | ✅ | ❌ | ✅ | ✅ | ✅✅ | [[07_REFERENCIAS/lightgbm\|Ke et al. 2017]] |
+| CatBoost | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | [[07_REFERENCIAS/catboost\|Prokhorenkova et al. 2018]] |
 
 **Legend:** ✅=bueno / ⚠️=moderado / ❌=malo
 
@@ -27,12 +27,12 @@
 
 | Modelo | Forma clusters | Escalable | n_clusters | Outliers | Paper |
 |--------|---------------|-----------|------------|----------|-------|
-| KMeans | Esféricos | ✅ | Requerido | ❌ | Lloyd 1982 |
+| KMeans | Esféricos | ✅ | Requerido | ❌ | [[07_REFERENCIAS/kmeans\|Lloyd 1982]] |
 | Agglomerative | Cualquiera (con linkage) | ⚠️ | Requerido | ❌ | |
-| DBSCAN | Arbitraria | ⚠️ | No requerido | ✅ | Ester et al. 1996 |
+| DBSCAN | Arbitraria | ⚠️ | No requerido | ✅ | [[07_REFERENCIAS/dbscan\|Ester et al. 1996]] |
 | GaussianMixture | Elipsoidal | ⚠️ | Requerido | ⚠️ | |
-| SpectralClustering | No convexa | ❌ | Requerido | ❌ | |
-| Birch | Esféricos | ✅ | Opcional | ⚠️ | Zhang et al. 1996 |
+| SpectralClustering | No convexa | ❌ | Requerido | ❌ | [[07_REFERENCIAS/spectral_clustering\|Ng et al. 2001]] |
+| Birch | Esféricos | ✅ | Opcional | ⚠️ | [[07_REFERENCIAS/birch\|Zhang et al. 1996]] |
 
 ## Redes neuronales
 
@@ -40,10 +40,10 @@
 |--------|---------|------------|------------|-----------|-------|
 | MLP | ✅✅ | ❌ | Altos | ⚠️ | |
 | CNN1D | ⚠️ | ✅(locales) | Medios | ✅ | |
-| LSTM | ❌ | ✅✅(largas) | Altos | ❌ | Hochreiter & Schmidhuber 1997 |
-| GRU | ❌ | ✅(largas) | Medios | ⚠️ | Cho et al. 2014 |
-| Transformer | ⚠️ | ✅✅(globales) | Muy altos | ❌ | Vaswani et al. 2017 |
-| ResNet | ✅ | ❌ | Altos | ⚠️ | He et al. 2016 |
+| LSTM | ❌ | ✅✅(largas) | Altos | ❌ | [[07_REFERENCIAS/lstm\|Hochreiter & Schmidhuber 1997]] |
+| GRU | ❌ | ✅(largas) | Medios | ⚠️ | [[07_REFERENCIAS/gru\|Cho et al. 2014]] |
+| Transformer | ⚠️ | ✅✅(globales) | Muy altos | ❌ | [[07_REFERENCIAS/transformer\|Vaswani et al. 2017]] |
+| ResNet | ✅ | ❌ | Altos | ⚠️ | [[07_REFERENCIAS/resnet\|He et al. 2016]] |
 
 ## Reglas prácticas
 

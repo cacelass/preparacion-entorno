@@ -24,6 +24,10 @@ Ver [[02_DATOS/features.md|Features]] para la documentación detallada de featur
 ## Decisiones de diseño
 
 
+## Papers de referencia
+
+Cada modelo tiene su ficha en [[07_REFERENCIAS/|07_REFERENCIAS/]] con el paper original, DOI y enlaces.
+
 ## Pendiente
 
 - [ ]
