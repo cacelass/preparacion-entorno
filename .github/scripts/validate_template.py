@@ -15,6 +15,11 @@ try:
 except ImportError:
     sys.exit("ERROR: pip install jinja2")
 
+try:
+    from jinja2_time import TimeExtension
+except ImportError:
+    TimeExtension = None
+
 BASE = Path(__file__).parent.parent.parent / "template"
 
 if not BASE.exists():
@@ -92,7 +97,10 @@ ALL_FILES = sorted([
     and ".DS_Store" not in str(f)
 ])
 
-env = Environment(loader=BaseLoader(), undefined=StrictUndefined, keep_trailing_newline=True)
+env = Environment(
+    loader=BaseLoader(), undefined=StrictUndefined, keep_trailing_newline=True,
+    extensions=["jinja2_time.TimeExtension"] if TimeExtension else [],
+)
 bugs: list[tuple[str, str, str]] = []
 
 print(f"BASE         : {BASE}")

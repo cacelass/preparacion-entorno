@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias de validación
-        run: pip install jinja2 pyyaml
+        run: pip install jinja2 pyyaml jinja2-time
 
       - name: Validar copier.yml
         run: python .github/scripts/check_copier.py
