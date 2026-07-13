@@ -92,7 +92,10 @@ def _inspect_agent_class(node: ast.ClassDef) -> tuple[str | None, list[str]]:
             warnings.append(f"La clase no define '{expected}' como atributo de clase (se esperaba, como en BaseAgent).")
     method_names = {n.name for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
     if "actions" not in method_names:
-        warnings.append("La clase no define un método 'actions()' — no se podrá despachar ninguna acción por CLI/Orchestrator.")
+        warnings.append(
+            "La clase no define un método 'actions()'"
+            " — no se podrá despachar ninguna acción por CLI/Orchestrator."
+        )
 
     if not _uses_shared_context(node):
         warnings.append(

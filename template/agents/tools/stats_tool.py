@@ -113,5 +113,10 @@ class StatsTool:
         s1, s2 = np.var(a, ddof=1), np.var(b, ddof=1)
         pooled = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
         d = (np.mean(a) - np.mean(b)) / pooled if pooled > 0 else 0.0
-        interpretation = "pequeño" if abs(d) < 0.2 else "medio" if abs(d) < 0.5 else "grande" if abs(d) < 0.8 else "muy grande"
+        interpretation = (
+            "pequeño" if abs(d) < 0.2
+            else "medio" if abs(d) < 0.5
+            else "grande" if abs(d) < 0.8
+            else "muy grande"
+        )
         return {"d": float(d), "interpretation": interpretation}

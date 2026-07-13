@@ -90,7 +90,9 @@ class DockerTool:
                     )
                 )
 
-            if upper.startswith("RUN") and " APT-GET INSTALL" in upper.replace("-Y", "") and "--NO-INSTALL-RECOMMENDS" not in upper:
+            if (upper.startswith("RUN")
+                and " APT-GET INSTALL" in upper.replace("-Y", "")
+                and "--NO-INSTALL-RECOMMENDS" not in upper):
                 findings.append(
                     DockerfileFinding(
                         i, "info",

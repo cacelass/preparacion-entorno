@@ -144,7 +144,8 @@ class DependencyTool:
         if latest is None:
             return PackageStatus(
                 name=name, declared_spec=spec, locked_version=locked_version, latest_version=None,
-                is_outdated=None, error="No se pudo consultar PyPI (red, timeout, o el paquete no existe con ese nombre).",
+                is_outdated=None,
+                error="No se pudo consultar PyPI (red, timeout, o el paquete no existe con ese nombre).",
             )
 
         reference_version = locked_version or latest

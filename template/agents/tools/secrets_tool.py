@@ -50,7 +50,10 @@ _ASSIGNMENT_RE = re.compile(
 _ENTROPY_THRESHOLD = 4.3
 _MIN_LENGTH_FOR_ENTROPY_CHECK = 20
 
-_FALSE_POSITIVE_VALUES = {"your_key_here", "your_secret", "changeme", "password123", "test", "example", "dummy", "placeholder"}
+_FALSE_POSITIVE_VALUES = {
+    "your_key_here", "your_secret", "changeme", "password123",
+    "test", "example", "dummy", "placeholder",
+}
 
 _SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build"}
 
@@ -96,7 +99,11 @@ class SecretsTool:
         return findings
 
     @staticmethod
-    def scan_with_heuristic(root: Path, *, extensions: tuple[str, ...] = (".py", ".env", ".yml", ".yaml", ".json", ".cfg", ".ini", ".toml", ".sh")) -> list[SecretFinding]:
+    def scan_with_heuristic(
+        root: Path, *,
+        extensions: tuple[str, ...] = (".py", ".env", ".yml", ".yaml",
+                                       ".json", ".cfg", ".ini", ".toml", ".sh"),
+    ) -> list[SecretFinding]:
         findings = []
         for path in root.rglob("*"):
             if not path.is_file() or path.suffix.lower() not in extensions:
@@ -133,7 +140,9 @@ class SecretsTool:
                         continue
                     if len(value) >= _MIN_LENGTH_FOR_ENTROPY_CHECK and shannon_entropy(value) >= _ENTROPY_THRESHOLD:
                         findings.append(SecretFinding(
-                            relative, i, f"Asignación de '{match.group(1)}' con valor de alta entropía", "heuristico-propio"
+                            relative, i,
+                            f"Asignación de '{match.group(1)}' con valor de alta entropía",
+                            "heuristico-propio",
                         ))
         return findings
 

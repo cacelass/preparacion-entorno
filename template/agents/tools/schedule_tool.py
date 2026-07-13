@@ -171,8 +171,12 @@ class ScheduleTool:
             "days_of_month": sorted(days),
             "months": sorted(months),
             "weekdays": sorted(weekdays),
-            "frequency": "cada minuto" if len(hours) == 24 and len(minutes) == 60
-                        else f"cada hora" if len(hours) == 24
-                        else f"cada día" if len(hours) == 1 and len(minutes) == 1 and len(weekdays) == 7 and len(days) == 31
-                        else "personalizada",
+            "frequency": (
+                "cada minuto" if len(hours) == 24 and len(minutes) == 60
+                else "cada hora" if len(hours) == 24
+                else "cada día"
+                if (len(hours) == 1 and len(minutes) == 1
+                    and len(weekdays) == 7 and len(days) == 31)
+                else "personalizada"
+            ),
         }

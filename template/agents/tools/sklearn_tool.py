@@ -77,7 +77,10 @@ class SklearnTool:
         gap = train_score - test_score
         if gap > gap_threshold:
             verdict = "overfitting"
-            note = f"train supera a test por {gap:.3f} (umbral {gap_threshold}) — el modelo memoriza en vez de generalizar."
+            note = (
+                f"train supera a test por {gap:.3f} (umbral {gap_threshold})"
+                " — el modelo memoriza en vez de generalizar."
+            )
         elif gap < -gap_threshold:
             verdict = "sospechoso"
             note = f"test supera a train por {-gap:.3f} — revisa el split, no es lo esperable."
