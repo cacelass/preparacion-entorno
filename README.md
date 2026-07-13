@@ -1,6 +1,6 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-1.9.0-blue)
+![version](https://img.shields.io/badge/dskit-1.12.4-blue)
 ![CI](https://github.com/cacelass/dskit/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
@@ -42,10 +42,10 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 ### Tipos de ML y arquitecturas
 - **4 tipos de ML**: `supervisado`, `no_supervisado`, `redes_neuronales`, `hibrido`
 - **2 tipos de tarea** (`task_type`): `clasificacion` o `regresion`
-- **5 arquitecturas NN** (`nn_model`): MLP · CNN1D · LSTM · GRU · Transformer
+- **6 arquitecturas NN** (`nn_model`): MLP · CNN1D · LSTM · GRU · Transformer · ResNet
 - **Optimizador configurable** (`optimizer_type`): AdamW · Adam · SGD · RMSProp · Adagrad
 - **Función de pérdida configurable** (`nn_loss_fn`): Auto · CrossEntropyLoss · MSELoss · L1Loss · BCEWithLogitsLoss
-- **Selector de modelo** (`model_type`): todos · RandomForest · XGBoost · LightGBM · LogisticRegression · KNN · DecisionTree · SVM · CatBoost
+- **Selector de modelo** (`model_type`): todos · RandomForest · ExtraTrees · GradientBoosting · AdaBoost · XGBoost · LightGBM · CatBoost · LogisticRegression · KNN · DecisionTree · SVM
 
 ### Módulos opcionales
 | Flag | Descripción | Make target |
@@ -57,6 +57,7 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 | `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
 | `use_docker` | Docker + interfaz de chat Gradio | `make chat` |
 | `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | automático |
+| papers + guía modelos | vault/07_REFERENCIAS/ (notas por modelo) + vault/01_PROYECTO/guiia_modelos.md | automático |
 | `use_shap` | SHAP values — importancia de features | automático |
 | `use_xgboost` | XGBoost (supervisado/híbrido) | automático |
 | `use_lightgbm` | LightGBM (supervisado/híbrido) | automático |
@@ -118,9 +119,9 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `project_description` | texto | siempre | Descripción breve |
 | `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | siempre | Determina el código generado |
 | `task_type` | `clasificacion` · `regresion` | supervisado, redes_neuronales, hibrido | Tipo de tarea |
-| `model_type` | `todos` · `RandomForest` · `XGBoost` · `LightGBM` · `LogisticRegression` · `KNN` · `DecisionTree` · `SVM` · `CatBoost` | supervisado, hibrido | Modelo a entrenar |
-| `cluster_model` | `todos` · `KMeans` · `DBSCAN` · `AgglomerativeClustering` · `GaussianMixture` · `HDBSCAN` | no_supervisado | Algoritmo de clustering |
-| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` | redes_neuronales | Arquitectura |
+| `model_type` | `todos` · `RandomForest` · `ExtraTrees` · `GradientBoosting` · `AdaBoost` · `XGBoost` · `LightGBM` · `CatBoost` · `LogisticRegression` · `KNN` · `DecisionTree` · `SVM` | supervisado, hibrido | Modelo a entrenar |
+| `cluster_model` | `todos` · `KMeans` · `AgglomerativeClustering` · `DBSCAN` · `GaussianMixture` · `SpectralClustering` · `Birch` | no_supervisado | Algoritmo de clustering |
+| `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` · `ResNet` | redes_neuronales | Arquitectura |
 | `optimizer_type` | `AdamW` · `Adam` · `SGD` · `RMSProp` · `Adagrad` | redes_neuronales | Optimizador PyTorch |
 | `nn_loss_fn` | `Auto` · `CrossEntropyLoss` · `MSELoss` · `L1Loss` · `BCEWithLogitsLoss` | redes_neuronales | Función de pérdida |
 | `use_xgboost` | true/false | supervisado, hibrido | Añade XGBoost |
