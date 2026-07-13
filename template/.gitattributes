@@ -1,0 +1,33 @@
+# Normalizar line endings a LF (incluso en Windows)
+* text=auto eol=lf
+
+# Archivos binarios
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.joblib binary
+*.pkl binary
+*.pt binary
+*.pth binary
+*.onnx binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Documentos generados — no incluirlos en language stats de GitHub
+docs/ linguist-generated=true
+graphify-out/ linguist-generated=true
+agents/workspace/ linguist-generated=true
+
+# Mantener .gitkeep en los directorios vacíos
+.gitkeep export-ignore
+
+# Archivos CI/CD — no incluirlos en archives de release
+.github/ export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+.editorconfig export-ignore
+.env.example export-ignore

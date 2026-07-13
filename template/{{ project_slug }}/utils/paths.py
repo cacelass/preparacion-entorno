@@ -15,7 +15,13 @@ RUNS_DIR = PROJECT_DIR / "runs"  # TensorBoard logs
 {% endif %}
 
 
-def make_dirs():
+_dirs_created = False
+
+
+def ensure_dirs():
+    global _dirs_created
+    if _dirs_created:
+        return
     for dir_path in [
         RAW_DATA_DIR,
         INTERIM_DATA_DIR,
@@ -28,6 +34,7 @@ def make_dirs():
 {% endif %}
     ]:
         dir_path.mkdir(parents=True, exist_ok=True)
+    _dirs_created = True
 
 
-make_dirs()
+ensure_dirs()

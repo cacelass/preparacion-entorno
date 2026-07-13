@@ -1,1 +1,33 @@
+# --- Entorno ---
 .claude/
+.venv/
+.env
+.env.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+dskit.egg-info/
+build/
+dist/
+*.egg
+.eggs/
+*.whl
+
+# --- Tests ---
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db

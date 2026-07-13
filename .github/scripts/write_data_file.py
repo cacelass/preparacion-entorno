@@ -24,6 +24,7 @@ BASE = {
     "project_open_source_license": "MIT",
     "python_version": "3.12",
     "project_version": "0.1.0",
+    "dskit_version": "1.9.0",
     # Flags opcionales — todos apagados por defecto en CI
     "model_type": "todos",
     "cluster_model": "todos",
@@ -51,7 +52,8 @@ VALID_KEYS = {"ml_type", "task_type", "model_type", "cluster_model", "nn_model",
               "use_api", "use_docker", "use_shap", "use_xgboost", "use_lightgbm",
                "use_catboost", "use_monitoring", "graphify_mode", "project_slug", "project_name",
               "project_author_name", "project_author_email", "project_description",
-              "project_open_source_license", "python_version", "project_version"}
+              "project_open_source_license", "python_version", "project_version",
+              "dskit_version"}
 
 for token in raw.split():
     if "=" in token:

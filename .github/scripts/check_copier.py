@@ -20,6 +20,7 @@ if not isinstance(cfg, dict):
 
 REQUIRED = [
     "project_name", "project_slug", "project_author_name", "project_author_email",
+    "project_version",
     "ml_type", "task_type", "nn_model", "optimizer_type", "nn_loss_fn",
     "use_api", "use_optuna", "use_monitoring", "use_mlflow",
     "use_duckdb", "use_docker",

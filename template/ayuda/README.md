@@ -67,7 +67,8 @@ Artifacts: pesos `.joblib` / `.pt` + figuras de evaluacion.
 Figuras generadas en `reports/figures/`:
 - `real_vs_pred_<modelo>.png` — scatter real vs predicho
 - `residuals_<modelo>.png` — residuos vs predicho + histograma
-{% endif %}{% if ml_type == "redes_neuronales" %} · Arquitectura: `{{ nn_model }}`{% endif %}
+{% endif %}
+{% if ml_type == "redes_neuronales" %} · Arquitectura: `{{ nn_model }}`{% endif %}
 
 {% if ml_type == "supervisado" %}
 ### Modelos disponibles{% if model_type == "todos" %} (todos){% else %} (activo: `{{ model_type }}`){% endif %}

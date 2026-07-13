@@ -223,6 +223,11 @@ python_version:
     - "3.13"
   default: "3.12"
 
+dskit_version:
+  type: str
+  default: "1.9.0"
+  help: "Versión de dskit que generó el proyecto (no cambiar)"
+
 project_version:
   type: str
   default: "0.1.0"
@@ -243,8 +248,30 @@ _message_before_copy: >-
   Generando proyecto '{{ project_name }}' ({{ ml_type }})...
 
 _tasks:
-  - "uv sync --extra dev --extra {{ ml_type }}{% if use_mlflow %} --extra mlflow_tracking{% endif %}{% if graphify_mode != 'no' %} --extra graphify{% endif %}{% if use_api %} --extra api{% endif %}{% if use_duckdb %} --extra duckdb{% endif %}{% if use_optuna %} --extra optuna{% endif %}{% if use_monitoring %} --extra monitoring{% endif %} && uv run python -c 'import sklearn; print(\"scikit-learn OK\")' {% if ml_type == 'redes_neuronales' %}&& uv run python -c 'import torch; print(\"torch\", torch.__version__)' {% endif %}{% if graphify_mode != 'no' %}&& uv run python -c 'import graphify; print(\"graphify\", graphify.__version__)' {% endif %}{% if use_optuna %}&& uv run python -c 'import optuna; print(\"optuna\", optuna.__version__)' {% endif %}{% if use_monitoring %}&& uv run python -c 'import evidently; print(\"evidently\", evidently.__version__)' {% endif %}"
+  - >-
+    uv sync --extra dev --extra {{ ml_type }}
+    {% if use_mlflow %}--extra mlflow_tracking{% endif %}
+    {% if graphify_mode != 'no' %}--extra graphify{% endif %}
+    {% if use_api %}--extra api{% endif %}
+    {% if use_duckdb %}--extra duckdb{% endif %}
+    {% if use_optuna %}--extra optuna{% endif %}
+    {% if use_monitoring %}--extra monitoring{% endif %}
+    && uv run python -c 'import sklearn; print("scikit-learn OK")'
+    {% if ml_type == 'redes_neuronales' %}
+    && uv run python -c 'import torch; print("torch", torch.__version__)'
+    {% endif %}
+    {% if graphify_mode != 'no' %}
+    && uv run python -c 'import graphify; print("graphify", graphify.__version__)'
+    {% endif %}
+    {% if use_optuna %}
+    && uv run python -c 'import optuna; print("optuna", optuna.__version__)'
+    {% endif %}
+    {% if use_monitoring %}
+    && uv run python -c 'import evidently; print("evidently", evidently.__version__)'
+    {% endif %}
+
 _exclude:
+  - "**/.gitkeep"
   # Lo que los agentes generan en runtime (logs de auditoría, eventos de
   # gstack, órdenes de trabajo...) nunca debe viajar del template al proyecto
   # generado — solo .gitignore y README.md viven directamente en workspace/.

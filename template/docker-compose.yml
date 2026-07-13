@@ -28,8 +28,8 @@ services:
       - ./models:/app/models
       # Datos de entrada — coloca aqui dataset.csv
       - ./data:/app/data
-      # Apuntes de clase
-      - ./apuntes:/app/apuntes
+      # Apuntes de clase (crear ./apuntes local si se necesita)
+
 
     environment:
       # Entorno de ejecucion

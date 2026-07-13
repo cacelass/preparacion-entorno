@@ -321,6 +321,31 @@ documentación/README de cada proyecto en el momento de escribir esto — aun
 así, estos repos cambian rápido, conviene revisar el estado actual antes de
 depender de alguno.
 
+### Directrices de comportamiento para agentes
+
+- **[multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills)** —
+  cuatro principios universales para reducir errores de LLMs al programar,
+  inspirados en observaciones de Andrej Karpathy: Piensa antes de codear,
+  Simplicidad primero, Cambios quirúrgicos, Ejecución guiada por objetivos.
+  No dependen de un proveedor de IA concreto. Este template los incluye como
+  sección en `AGENTS.md` y como prompt en `agents/prompts/universal_guidelines.md`
+  para que cualquier agente pueda usarlos.
+- **[JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)** —
+  skill de concisión que reduce ~65% los tokens de salida eliminando relleno
+  y conservando precisión técnica. Funciona con 30+ agentes (Claude Code,
+  Codex, Gemini, Cursor, Cline, Copilot...). Este template incorpora su
+  directriz de concisión en las mismas secciones que karpathy-skills.
+
+### Orquestación y meta-harness
+
+- **[ruvnet/ruflo](https://github.com/ruvnet/ruflo)** — meta-harness para
+  agentes de codificación: 100+ agentes especializados, coordinación por
+  swarms, memoria vectorial con aprendizaje continuo, federación segura entre
+  máquinas, y servidor MCP. Está construido en TypeScript/Node.js (ecosistema
+  diferente al de este template), pero sus patrones de orquestación
+  (ruteo inteligente, workers en segundo plano, topologías de consenso)
+  son referencia arquitectónica útil independientemente del lenguaje.
+
 ### Frameworks de skills para agentes de codificación
 
 - **[obra/superpowers](https://github.com/obra/superpowers)** — metodología

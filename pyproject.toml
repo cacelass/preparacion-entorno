@@ -9,8 +9,12 @@ readme = "README.md"
 requires-python = ">= 3.10"
 license = { text = "GPL-3.0" }
 dependencies = [
-    "copier",
+    "copier>=6.0",
+    "joblib>=1.5.3",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
     "pyyaml",
+    "scikit-learn>=1.7.2",
 ]
 
 [project.optional-dependencies]

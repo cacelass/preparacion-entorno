@@ -18,6 +18,16 @@
 
 ---
 
+## Tabla de contenidos
+
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Inicio rápido](#inicio-rápido)
+- [Sistema de agentes](#sistema-de-agentes){% if use_docker %}
+- [Docker — Interfaz de chat](#docker--interfaz-de-chat){% endif %}{% if graphify_mode == "graphify + obsidian vault" %}
+- [Obsidian Vault](#obsidian-vault){% endif %}
+
+---
+
 ## Estructura del proyecto
 
 ```
@@ -110,6 +120,23 @@ python main.py
 ```
 
 Consulta el archivo `ayuda` para más detalles.
+
+## Sistema de agentes
+
+Este proyecto incluye un sistema de **agentes autónomos** que automatizan
+tareas de desarrollo: git, tests, documentación, CI/CD, dependencias, revisión
+de código, secretos y más. Todos los agentes son agnósticos de proveedor de IA
+y se ejecutan vía comandos de shell.
+
+```bash
+# Listar agentes disponibles
+uv run python -m agents list
+
+# Ejecutar un agente (ej: análisis de dependencias)
+uv run python -m agents run dependency check_outdated
+```
+
+Ver `AGENTS.md` para la documentación completa del sistema.
 
 {% if graphify_mode == "graphify + obsidian vault" %}
 

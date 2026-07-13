@@ -18,12 +18,10 @@ build/
 # Control de versiones
 .git/
 .gitignore
-.gitattributes
 
 # Herramientas de desarrollo
 .copier-answers.yml
 .editorconfig
-.pre-commit-config.yaml
 
 # Notebooks (demasiado pesados para el contenedor de inferencia)
 notebooks/

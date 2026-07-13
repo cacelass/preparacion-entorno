@@ -20,7 +20,6 @@
 ├── models/            — Modelos entrenados (.joblib, .pkl)
 ├── visualization/     — Código de visualización
 ├── api/               — FastAPI (si use_api)
-├── pipelines/         — Pipelines de entrenamiento/evaluación
 │
 tests/
 ├── test_*.py          — Tests del proyecto

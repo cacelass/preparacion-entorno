@@ -985,7 +985,8 @@ class TransformerClassifier(nn.Module):
     def __init__(self, input_dim, output_dim, d_model=64, nhead=4,
                  num_layers=2, dim_ff=256, dropout=0.1):
         super().__init__()
-        assert d_model % nhead == 0, "d_model debe ser múltiplo de nhead"
+        if d_model % nhead != 0:
+            raise ValueError(f"d_model ({d_model}) debe ser múltiplo de nhead ({nhead})")
         self.embedding = nn.Linear(input_dim, d_model)
         self.pos_enc   = _PositionalEncoding(d_model, dropout=dropout)
         enc_layer      = nn.TransformerEncoderLayer(

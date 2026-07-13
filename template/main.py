@@ -1,7 +1,9 @@
 """
 Punto de entrada principal del proyecto.
-Ejecutar: python main.py
+Ejecutar: python main.py [--pipeline]
 """
+import sys
+
 {% if ml_type == 'supervisado' %}
 from {{ project_slug }}.data.make_dataset import load_data
 from {{ project_slug }}.features.build_features import preprocess_data
@@ -128,6 +130,9 @@ def run_full_pipeline() -> None:
 
 
 def main():
+    if '--pipeline' in sys.argv:
+        run_full_pipeline()
+        return
     print('=' * 60)
     accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
@@ -206,6 +211,9 @@ def run_full_pipeline() -> None:
 
 
 def main():
+    if '--pipeline' in sys.argv:
+        run_full_pipeline()
+        return
     print('=' * 60)
     accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
@@ -235,6 +243,8 @@ from {{ project_slug }}.visualization.visualize import (
     plot_pca_variance,
 )
 from {{ project_slug }}.utils.paths import RUNS_DIR
+
+
 
 # ---------------------------------------------------------------------------
 # Configuración
@@ -342,6 +352,9 @@ def run_full_pipeline() -> None:
 
 
 def main():
+    if '--pipeline' in sys.argv:
+        run_full_pipeline()
+        return
     print('=' * 60)
     accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':
@@ -491,6 +504,9 @@ def run_full_pipeline() -> None:
 
 
 def main():
+    if '--pipeline' in sys.argv:
+        run_full_pipeline()
+        return
     print('=' * 60)
     accion = input('Ejecutar pipeline completo (0) o probar el modelo con tus datos (1)? (0/1): ').strip()
     if accion == '0':

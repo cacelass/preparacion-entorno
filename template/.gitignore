@@ -19,10 +19,12 @@ build/
 dist/
 *.egg-info/
 *.egg
+*.whl
 .eggs/
 develop-eggs/
 sdist/
 wheels/
+pip-wheel-metadata/
 .installed.cfg
 MANIFEST
 

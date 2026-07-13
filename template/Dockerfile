@@ -37,8 +37,8 @@ COPY pyproject.toml .
 # Stub del paquete para que setuptools resuelva los extras sin el codigo real
 RUN mkdir -p {{ project_slug }} && touch {{ project_slug }}/__init__.py
 
-RUN uv pip install --system ".[{{ ml_type }}]" || \
-    pip install --no-cache-dir ".[{{ ml_type }}]"
+RUN uv pip install --system ".[{{ ml_type }}]" 2>/dev/null \
+    || { echo "WARN: uv falló, usando pip"; pip install --no-cache-dir ".[{{ ml_type }}]"; }
 
 # ── Interfaz web de chat ──────────────────────────────────────────────────────
 RUN pip install --no-cache-dir \
@@ -47,13 +47,13 @@ RUN pip install --no-cache-dir \
     websockets
 
 # ── Herramientas de documentacion y apuntes ──────────────────────────────────
-RUN pip install --no-cache-dir "markitdown[all]" || \
-    pip install --no-cache-dir markitdown || \
-    echo "INFO: markitdown no disponible — omitido"
+RUN pip install --no-cache-dir "markitdown[all]" 2>/dev/null \
+    || pip install --no-cache-dir markitdown 2>/dev/null \
+    || echo "INFO: markitdown no disponible — omitido"
 
-RUN pip install --no-cache-dir graphify || \
-    pip install --no-cache-dir graphviz || \
-    echo "INFO: graphify/graphviz no disponible — omitido"
+RUN pip install --no-cache-dir graphify 2>/dev/null \
+    || pip install --no-cache-dir graphviz 2>/dev/null \
+    || echo "INFO: graphify/graphviz no disponible — omitido"
 
 # ── Assets del frontend (sin dependencia de CDN en runtime) ──────────────────
 # Si la descarga falla no se crea el fichero:
@@ -71,8 +71,8 @@ RUN if [ -f /tmp/marked.min.js ]; then \
     fi
 
 # Instalar el paquete en modo editable ahora que el codigo fuente esta presente
-RUN uv pip install --system -e . --no-deps || \
-    pip install --no-cache-dir -e . --no-deps
+RUN uv pip install --system -e . --no-deps 2>/dev/null \
+    || { echo "WARN: uv falló, usando pip"; pip install --no-cache-dir -e . --no-deps; }
 
 # ── Permisos del entrypoint ───────────────────────────────────────────────────
 RUN chmod +x /app/chat/entrypoint.sh

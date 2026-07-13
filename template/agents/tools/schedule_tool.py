@@ -78,7 +78,8 @@ class ScheduleTool:
         except (ValueError, IndexError) as e:
             return {"valid": False, "error": str(e)}
 
-    def to_human(self, expr: str) -> str:
+    @staticmethod
+    def to_human(expr: str) -> str:
         """Convierte una expresión cron a descripción legible."""
         expr_in = expr.strip().lower()
         if expr_in in _ALIASES:

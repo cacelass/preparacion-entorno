@@ -24,7 +24,7 @@ STD = dict(
     project_slug="test_project", project_name="Test Project",
     project_author_name="CI", project_author_email="ci@test.com",
     project_description="CI validation", project_open_source_license="MIT",
-    python_version="3.12", project_version="0.1.0",
+    python_version="3.12", project_version="0.1.0", dskit_version="1.9.0",
 )
 
 DEFAULTS = dict(

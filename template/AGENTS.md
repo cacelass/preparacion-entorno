@@ -18,6 +18,72 @@ revisión de código, tests, dependencias y despliegue.
 - **Conoce este template.** Los agentes saben que el código vive en
   `{{ project_slug }}/`, los datasets en `data/`, los modelos en `models/`.
 
+## Principios de comportamiento
+
+Estos principios aplican a cualquier agente de codificación (Claude Code,
+Codex, Cursor, Gemini, Cline, Copilot, opencode...) que trabaje en este
+proyecto. No dependen de un proveedor ni de una herramienta concreta.
+
+### Piensa antes de codear
+
+No asumas. No escondas dudas. Superficia los trade-offs.
+
+- Si una instrucción es ambigua, presenta múltiples interpretaciones en vez
+  de elegir una en silencio
+- Si algo no está claro, pregunta — no inventes
+- Si existe un enfoque más simple, dilo
+- Para cuando estés confuso: nombra qué no entiendes y pide aclaración
+
+### Simplicidad primero
+
+El mínimo código que resuelve el problema. Nada especulativo.
+
+- Nada de funcionalidades que no se pidieron
+- Nada de abstracciones para código que se usa una vez
+- Nada de "flexibilidad" o "configurabilidad" no solicitada
+- Nada de manejo de errores para escenarios imposibles
+- Si 200 líneas pueden ser 50, reescríbelas
+
+### Cambios quirúrgicos
+
+Toca solo lo que debes. No mejoren código ajeno.
+
+- No "mejores" código, comentarios o formato adyacente
+- No refactorices cosas que no están rotas
+- Respeta el estilo existente, aunque lo harías diferente
+- Si ves código muerto no relacionado, menciónalo — no lo borres
+- Al borrar código tuyo, elimina imports/variables/funciones que tus cambios
+  dejaron sin usar. No toques código muerto preexistente
+
+### Ejecución guiada por objetivos
+
+Define criterios de éxito. Itera hasta verificarlos.
+
+En vez de decir "añade validación", escribe "escribe tests para entradas
+inválidas, luego haz que pasen". En vez de "arregla el bug", escribe
+"escribe un test que lo reproduzca, luego haz que pase".
+
+Para tareas multi-paso, usa un plan con verificación por paso:
+
+```
+1. [Paso] → verificar: [cómo]
+2. [Paso] → verificar: [cómo]
+```
+
+### Concisión
+
+Sé breve. Di lo mismo con la mitad de palabras.
+
+- Elimina relleno ("I'd be happy to help", "Sure!", "Let me take a look")
+- Preserva el contenido técnico: código, comandos, rutas, errores
+- Usa frases cortas y directas. Un fragmento vale si es claro
+- No repitas lo que el usuario ya sabe
+- Una línea vale más que un párrafo
+
+El test: si un ingeniero senior diría "esto es demasiado complicado",
+simplifícalo. Si una respuesta puede perder la mitad de palabras sin perder
+información, hazlo.
+
 ## Agentes disponibles
 
 | Agente | Hace |

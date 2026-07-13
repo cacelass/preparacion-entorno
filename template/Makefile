@@ -1,12 +1,13 @@
 .PHONY: setup install-deps \
         data features train predict pipeline \
-        test smoke lint format lock \
+        test smoke lint format check lock \
         lab notebook tb \
         docs \
         profile \
         mlflow \
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
+        agents-list agents-run agents-doctor \
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -106,7 +107,14 @@ setup:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Instalando dependencias para ML tipo: $(ML_TYPE)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	uv sync --extra dev --extra $(ML_TYPE)
+	uv sync --extra dev --extra $(ML_TYPE) \
+{% if use_mlflow %}		--extra mlflow_tracking \
+{% endif %}{% if graphify_mode != 'no' %}		--extra graphify \
+{% endif %}{% if use_api %}		--extra api \
+{% endif %}{% if use_duckdb %}		--extra duckdb \
+{% endif %}{% if use_optuna %}		--extra optuna \
+{% endif %}{% if use_monitoring %}		--extra monitoring \
+{% endif %}		&& echo "  Extras instalados."
 	@echo ""
 	@echo "  Listo. Activa el entorno con:  source .venv/bin/activate"
 	@echo ""
@@ -204,6 +212,10 @@ smoke:
 	@echo "▶  Test de humo — pipeline con datos sintéticos"
 	uv run pytest tests/ -v -m smoke --tb=short
 
+check: lint test
+	@echo ""
+	@echo "  ✅ check pasado: lint + test OK"
+
 lint:
 	uv run ruff check $(MODULE)/ tests/
 	uv run ruff format --check $(MODULE)/ tests/
@@ -246,6 +258,18 @@ docs:
 	$(MAKE) html -C docs
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Sistema de agentes
+# ─────────────────────────────────────────────────────────────────────────────
+agents-list:
+	uv run python -m agents list
+
+agents-run:
+	uv run python -m agents run $(filter-out $@,$(MAKECMDGOALS))
+
+agents-doctor:
+	uv run python -m agents doctor
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Limpieza
 # ─────────────────────────────────────────────────────────────────────────────
 clean:
@@ -263,6 +287,8 @@ clean-figures:
 	@echo "  Figuras eliminadas."
 
 clean-all: clean clean-models clean-figures
+	rm -f reports/*.csv
+	rm -rf agents/workspace/
 	@echo "  Limpieza completa."
 
 

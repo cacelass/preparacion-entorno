@@ -1314,7 +1314,6 @@ def try_model() -> None:
     print(f"\n{'='*50}")
     print(f"  Checkpoint : {ckpt_path.name}")
     print(f"  Predicción : {preds[0]}")
-    model.eval()
     with torch.no_grad():
         X_t = torch.tensor(X_new, dtype=torch.float32).to(device)
         logits = model(X_t)
