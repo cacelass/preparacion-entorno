@@ -22,6 +22,15 @@ from contextlib import nullcontext
 {% if model_type == "todos" or model_type == "RandomForest" %}
 from sklearn.ensemble import RandomForestClassifier
 {% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+from sklearn.ensemble import ExtraTreesClassifier
+{% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+from sklearn.ensemble import GradientBoostingClassifier
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+from sklearn.ensemble import AdaBoostClassifier
+{% endif %}
 {% if model_type == "todos" or model_type == "LogisticRegression" %}
 from sklearn.linear_model import LogisticRegression
 {% endif %}
@@ -38,11 +47,20 @@ from sklearn.preprocessing import StandardScaler as _SVMScaler
 {% endif %}
 from sklearn.model_selection import cross_val_score
 {% else %}
-{% if model_type == "todos" %}
+{% if model_type == "todos" or model_type == "LinearRegression" or model_type == "Ridge" or model_type == "Lasso" %}
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 {% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
 from sklearn.ensemble import RandomForestRegressor
+{% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+from sklearn.ensemble import ExtraTreesRegressor
+{% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+from sklearn.ensemble import GradientBoostingRegressor
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+from sklearn.ensemble import AdaBoostRegressor
 {% endif %}
 {% if model_type == "todos" or model_type == "KNN" %}
 from sklearn.neighbors import KNeighborsRegressor
@@ -124,6 +142,15 @@ def _build_models() -> dict:
 {% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto con feature importances.
 {% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+    GradientBoosting   → GBM clásico de sklearn. Bueno con datos tabulares.
+{% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+    ExtraTrees         → más aleatorización que RF. Reduce aún más el overfitting.
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+    AdaBoost           → boosting adaptativo. Pesa muestras mal clasificadas.
+{% endif %}
 {% if use_xgboost or model_type == "XGBoost" %}
     XGBoost            → gradient boosting optimizado. Referencia en Kaggle.
 {% endif %}
@@ -134,9 +161,13 @@ def _build_models() -> dict:
     CatBoost           → boosting nativo para categoricas. Poco tunning necesario.
 {% endif %}
 {% else %}
-{% if model_type == "todos" %}
+{% if model_type == "todos" or model_type == "LinearRegression" %}
     LinearRegression   → modelo base. Rápido e interpretable.
+{% endif %}
+{% if model_type == "todos" or model_type == "Ridge" %}
     Ridge              → regresión lineal con regularización L2.
+{% endif %}
+{% if model_type == "todos" or model_type == "Lasso" %}
     Lasso              → regularización L1, útil para selección de variables.
 {% endif %}
 {% if model_type == "todos" or model_type == "KNN" %}
@@ -144,6 +175,15 @@ def _build_models() -> dict:
 {% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
     RandomForest       → ensemble robusto. feature_importances_ disponible.
+{% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+    GradientBoosting   → GBM clásico para regresión. Robustez y precisión.
+{% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+    ExtraTrees         → RF extremo. Máxima aleatorización, mínimo sesgo.
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+    AdaBoost           → boosting adaptativo para regresión.
 {% endif %}
 {% if use_xgboost or model_type == "XGBoost" %}
     XGBoost            → gradient boosting para regresión.
@@ -171,6 +211,24 @@ def _build_models() -> dict:
 {% endif %}
 {% if model_type == "todos" or model_type == "RandomForest" %}
         "RandomForest",
+{% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+        "GradientBoosting",
+{% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+        "ExtraTrees",
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+        "AdaBoost",
+{% endif %}
+{% if model_type == "todos" or model_type == "LinearRegression" %}
+        "LinearRegression",
+{% endif %}
+{% if model_type == "todos" or model_type == "Ridge" %}
+        "Ridge",
+{% endif %}
+{% if model_type == "todos" or model_type == "Lasso" %}
+        "Lasso",
 {% endif %}
 {% if use_xgboost or model_type == "XGBoost" %}
         "XGBoost",
@@ -243,10 +301,58 @@ def _build_models() -> dict:
         )),
     ])
 {% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+{% if use_optuna %}
+    models["GradientBoosting"] = GradientBoostingClassifier(**{
+        "n_estimators": 200, "max_depth": 5, "learning_rate": 0.1,
+        "subsample": 0.8, "max_features": "sqrt", "random_state": 42,
+        **_best.get("GradientBoosting", {}),
+    })
 {% else %}
-{% if model_type == "todos" %}
+    models["GradientBoosting"] = GradientBoostingClassifier(
+        n_estimators=200, max_depth=5, learning_rate=0.1,
+        subsample=0.8, max_features="sqrt", random_state=42,
+    )
+{% endif %}
+{% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+{% if use_optuna %}
+    models["ExtraTrees"] = ExtraTreesClassifier(**{
+        "n_estimators": 200, "max_depth": 10, "max_features": "sqrt",
+        "min_samples_leaf": 2, "class_weight": "balanced",
+        "random_state": 42, "n_jobs": -1,
+        **_best.get("ExtraTrees", {}),
+    })
+{% else %}
+    models["ExtraTrees"] = ExtraTreesClassifier(
+        n_estimators=200, max_depth=10, max_features="sqrt",
+        min_samples_leaf=2, class_weight="balanced",
+        random_state=42, n_jobs=-1,
+    )
+{% endif %}
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+{% if use_optuna %}
+    models["AdaBoost"] = AdaBoostClassifier(**{
+        "n_estimators": 200, "learning_rate": 0.1, "algorithm": "SAMME.R",
+        "random_state": 42,
+        **_best.get("AdaBoost", {}),
+    })
+{% else %}
+    models["AdaBoost"] = AdaBoostClassifier(
+        n_estimators=200, learning_rate=0.1, algorithm="SAMME.R",
+        random_state=42,
+    )
+{% endif %}
+{% endif %}
+{% else %}
+{% if model_type == "todos" or model_type == "LinearRegression" %}
     models["LinearRegression"] = LinearRegression()
+{% endif %}
+{% if model_type == "todos" or model_type == "Ridge" %}
     models["Ridge"] = Ridge(alpha=1.0)
+{% endif %}
+{% if model_type == "todos" or model_type == "Lasso" %}
     models["Lasso"] = Lasso(alpha=0.1, max_iter=2000)
 {% endif %}
 {% if model_type == "todos" or model_type == "KNN" %}
@@ -290,6 +396,48 @@ def _build_models() -> dict:
         ("scaler", _SVMScaler()),
         ("svr", SVR(kernel="rbf", C=1.0, gamma="scale")),
     ])
+{% endif %}
+{% if model_type == "todos" or model_type == "GradientBoosting" %}
+{% if use_optuna %}
+    models["GradientBoosting"] = GradientBoostingRegressor(**{
+        "n_estimators": 200, "max_depth": 5, "learning_rate": 0.1,
+        "subsample": 0.8, "max_features": "sqrt", "random_state": 42,
+        **_best.get("GradientBoosting", {}),
+    })
+{% else %}
+    models["GradientBoosting"] = GradientBoostingRegressor(
+        n_estimators=200, max_depth=5, learning_rate=0.1,
+        subsample=0.8, max_features="sqrt", random_state=42,
+    )
+{% endif %}
+{% endif %}
+{% if model_type == "todos" or model_type == "ExtraTrees" %}
+{% if use_optuna %}
+    models["ExtraTrees"] = ExtraTreesRegressor(**{
+        "n_estimators": 200, "max_depth": 10, "max_features": "sqrt",
+        "min_samples_leaf": 2, "random_state": 42, "n_jobs": -1,
+        **_best.get("ExtraTrees", {}),
+    })
+{% else %}
+    models["ExtraTrees"] = ExtraTreesRegressor(
+        n_estimators=200, max_depth=10, max_features="sqrt",
+        min_samples_leaf=2, random_state=42, n_jobs=-1,
+    )
+{% endif %}
+{% endif %}
+{% if model_type == "todos" or model_type == "AdaBoost" %}
+{% if use_optuna %}
+    models["AdaBoost"] = AdaBoostRegressor(**{
+        "n_estimators": 200, "learning_rate": 0.1, "loss": "linear",
+        "random_state": 42,
+        **_best.get("AdaBoost", {}),
+    })
+{% else %}
+    models["AdaBoost"] = AdaBoostRegressor(
+        n_estimators=200, learning_rate=0.1, loss="linear",
+        random_state=42,
+    )
+{% endif %}
 {% endif %}
 {% endif %}
 
@@ -557,6 +705,18 @@ from sklearn.cluster import KMeans
 {% if cluster_model == "todos" or cluster_model == "AgglomerativeClustering" %}
 from sklearn.cluster import AgglomerativeClustering
 {% endif %}
+{% if cluster_model == "todos" or cluster_model == "DBSCAN" %}
+from sklearn.cluster import DBSCAN
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "SpectralClustering" %}
+from sklearn.cluster import SpectralClustering
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "Birch" %}
+from sklearn.cluster import Birch
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "GaussianMixture" %}
+from sklearn.mixture import GaussianMixture
+{% endif %}
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
 from sklearn.pipeline import Pipeline
@@ -581,6 +741,22 @@ def _build_models(n_clusters: int = 3) -> dict:
     AgglomerativeClustering → clustering jerárquico aglomerativo (bottom-up).
                                linkage: 'ward' minimiza varianza intraclúster.
 {% endif %}
+{% if cluster_model == "todos" or cluster_model == "DBSCAN" %}
+    DBSCAN            → densidad. Clusters de forma arbitraria + detección de
+                        outliers (-1). eps y min_samples controlan densidad mínima.
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "GaussianMixture" %}
+    GaussianMixture   → clustering probabilístico. Asignación suave a cada cluster.
+                        Útil cuando los clusters se solapan.
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "SpectralClustering" %}
+    SpectralClustering→ basado en grafos. Captura clusters no convexos.
+                        Efectivo con datos donde los clusters están conectados.
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "Birch" %}
+    Birch             → clustering incremental. Escalable a grandes datasets.
+                        Construye un árbol CF en una sola pasada.
+{% endif %}
     """
     models = {}
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
@@ -596,6 +772,36 @@ def _build_models(n_clusters: int = 3) -> dict:
     models["AgglomerativeClustering"] = AgglomerativeClustering(
         n_clusters=n_clusters,
         linkage="ward",
+    )
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "DBSCAN" %}
+    models["DBSCAN"] = DBSCAN(
+        eps=0.5,
+        min_samples=5,
+        metric="euclidean",
+    )
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "GaussianMixture" %}
+    models["GaussianMixture"] = GaussianMixture(
+        n_components=n_clusters,
+        covariance_type="full",
+        n_init=5,
+        random_state=42,
+    )
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "SpectralClustering" %}
+    models["SpectralClustering"] = SpectralClustering(
+        n_clusters=n_clusters,
+        affinity="rbf",
+        n_init=10,
+        random_state=42,
+    )
+{% endif %}
+{% if cluster_model == "todos" or cluster_model == "Birch" %}
+    models["Birch"] = Birch(
+        n_clusters=n_clusters,
+        threshold=0.5,
+        branching_factor=50,
     )
 {% endif %}
     return models

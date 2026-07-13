@@ -1,0 +1,11 @@
+# security.txt — https://securitytxt.org
+#
+# Si encuentras una vulnerabilidad de seguridad en este proyecto,
+# por favor repórtala abriendo un issue en GitHub:
+#   https://github.com/cacelass/dskit/issues
+#
+# O contacta al mantenedor directamente si el issue es sensible:
+#   - GitHub: @cacelass
+
+Contact: https://github.com/cacelass/dskit/issues/new
+Preferred-Languages: es, en

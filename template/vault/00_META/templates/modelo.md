@@ -19,6 +19,26 @@ created: {{date}}
 | Train    |      |          |    |
 | Test     |      |          |    |
 
+## Paper de referencia
+
+- **Título:**
+- **Autores:**
+- **Año:**
+- **DOI / arXiv:**
+- **URL:**
+
+## Cuándo usar este modelo
+
+| Situación | Recomendación |
+|-----------|---------------|
+|          |               |
+
+## Ventajas
+
+
+## Limitaciones
+
+
 ## Aprendizajes
 
 {% endraw %}

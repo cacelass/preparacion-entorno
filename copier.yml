@@ -117,6 +117,9 @@ model_type:
   choices:
     - todos
     - RandomForest
+    - ExtraTrees
+    - GradientBoosting
+    - AdaBoost
     - XGBoost
     - LightGBM
     - CatBoost
@@ -134,6 +137,10 @@ cluster_model:
     - todos
     - KMeans
     - AgglomerativeClustering
+    - DBSCAN
+    - GaussianMixture
+    - SpectralClustering
+    - Birch
   default: todos
   when: "{{ ml_type == 'no_supervisado' }}"
 
@@ -211,6 +218,7 @@ project_open_source_license:
     - No license file
     - MIT
     - BSD-3-Clause
+    - Apache-2.0
   default: No license file
 
 python_version:
@@ -287,6 +295,9 @@ _exclude:
   - "{% if not use_docker %}docker-compose.yml{% endif %}"
   - "{% if not use_docker %}.dockerignore{% endif %}"
   - "{% if graphify_mode != 'graphify + obsidian vault' %}vault{% endif %}"
+
+_jinja_extensions:
+  - jinja2_time.TimeExtension
 
 _subdirectory: template
 _templates_suffix: ""

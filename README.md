@@ -1,9 +1,10 @@
 # DSKIT
 
 ![version](https://img.shields.io/badge/dskit-1.9.0-blue)
+![CI](https://github.com/cacelass/dskit/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
-![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey)
+![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 **Template profesional para Data Science y AI Engineering**
 
@@ -295,4 +296,4 @@ Ver [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-GPL-3.0
+Apache-2.0
