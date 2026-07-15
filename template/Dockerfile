@@ -77,6 +77,10 @@ RUN uv pip install --system -e . --no-deps 2>/dev/null \
 # ── Permisos del entrypoint ───────────────────────────────────────────────────
 RUN chmod +x /app/chat/entrypoint.sh
 
+# ── Usuario no root ──────────────────────────────────────────────────────────
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # ── Directorios persistibles (montados como volumenes) ───────────────────────
 VOLUME ["/app/models", "/app/data", "/app/apuntes"]
 

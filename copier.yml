@@ -296,8 +296,5 @@ _exclude:
   - "{% if not use_docker %}.dockerignore{% endif %}"
   - "{% if graphify_mode != 'graphify + obsidian vault' %}vault{% endif %}"
 
-_jinja_extensions:
-  - jinja2_time.TimeExtension
-
 _subdirectory: template
 _templates_suffix: ""

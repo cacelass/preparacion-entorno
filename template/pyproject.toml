@@ -33,10 +33,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "bandit",
+    "black",
     "hypothesis",
     "invoke",
+    "isort",
     "mypy",
     "nbdime",
+    "pip-audit",
+    "pre-commit",
+    "radon",
     "ruff",
     "pytest",
     "pytest-cov",
@@ -152,7 +158,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts   = "-v --tb=short"
+addopts   = "-v --tb=short --cov={{ project_slug }} --cov-report=term-missing --cov-fail-under=80"
 markers   = [
     "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
 ]
@@ -178,3 +184,24 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*"  = ["F401", "F811", "E402", "F841"]
 "docs/*"   = ["E402", "W292"]
+
+[tool.isort]
+profile = "black"
+line_length = 165
+skip = ["notebooks", ".venv", "dist"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+exclude = ["notebooks/", ".venv"]
+
+[tool.bandit]
+exclude_dirs = ["notebooks", ".venv", "tests", "docs"]
+skips = ["B101", "B404", "B603", "B113"]
+
+[tool.radon]
+max_cc = 10
+exclude = ["notebooks/", ".venv", "tests/", "docs/"]
+
+[[tool.radon.halstead]]
+exclude = ["notebooks/", ".venv", "tests/", "docs/"]

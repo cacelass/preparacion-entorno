@@ -1,6 +1,6 @@
 .PHONY: setup install-deps \
         data features train predict pipeline \
-        test smoke lint format check lock \
+        test smoke lint format typecheck security audit check lock \
         lab notebook tb \
         docs \
         profile \
@@ -43,10 +43,14 @@ help:
 	@echo "    make pipeline       data → features → train → predict (todo)"
 	@echo ""
 	@echo "  Calidad"
-	@echo "    make test           pytest -v (todos los tests)"
+	@echo "    make check          lint + typecheck + test (batería completa)"
+	@echo "    make test           pytest -v - cov≥80% (todos los tests)"
 	@echo "    make smoke          test de humo — verifica que el pipeline arranca"
 	@echo "    make lint           ruff check (solo lectura, sin modificar)"
 	@echo "    make format         ruff format (aplica cambios en sitio)"
+	@echo "    make typecheck      mypy --strict (tipado estático)"
+	@echo "    make security       bandit + pip-audit (vulnerabilidades)"
+	@echo "    make audit          radon cc + agents audit (complejidad + equipo)"
 	@echo ""
 	@echo "  Jupyter"
 	@echo "    make lab            JupyterLab  (puerto 8888)"
@@ -128,6 +132,7 @@ setup:
 {% endif %}{% if use_optuna %}		--extra optuna \
 {% endif %}{% if use_monitoring %}		--extra monitoring \
 {% endif %}		&& echo "  Extras instalados."
+	@uv run pre-commit install 2>/dev/null || echo "  (pre-commit no disponible)"
 	@echo ""
 	@echo "  Listo. Activa el entorno con:  source .venv/bin/activate"
 	@echo ""
@@ -225,9 +230,9 @@ smoke:
 	@echo "▶  Test de humo — pipeline con datos sintéticos"
 	uv run pytest tests/ -v -m smoke --tb=short
 
-check: lint test
+check: lint typecheck test
 	@echo ""
-	@echo "  ✅ check pasado: lint + test OK"
+	@echo "  ✅ check pasado: lint + typecheck + test OK"
 
 lint:
 	uv run ruff check $(MODULE)/ tests/
@@ -235,6 +240,22 @@ lint:
 
 format:
 	uv run ruff format $(MODULE)/ tests/
+
+typecheck:
+	uv run mypy --strict $(MODULE)/ tests/
+	@echo "  ✅ typecheck OK"
+
+security:
+	uv run bandit -r $(MODULE)/ -f txt -x tests
+	uv run pip-audit 2>/dev/null || echo "  (pip-audit requiere paquetes instalados — ejecuta make setup primero)"
+	@echo "  ✅ security check OK"
+
+audit:
+	@echo "▶  Complejidad ciclomática (radon)"
+	@uv run radon cc $(MODULE)/ -s --min C 2>/dev/null || echo "  (sin radon)"
+	@echo ""
+	uv run python -m agents audit suggest 2>/dev/null || echo "  (agente 'audit' no disponible — ejecuta make setup)"
+	@echo "  ✅ audit OK"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Jupyter

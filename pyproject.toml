@@ -19,9 +19,17 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff",
-    "pytest",
+    "bandit",
+    "black",
+    "isort",
     "jinja2",
+    "mypy",
+    "pip-audit",
+    "pre-commit",
+    "pytest",
+    "radon",
+    "ruff",
+    "types-PyYAML",
 ]
 
 [build-system]
@@ -40,3 +48,21 @@ exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = ["template", ".venv"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+exclude = ["template/", ".venv"]
+
+[tool.bandit]
+exclude_dirs = ["template", ".venv", "tests"]
+skips = ["B101", "B404", "B603"]
+
+[tool.radon]
+max_cc = 10
+exclude = ["template/", ".venv", "tests/"]

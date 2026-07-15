@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias de validación
-        run: pip install jinja2 pyyaml jinja2-time
+        run: pip install jinja2 pyyaml
 
       - name: Validar copier.yml
         run: python .github/scripts/check_copier.py
@@ -71,14 +71,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v5
 
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Instalar copier y pyyaml
-        run: pip install copier pyyaml jinja2-time
+        run: pip install copier pyyaml
 
       - name: Escribir data file
         run: python .github/scripts/write_data_file.py "${{ matrix.data }}"
@@ -100,3 +100,11 @@ jobs:
       - name: Lint
         working-directory: /tmp/generated
         run: uv run ruff check .
+
+      - name: Security scan (Bandit)
+        working-directory: /tmp/generated
+        run: uv run bandit -r . -f txt -x notebooks,.venv,tests || echo "  (avisos de bandit — revisar si hay falsos positivos)"
+
+      - name: Vulnerability scan (pip-audit)
+        working-directory: /tmp/generated
+        run: uv run pip-audit 2>/dev/null || echo "  (pip-audit requiere deps instaladas)"

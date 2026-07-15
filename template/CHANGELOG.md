@@ -5,7 +5,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
-## [{{ project_version }}] — {% now 'utc', '%Y-%m-%d' %}
+## [{{ project_version }}] — {{ project_version_date | default('yyyy-mm-dd') }}
 
 ### Añadido
 

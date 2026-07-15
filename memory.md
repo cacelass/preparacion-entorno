@@ -32,6 +32,19 @@ Instrucciones, correcciones y preferencias guardadas por el usuario para recorda
 - Abstracciones removidas: `base_tool.py` (ABC muerta), `prev()` reference resolution de `gstack/stack.py` (DSL no usado), `_discover_entry_points()` de `registry.py` (infraestructura de plugins sin paquetes externos)
 - 219 tests pasan en agentes
 
+## Code review checklist
+
+Checklist de áreas clave a inspeccionar y herramientas a incorporar, según revisión exterior:
+- **Código**: módulos bajo `{{ project_slug }}/` — data, features, models, utils, visualization. Verificar estructura de paquete Python (src/, `__init__.py`).
+- **CI**: `.github/workflows/` — validar comandos existentes, eliminar redundancias.
+- **Tests**: `tests/` — listar módulos sin cobertura. Meta ≥80%.
+- **Docs**: README, LICENSE, CONTRIBUTING, SECURITY — imprescindibles.
+- **Deps**: escaneo de vulnerabilidades (pip-audit), justificar dependencias.
+- **Herramientas a integrar**: Black (formato), isort (imports), MyPy strict (tipado), Radon ≤10 (complejidad ciclomática), Bandit (seguridad), pre-commit hooks, pytest-cov --cov-fail-under=80.
+- **Tests a añadir**: unitarios por módulo (data, features, modelos), integración (pipeline completo con dataset controlado), E2E (CLI/pipelines). Usar fixtures+parametrización en pytest.
+- **Refactorizaciones**: eliminar sobreabstracción (funciones > clases encadenadas si solo hay una variante), eliminar código muerto, simplificar pipelines fragmentados, docstrings estilo Google en API pública.
+- **Regla**: no abstracción anticipada. Solo extraer interfaz cuando haya ≥2 implementaciones reales.
+
 ## Self-maintenance (Jul 2026)
 
 - dskit tiene su propio `Makefile` en la raíz para auto-mantenimiento
@@ -40,4 +53,3 @@ Instrucciones, correcciones y preferencias guardadas por el usuario para recorda
 - `make recommended-all` en proyectos generados como alias
 - `uv pip install eticas-audit` para fairness/bias (ITACA)
 - `npm install -g @synsci/openscience` para AI workbench científico
-

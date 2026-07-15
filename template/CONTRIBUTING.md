@@ -7,13 +7,15 @@ Gracias por tu interés en contribuir a {{ project_name }}.
 1. Haz un fork del repositorio.
 2. Crea una rama para tu cambio (`git checkout -b feat/mi-cambio`).
 3. Asegúrate de que los tests pasan: `make check`.
-4. Haz commit con un mensaje descriptivo.
-5. Abre un Pull Request.
+4. Ejecuta la batería de calidad: `make lint typecheck security audit`.
+5. Haz commit con un mensaje descriptivo (conventional commit).
+6. Abre un Pull Request.
 
 ## Guías
 
 - Sigue el estilo del código existente (ruff lo valida con `make lint`).
-- Añade tests para cualquier funcionalidad nueva.
+- Añade tests para cualquier funcionalidad nueva. La cobertura mínima es 80%.
+- Añade type hints en todo código nuevo (validado con `make typecheck`).
 - Actualiza el CHANGELOG.md con tus cambios.
 
 ## Reportar issues
