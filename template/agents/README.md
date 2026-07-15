@@ -321,6 +321,31 @@ documentación/README de cada proyecto en el momento de escribir esto — aun
 así, estos repos cambian rápido, conviene revisar el estado actual antes de
 depender de alguno.
 
+### Instalación rápida
+
+```bash
+# Ver todas las herramientas recomendadas
+make recommended-tools
+
+# Skills.sh (requiere Node.js)
+npx skills add obra/superpowers
+npx skills add mattpocock/skills
+npx autoskills -y
+
+# Memoria (Python)
+uv pip install cognee supermemory
+
+# Fairness / bias
+uv pip install eticas-audit
+
+# AI workbench científico
+npm install -g @synsci/openscience
+```
+
+Los `make` targets del proyecto (`make skills`, `make recommended-tools`) se
+encargan de instalar lo local; lo demás depende del ecosistema de cada
+herramienta (npm, pip, git clone).
+
 ### Directrices de comportamiento para agentes
 
 - **[multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills)** —

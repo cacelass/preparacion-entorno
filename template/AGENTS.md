@@ -114,6 +114,23 @@ información, hazlo.
 | `knowledge` | Construye y mantiene el grafo de conocimiento + bóveda Obsidian |
 | `docsearch` | Busca/navega el grafo de conocimiento, poda nodos irrelevantes |
 | `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |
+| `memory` | **Memoria proactiva**: observa trayectorias de agentes, mantiene un banco estructurado (facts/state/traces) e inyecta contexto para combatir *behavioral state decay* en tareas largas |
+
+## Skills del asistente
+
+Los prompts de los agentes (`agents/prompts/*.md`) también funcionan como
+skills para asistentes de IA (Claude Code, opencode, Cursor, Copilot...).
+
+```bash
+# Instalar skills localmente en .opencode/skills/
+make skills
+
+# Instalar skills del ecosistema (Node.js requerido)
+npx autoskills -y
+```
+
+Esto hace que el asistente entienda tu stack y los roles de cada agente sin
+configuración adicional.
 
 ## Roles y límites — `agents/contracts.py`
 

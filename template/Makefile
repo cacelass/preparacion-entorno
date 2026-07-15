@@ -7,7 +7,8 @@
         mlflow \
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
-        agents-list agents-run agents-doctor \
+        agents-list agents-run agents-doctor agents-memory \
+        skills recommended-tools recommended-all \
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -85,6 +86,18 @@ help:
 {% endif %}
 	@echo "  Documentación"
 	@echo "    make docs           sphinx-apidoc + html"
+	@echo ""
+	@echo "  Agentes"
+	@echo "    make agents-list     listar agentes disponibles"
+	@echo "    make agents-run      ejecutar un agente"
+	@echo "    make agents-doctor   diagnóstico completo con agentes"
+	@echo "    make agents-memory   estado de la memoria de agentes"
+	@echo ""
+	@echo "  Skills del asistente"
+	@echo "    make skills          instalar skills locales en .opencode/skills/"
+	@echo ""
+	@echo "  Ecosistema"
+	@echo "    make recommended-tools  mostrar herramientas recomendadas"
 	@echo ""
 	@echo "  Limpieza"
 	@echo "    make clean          cachés y __pycache__"
@@ -268,6 +281,57 @@ agents-run:
 
 agents-doctor:
 	uv run python -m agents doctor
+
+agents-memory:
+	@echo "▶  Estado de la memoria de agentes"
+	uv run python -m agents run memory status
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Skills — configuración del asistente de IA
+# ─────────────────────────────────────────────────────────────────────────────
+skills:
+	@echo "▶  Instalando skills del proyecto..."
+	@mkdir -p .opencode/skills
+	@for skill in agents/prompts/*.md; do \
+		name=$$(basename "$$skill" .md); \
+		cp "$$skill" ".opencode/skills/$$name.md"; \
+		echo "   skill: $$name"; \
+	done
+	@echo "   Skills instaladas en .opencode/skills/ (disponibles para el asistente)."
+	@echo ""
+	@echo "   Para soporte multi-asistente, también se pueden instalar como:"
+	@echo "     npx autoskills -y    (si usas Node.js, instala skills de skills.sh)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Recomendados — instala herramientas del ecosistema (agents/README.md)
+# ─────────────────────────────────────────────────────────────────────────────
+recommended-tools:
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "  Herramientas recomendadas del ecosistema"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "  Skills (skills.sh):"
+	@echo "    npx skills add obra/superpowers"
+	@echo "    npx skills add mattpocock/skills"
+	@echo "    npx skills add anthropics/skills/skill-creator"
+	@echo ""
+	@echo "  Frameworks de memoria (pip):"
+	@echo "    uv pip install cognee"
+	@echo "    uv pip install supermemory"
+	@echo ""
+	@echo "  Agentes de investigación (pip):"
+	@echo "    uv pip install langchain-community langgraph"
+	@echo "    git clone https://github.com/langchain-ai/local-deep-researcher"
+	@echo ""
+	@echo "  Fairness / bias (pip):"
+	@echo "    uv pip install eticas-audit"
+	@echo ""
+	@echo "  Otros:"
+	@echo "    npx autoskills -y           # skills automáticas por stack"
+	@echo "    npm install -g @synsci/openscience  # AI workbench científico"
+	@echo ""
+
+recommended-all: recommended-tools
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Limpieza
