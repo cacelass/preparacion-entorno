@@ -1,12 +1,12 @@
 {% if ml_type == 'supervisado' %}
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-from {{ project_slug }}.utils.paths import FIGURES_DIR
+from {{project_slug}}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 plt.rcParams["figure.figsize"] = (12, 7)
@@ -210,17 +210,16 @@ def plot_pairplot(df: pd.DataFrame, target_col: str, max_features: int = 6) -> N
 
 
 {% elif ml_type == 'no_supervisado' %}
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import seaborn as sns
 import scipy.cluster.hierarchy as sch
-
+import seaborn as sns
 from sklearn.decomposition import PCA
-
-from {{ project_slug }}.utils.paths import FIGURES_DIR
+from {{project_slug}}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 
@@ -443,15 +442,15 @@ def plot_cluster_profiles(X, labels, feature_names: list = None) -> None:
 
 
 {% elif ml_type == 'redes_neuronales' %}
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-
-from {{ project_slug }}.utils.paths import FIGURES_DIR
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from {{project_slug}}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 
@@ -618,7 +617,6 @@ def plot_embeddings_2d(model, X, labels=None, feature_names=None, model_name="NN
     """
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     import torch
-
     import torch.nn as nn
     model.eval()
     X_t = torch.tensor(X.values if hasattr(X, "values") else X[:500], dtype=torch.float32)
@@ -670,7 +668,6 @@ def plot_attention_weights(attention_weights, model_name="Transformer"):
         return
     att = attention_weights  # (batch, heads, seq_len, seq_len)
     n_heads = min(4, att.shape[1])
-    seq_len = att.shape[-1]
 
     fig, axes = plt.subplots(1, n_heads, figsize=(5 * n_heads, 5))
     if n_heads == 1:
@@ -718,16 +715,16 @@ def plot_reliability_diagram(probas, y_true, model_name, T=None, n_bins=10):
 
 
 {% elif ml_type == 'hibrido' %}
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-
-from {{ project_slug }}.utils.paths import FIGURES_DIR
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from {{project_slug}}.utils.paths import FIGURES_DIR
 
 plt.style.use("ggplot")
 

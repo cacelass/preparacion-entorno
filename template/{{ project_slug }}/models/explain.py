@@ -52,7 +52,6 @@ def explain_model(
     has_lstm = hasattr(model, "lstm")
     has_gru = hasattr(model, "gru")
     has_embedding = hasattr(model, "embedding")
-    has_conv = hasattr(model, "conv")
 
     # LayerIntegratedGradients para modelos recurrentes (atribuye a input)
     if has_lstm:
