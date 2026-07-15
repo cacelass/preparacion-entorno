@@ -52,6 +52,7 @@ DEFAULTS = dict(
     use_lightgbm=False,
     use_catboost=False,
     use_monitoring=False,
+    use_calibration=False,
     graphify_mode="no",
 )
 
@@ -151,6 +152,7 @@ COMBOS: list[tuple[str, dict]] = [
             optimizer_type="RMSProp",
             nn_loss_fn="BCEWithLogitsLoss",
             use_optuna=True,
+            use_calibration=True,
         ),
     ),
     (

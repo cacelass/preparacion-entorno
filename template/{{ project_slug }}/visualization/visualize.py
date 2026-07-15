@@ -590,6 +590,133 @@ def plot_class_balance(df, target_col: str) -> None:
     plt.close(fig)
 
 
+def plot_feature_attribution(importances, feature_names, model_name, max_display=15):
+    """Barra de importancia por feature desde Captum o cualquier atribución."""
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    n_feat = len(importances)
+    top_k = min(max_display, n_feat)
+    indices = np.argsort(np.abs(importances))[::-1][:top_k]
+    fig, ax = plt.subplots(figsize=(9, max(4, top_k * 0.4)))
+    ax.barh(range(top_k), importances[indices][::-1], color="steelblue")
+    ax.set_yticks(range(top_k))
+    ax.set_yticklabels([feature_names[i] for i in indices[::-1]], fontsize=9)
+    ax.set_xlabel("Importancia")
+    ax.set_title(f"Feature Attribution — {model_name}")
+    fig.tight_layout()
+    path = FIGURES_DIR / f"attribution_{model_name}.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"    attribution_{model_name}.png guardado")
+
+
+def plot_embeddings_2d(model, X, labels=None, feature_names=None, model_name="NN"):
+    """
+    Extrae embeddings intermedios del modelo y los proyecta en 2D.
+
+    Para LSTM/Transformer usa get_embeddings() si existe;
+    si no, usa la penúltima capa como embedding.
+    """
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    import torch
+
+    import torch.nn as nn
+    model.eval()
+    X_t = torch.tensor(X.values if hasattr(X, "values") else X[:500], dtype=torch.float32)
+
+    with torch.no_grad():
+        if hasattr(model, "get_embeddings"):
+            emb = model.get_embeddings(X_t).cpu().numpy()
+        else:
+            body = nn.Sequential(*list(model.children())[:-1])
+            emb = body(X_t).cpu().numpy()
+
+    # Reducir a 2D
+    if emb.ndim == 3:
+        emb = emb.mean(axis=1)  # (batch, seq_len, dim) → (batch, dim)
+    n = emb.shape[0]
+
+    try:
+        import umap
+        reducer = umap.UMAP(n_components=2, random_state=42)
+        emb_2d = reducer.fit_transform(emb)
+        method = "UMAP"
+    except ImportError:
+        from sklearn.decomposition import PCA
+        reducer = PCA(n_components=2, random_state=42)
+        emb_2d = reducer.fit_transform(emb)
+        method = "PCA"
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    sc = ax.scatter(emb_2d[:, 0], emb_2d[:, 1],
+                    c=labels[:n] if labels is not None else "steelblue",
+                    cmap="tab10" if labels is not None else None,
+                    s=15, alpha=0.7)
+    if labels is not None:
+        plt.colorbar(sc, ax=ax, label="Clase")
+    ax.set_title(f"Embeddings ({method}) — {model_name}")
+    ax.set_xlabel(f"{method} 1")
+    ax.set_ylabel(f"{method} 2")
+    fig.tight_layout()
+    path = FIGURES_DIR / f"embeddings_{model_name}.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"    embeddings_{model_name}.png guardado")
+
+
+def plot_attention_weights(attention_weights, model_name="Transformer"):
+    """Heatmap de pesos de atención (última capa, primeras cabezas)."""
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    if attention_weights is None:
+        return
+    att = attention_weights  # (batch, heads, seq_len, seq_len)
+    n_heads = min(4, att.shape[1])
+    seq_len = att.shape[-1]
+
+    fig, axes = plt.subplots(1, n_heads, figsize=(5 * n_heads, 5))
+    if n_heads == 1:
+        axes = [axes]
+    for h in range(n_heads):
+        im = axes[h].imshow(att[0, h].cpu().numpy(), cmap="Blues")
+        axes[h].set_title(f"Cabeza {h+1}")
+        axes[h].set_xlabel("Posición (key)")
+        axes[h].set_ylabel("Posición (query)")
+        plt.colorbar(im, ax=axes[h], fraction=0.046)
+    fig.suptitle(f"Atención — {model_name}", fontsize=13)
+    fig.tight_layout()
+    path = FIGURES_DIR / f"attention_{model_name}.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"    attention_{model_name}.png guardado")
+
+
+def plot_reliability_diagram(probas, y_true, model_name, T=None, n_bins=10):
+    """Reliability diagram: accuracy por nivel de confianza."""
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    if probas.ndim == 2:
+        probas = probas.max(axis=1)
+    bins = np.linspace(0, 1, n_bins + 1)
+    conf_mean = np.zeros(n_bins)
+    acc_mean = np.zeros(n_bins)
+    for i in range(n_bins):
+        mask = (probas > bins[i]) & (probas <= bins[i + 1])
+        if mask.sum() > 0:
+            conf_mean[i] = probas[mask].mean()
+            acc_mean[i] = y_true[mask].mean()
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.plot([0, 1], [0, 1], "k--", lw=1.5, label="Perfecto")
+    ax.plot(conf_mean, acc_mean, "bo-", lw=2, markersize=6, label="Modelo")
+    ax.set_xlabel("Confianza")
+    ax.set_ylabel("Accuracy")
+    ax.set_title(f"Reliability — {model_name}" + (f" (T={T:.3f})" if T else ""))
+    ax.legend()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / f"reliability_{model_name}.png", dpi=150)
+    plt.close(fig)
+    print(f"    reliability_{model_name}.png guardado")
+
+
 {% elif ml_type == 'hibrido' %}
 import numpy as np
 import pandas as pd

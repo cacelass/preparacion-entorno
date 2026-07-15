@@ -9,6 +9,7 @@ También añade los campos obligatorios comunes para todos los proyectos CI.
 Uso:
     python write_data_file.py "ml_type=supervisado task_type=clasificacion"
 """
+
 import sys
 from pathlib import Path
 
@@ -41,19 +42,43 @@ BASE = {
     "use_lightgbm": False,
     "use_catboost": False,
     "use_monitoring": False,
+    "use_calibration": False,
     "graphify_mode": "no",
 }
 
 # Parsear argumentos de la forma "key=val key=val"
 raw = " ".join(sys.argv[1:])
 overrides: dict = {}
-VALID_KEYS = {"ml_type", "task_type", "model_type", "cluster_model", "nn_model",
-              "optimizer_type", "nn_loss_fn", "use_mlflow", "use_optuna", "use_duckdb",
-              "use_api", "use_docker", "use_shap", "use_xgboost", "use_lightgbm",
-               "use_catboost", "use_monitoring", "graphify_mode", "project_slug", "project_name",
-              "project_author_name", "project_author_email", "project_description",
-              "project_open_source_license", "python_version", "project_version",
-              "dskit_version"}
+VALID_KEYS = {
+    "ml_type",
+    "task_type",
+    "model_type",
+    "cluster_model",
+    "nn_model",
+    "optimizer_type",
+    "nn_loss_fn",
+    "use_mlflow",
+    "use_optuna",
+    "use_duckdb",
+    "use_api",
+    "use_docker",
+    "use_shap",
+    "use_xgboost",
+    "use_lightgbm",
+    "use_catboost",
+    "use_monitoring",
+    "use_calibration",
+    "graphify_mode",
+    "project_slug",
+    "project_name",
+    "project_author_name",
+    "project_author_email",
+    "project_description",
+    "project_open_source_license",
+    "python_version",
+    "project_version",
+    "dskit_version",
+}
 
 for token in raw.split():
     if "=" in token:

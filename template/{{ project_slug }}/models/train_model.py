@@ -1092,14 +1092,18 @@ class LSTMClassifier(nn.Module):
 
     def forward(self, x):
         # x: (batch, seq_len, input_dim)
-        # Para datos tabulares sin dimensión temporal: unsqueeze(1)
         if x.dim() == 2:
             x = x.unsqueeze(1)
         _, (h_n, _) = self.lstm(x)
-        # h_n: (num_layers * num_directions, batch, hidden_dim)
-        # Tomamos el último estado de la última dirección
         out = h_n[-1]
         return self.head(out)
+
+    def get_embeddings(self, x):
+        """Retorna el último estado oculto (representación intermedia)."""
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+        _, (h_n, _) = self.lstm(x)
+        return h_n[-1]
 
 
 # ---------------------------------------------------------------------------
@@ -1141,6 +1145,13 @@ class GRUClassifier(nn.Module):
             x = x.unsqueeze(1)
         _, h_n = self.gru(x)
         return self.head(h_n[-1])
+
+    def get_embeddings(self, x):
+        """Retorna el último estado oculto (representación intermedia)."""
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+        _, h_n = self.gru(x)
+        return h_n[-1]
 
 
 # ---------------------------------------------------------------------------
@@ -1201,16 +1212,47 @@ class TransformerClassifier(nn.Module):
         )
         self.encoder = nn.TransformerEncoder(enc_layer, num_layers=num_layers)
         self.head    = nn.Linear(d_model, output_dim)
+        self._attention_weights: list[torch.Tensor] = []
+
+    def _register_attention_hook(self):
+        """Registra hook para capturar pesos de atención de la última capa."""
+        def _hook(module, inp, out):
+            # out[1] contiene los pesos de atención en nn.MultiheadAttention
+            if isinstance(out, tuple) and len(out) > 1 and out[1] is not None:
+                self._attention_weights.append(out[1].detach().cpu())
+        for layer in self.encoder.layers:
+            layer.self_attn.register_forward_hook(_hook)
 
     def forward(self, x):
         # x: (batch, input_dim) → (batch, 1, input_dim) si es tabular
         if x.dim() == 2:
             x = x.unsqueeze(1)
-        x = self.embedding(x)      # (batch, seq_len, d_model)
+        x = self.embedding(x)
         x = self.pos_enc(x)
         x = self.encoder(x)
-        x = x.mean(dim=1)          # Global Average Pooling sobre tokens
+        x = x.mean(dim=1)
         return self.head(x)
+
+    def get_attention_weights(self, x):
+        """Retorna pesos de atención de la última capa: (batch, heads, seq_len, seq_len)."""
+        self._attention_weights.clear()
+        if not self._attention_weights:
+            self._register_attention_hook()
+        self.eval()
+        with torch.no_grad():
+            self(x)
+        if self._attention_weights:
+            return self._attention_weights[-1]
+        return None
+
+    def get_embeddings(self, x):
+        """Retorna embedding antes del pooling: (batch, seq_len, d_model)."""
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+        x = self.embedding(x)
+        x = self.pos_enc(x)
+        x = self.encoder(x)
+        return x
 
 
 # ---------------------------------------------------------------------------
@@ -1621,6 +1663,25 @@ def train_models(
 
     # Guardar output_dim para que la API sepa cuántas clases/dimensiones usar al cargar
     joblib.dump(output_dim, ARTIFACTS_DIR / "output_dim.joblib")
+
+{% if use_calibration and task_type == 'clasificacion' %}
+    # ── Calibración post-hoc (Temperature Scaling) ─────────────────────────
+    try:
+        from {{ project_slug }}.models.calibrate import TemperatureScaler
+        scaler = TemperatureScaler()
+        nll_before = F.cross_entropy(
+            model(torch.cat([X_t, X_v])), torch.cat([y_t, y_v])
+        ).item()
+        scaler.fit(model, val_loader, device, max_iter=50)
+        T = scaler.get_temperature()
+        with torch.no_grad():
+            logits_cal = scaler(model(torch.cat([X_t, X_v])))
+            nll_after = F.cross_entropy(logits_cal, torch.cat([y_t, y_v])).item()
+        joblib.dump(scaler.state_dict(), ARTIFACTS_DIR / "temperature_scaler.joblib")
+        print(f"    Calibración: T={T:.4f}  NLL antes={nll_before:.4f}  después={nll_after:.4f}")
+    except Exception as exc:
+        print(f"    Calibración no disponible: {exc}")
+{% endif %}
 
     return {MODEL_NAME: model}
 

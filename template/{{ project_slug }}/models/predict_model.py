@@ -928,6 +928,23 @@ def evaluate_models(models, X_test, y_test, num_classes: int = 2,
             _plot_proba_distribution(proba_out, y_true, name)
         _export_predictions(y_true, y_pred, proba_out, name, num_classes)
 
+        # ── Diagrama de calibración (si hay temperature scaler) ──────────
+        _calib_path = MODELS_DIR / "artifacts" / "temperature_scaler.joblib"
+        if _calib_path.exists() and num_classes > 1:
+            try:
+                import joblib as _jl
+                from {{ project_slug }}.models.calibrate import TemperatureScaler
+                _scaler = TemperatureScaler()
+                _scaler.load_state_dict(_jl.load(_calib_path))
+                _T = _scaler.get_temperature()
+                with torch.no_grad():
+                    _proba_cal = torch.softmax(_scaler(logits), dim=1).cpu().numpy()
+                _plot_reliability_diagram(
+                    _proba_cal, y_true, name, T=_T,
+                )
+            except Exception as _calib_err:
+                print(f"    Calibración no disponible: {_calib_err}")
+
         results.append({
             "Modelo": name, "Accuracy": round(acc, 4), "F1": round(f1, 4),
             "Precision": round(prec, 4), "Recall": round(rec, 4),
@@ -1325,4 +1342,155 @@ def try_model() -> None:
             proba = torch.softmax(logits, dim=1).cpu().numpy()[0]
             print(f"  Probabilidades: {dict(enumerate(proba.round(4).tolist()))}")
     print(f"{'='*50}\n")
+
+
+# ---------------------------------------------------------------------------
+# Diagrama de calibración (reliability)
+# ---------------------------------------------------------------------------
+def _plot_reliability_diagram(probas, y_true, model_name, T=None, n_bins=10):
+    """
+    Reliability diagram: confianza media vs accuracy real por bin.
+
+    Parameters
+    ----------
+    probas     : array (n, n_classes) probabilidades calibradas (si es 1D se
+                 interpreta como binario, clase positiva)
+    y_true     : array (n,) etiquetas verdaderas
+    model_name : nombre del modelo para el título
+    T          : temperatura (opcional, para mostrar en el gráfico)
+    n_bins     : número de bins de confianza
+    """
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    if probas.ndim == 2:
+        pred_class = np.argmax(probas, axis=1)
+        conf = probas.max(axis=1)
+    else:
+        pred_class = (probas >= 0.5).astype(int)
+        conf = probas
+
+    bins = np.linspace(0, 1, n_bins + 1)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    acc_per_bin = np.zeros(n_bins)
+    conf_per_bin = np.zeros(n_bins)
+    count_per_bin = np.zeros(n_bins)
+
+    for i in range(n_bins):
+        mask = (conf > bins[i]) & (conf <= bins[i + 1])
+        count_per_bin[i] = mask.sum()
+        if count_per_bin[i] > 0:
+            conf_per_bin[i] = conf[mask].mean()
+            acc_per_bin[i] = (y_true[mask] == pred_class[mask]).mean()
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.plot([0, 1], [0, 1], "k--", lw=1.5, label="Perfectamente calibrado")
+    ax.plot(conf_per_bin, acc_per_bin, "bo-", lw=2, markersize=6, label="Modelo")
+    ax.fill_between(bin_centers, 0, count_per_bin / count_per_bin.max() * 0.1,
+                    alpha=0.15, label="Frecuencia (norm.)")
+    ax.set_xlabel("Confianza media")
+    ax.set_ylabel("Accuracy")
+    ax.set_title(f"Reliability Diagram — {model_name}" + (f" (T={T:.3f})" if T else ""))
+    ax.legend()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    fig.tight_layout()
+    path = FIGURES_DIR / f"reliability_{model_name}.png"
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"    reliability_{model_name}.png guardado")
+
+
+# ---------------------------------------------------------------------------
+# Explicabilidad con Captum
+# ---------------------------------------------------------------------------
+def explain_models(
+    models: dict,
+    X_test,
+    feature_names: list = None,
+    target: int = None,
+    max_display: int = 15,
+) -> None:
+    """
+    Genera explicaciones Captum para cada modelo PyTorch.
+
+    Por modelo produce en reports/figures/:
+      - attribution_bar_{name}.png  → importancia global media
+      - attribution_hist_{name}.png → distribución de atribuciones
+
+    Parameters
+    ----------
+    models        : dict nombre → modelo (output de train_models)
+    X_test        : datos de test (array-like)
+    feature_names : nombres de features
+    target        : clase objetivo (None = clase predicha)
+    max_display   : máx features a mostrar en barras
+    """
+    try:
+        from {{ project_slug }}.models.explain import explain_model, summarize_attributions
+    except ImportError as _e:
+        print(f"  Captum no disponible: {_e}")
+        return
+
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    if hasattr(X_test, "values"):
+        X_arr = X_test.values
+    else:
+        X_arr = X_test
+
+    feat_names = feature_names or [f"feature_{i}" for i in range(X_arr.shape[1])]
+    X_t = torch.tensor(X_arr[:32], dtype=torch.float32)  # primeras 32 muestras
+
+    print(f"\n{'='*60}\n  Captum — Explicabilidad de modelos\n{'='*60}")
+
+    for name, model in models.items():
+        print(f"\n--- {name} ---")
+        try:
+            attr = explain_model(model, X_t, target=target)
+            imp = summarize_attributions(attr, agg="absmean")
+
+            _plot_attribution_bar(imp, feat_names, name, max_display)
+            _plot_attribution_hist(attr, feat_names, name)
+        except Exception as exc:
+            print(f"    Captum no disponible para {name}: {exc}")
+
+
+def _plot_attribution_bar(importances, feat_names, model_name, max_display=15):
+    """Barra de importancia global (|atribución| media)."""
+    n_feat = len(importances)
+    top_k = min(max_display, n_feat)
+    indices = np.argsort(np.abs(importances))[::-1][:top_k]
+
+    fig, ax = plt.subplots(figsize=(9, max(4, top_k * 0.4)))
+    ax.barh(range(top_k), importances[indices][::-1], color="steelblue")
+    ax.set_yticks(range(top_k))
+    ax.set_yticklabels([feat_names[i] for i in indices[::-1]], fontsize=9)
+    ax.set_xlabel("Atribución media (|Captum IG|)")
+    ax.set_title(f"Importancia de features — {model_name}")
+    fig.tight_layout()
+    path = FIGURES_DIR / f"attribution_bar_{model_name}.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"    attribution_bar_{model_name}.png guardado")
+
+
+def _plot_attribution_hist(attributions, feat_names, model_name):
+    """Heatmap de atribuciones por muestra (primeras 16) vs feature."""
+    n_samples = min(16, attributions.shape[0])
+    n_feat = attributions.shape[1]
+    if n_feat > 30:
+        return  # demasiadas features para heatmap legible
+
+    fig, ax = plt.subplots(figsize=(10, max(4, n_samples * 0.5)))
+    im = ax.imshow(attributions[:n_samples].T, aspect="auto", cmap="RdBu_r")
+    ax.set_yticks(range(n_feat))
+    ax.set_yticklabels([feat_names[i] if i < len(feat_names) else f"F{i}" for i in range(n_feat)], fontsize=8)
+    ax.set_xlabel("Muestra")
+    ax.set_xticks(range(n_samples))
+    ax.set_title(f"Atribuciones por muestra — {model_name}")
+    plt.colorbar(im, ax=ax, label="Atribución")
+    fig.tight_layout()
+    path = FIGURES_DIR / f"attribution_hist_{model_name}.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"    attribution_hist_{model_name}.png guardado")
 {% endif %}

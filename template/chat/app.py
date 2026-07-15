@@ -262,6 +262,10 @@ def _welcome_message() -> str:
         f"- `predict` — hacer una prediccion paso a paso\n"
         f"- `train` — lanzar el entrenamiento\n"
         f"- `reload` — recargar modelos del disco\n"
+{% if ml_type == 'redes_neuronales' %}
+        f"- `explain` — explicar el modelo con Captum\n"
+        f"- `calibrate` — mostrar estado de calibracion\n"
+{% endif %}
         f"- `help` — mostrar este mensaje"
     )
 
@@ -448,11 +452,65 @@ async def process_message(msg: str, session: dict) -> str:
         return _start_prediction(session)
     if low in ("cancel", "cancelar"):
         return "ℹ No hay ninguna operacion activa."
+{% if ml_type == 'redes_neuronales' %}
+    if low in ("explain", "explicar", "explica"):
+        return _handle_explain()
+    if low in ("calibrate", "calibracion"):
+        return _handle_calibrate()
+{% endif %}
 
     return (
         f"❓ No reconozco `{msg}`.\n\n"
         f"Escribe `help` para ver los comandos disponibles."
     )
+
+
+{% if ml_type == 'redes_neuronales' %}
+def _handle_explain() -> str:
+    """Explica el modelo actual con Captum."""
+    if not _state["model_loaded"]:
+        return "   No hay modelos cargados."
+    fn = _state["feature_names"]
+    if not fn:
+        return "   No hay nombres de features."
+    try:
+        from {{ project_slug }}.models.explain import explain_model, summarize_attributions
+        import torch
+        model = list(_state["models"].values())[0]
+        X_dummy = torch.randn(1, len(fn))
+        attr = explain_model(model, X_dummy)
+        imp = summarize_attributions(attr, agg="absmean")
+        top_k = min(10, len(imp))
+        indices = np.argsort(np.abs(imp))[::-1][:top_k]
+        lines = [f"**Top-{top_k} features más importantes:**\n"]
+        for i, idx in enumerate(indices):
+            lines.append(f"  {i+1}. `{fn[idx]}` — {imp[idx]:.4f}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"   Explicabilidad no disponible: {exc}"
+
+
+def _handle_calibrate() -> str:
+    """Muestra estado de calibración."""
+    cal_path = MODELS_DIR / "artifacts" / "temperature_scaler.joblib"
+    if not cal_path.exists():
+        return "   No hay calibración disponible. Entrena con `use_calibration=true`."
+    try:
+        import joblib
+        from {{ project_slug }}.models.calibrate import TemperatureScaler
+        scaler = TemperatureScaler()
+        scaler.load_state_dict(joblib.load(cal_path))
+        T = scaler.get_temperature()
+        return (
+            f"**Calibración activa**\n\n"
+            f"**Temperatura (T):** `{T:.4f}`\n\n"
+            f"- T ≈ 1.0 → sin efecto\n"
+            f"- T > 1.0 → suaviza probabilidades (menos overconfidence)\n"
+            f"- T < 1.0 → acentúa probabilidades"
+        )
+    except Exception as exc:
+        return f"   Error al leer calibración: {exc}"
+{% endif %}
 
 
 # ---------------------------------------------------------------------------
@@ -505,6 +563,116 @@ async def api_reload():
         "model_loaded": _state["model_loaded"],
         "models": list(_state["models"].keys()),
     }
+
+
+@app.post("/api/predict")
+async def api_predict(data: dict):
+    """Endpoint REST para predicción directa (usado por el frontend form)."""
+    features = data.get("features", {})
+    try:
+        X = _preprocess(features)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+{% if ml_type == 'supervisado' or ml_type == 'hibrido' %}
+    model_name = list(_state["models"].keys())[0]
+    model = _state["models"][model_name]
+    pred = model.predict(X)[0]
+    result = {"prediction": int(pred), "model": model_name}
+{% if task_type == 'clasificacion' %}
+    if hasattr(model, "predict_proba"):
+        prob = float(model.predict_proba(X)[0].max())
+        result["probability"] = prob
+{% endif %}
+    return result
+
+{% elif ml_type == 'no_supervisado' %}
+    model_name = list(_state["models"].keys())[0]
+    model = _state["models"][model_name]
+    if hasattr(model, "predict"):
+        cluster = int(model.predict(X)[0])
+        return {"cluster": cluster, "model": model_name}
+    return {"error": f"Modelo '{model_name}' no soporta predicción"}
+
+{% elif ml_type == 'redes_neuronales' %}
+    model_name = "{{ nn_model }}"
+    model = _state["models"].get(model_name)
+    if model is None:
+        return {"error": "Modelo no cargado"}
+    with torch.no_grad():
+        tensor = torch.tensor(X, dtype=torch.float32)
+        logits = model(tensor)
+{% if task_type == 'clasificacion' %}
+        probs = torch.softmax(logits, dim=-1)
+        pred = int(probs.argmax(dim=-1).item())
+        prob = float(probs.max().item())
+    return {"prediction": pred, "probability": prob, "model": model_name}
+{% else %}
+        pred = float(logits.squeeze().item())
+    return {"prediction": pred, "model": model_name}
+{% endif %}
+{% endif %}
+
+
+@app.post("/api/explain")
+async def api_explain():
+    """Explica la última predicción con Captum (redes neuronales)."""
+{% if ml_type == 'redes_neuronales' %}
+    if not _state["model_loaded"]:
+        return {"error": "No hay modelo cargado"}
+    model_name = "{{ nn_model }}"
+    model = _state["models"].get(model_name)
+    if model is None:
+        return {"error": "Modelo no encontrado"}
+    fn = _state["feature_names"]
+    if not fn:
+        return {"error": "No hay nombres de features"}
+    try:
+        from {{ project_slug }}.models.explain import explain_model, summarize_attributions
+        X_dummy = torch.randn(1, len(fn))
+        attr = explain_model(model, X_dummy)
+        imp = summarize_attributions(attr, agg="absmean")
+        # Generar gráfico en base64
+        import io, base64, matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(8, max(4, len(fn) * 0.3)))
+        indices = np.argsort(np.abs(imp))[::-1]
+        ax.barh(range(len(imp)), imp[indices][::-1], color="steelblue")
+        ax.set_yticks(range(len(imp)))
+        ax.set_yticklabels([fn[i] for i in indices[::-1]], fontsize=8)
+        ax.set_xlabel("Importancia (Captum IG)")
+        fig.tight_layout()
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+        plt.close(fig)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return {"plot": b64, "feature_names": fn}
+    except Exception as exc:
+        return {"error": str(exc)}
+{% else %}
+    return {"error": "Explicabilidad solo disponible para redes neuronales"}
+{% endif %}
+
+
+@app.get("/api/calibrate/status")
+async def api_calibrate_status():
+    """Estado de la calibración (temperatura)."""
+{% if ml_type == 'redes_neuronales' %}
+    cal_path = MODELS_DIR / "artifacts" / "temperature_scaler.joblib"
+    if cal_path.exists():
+        try:
+            import joblib
+            from {{ project_slug }}.models.calibrate import TemperatureScaler
+            scaler = TemperatureScaler()
+            scaler.load_state_dict(joblib.load(cal_path))
+            return {"calibrated": True, "temperature": scaler.get_temperature()}
+        except Exception:
+            return {"calibrated": False, "temperature": None}
+    return {"calibrated": False, "temperature": None}
+{% else %}
+    return {"calibrated": False, "temperature": None, "note": "Calibración solo disponible para redes neuronales"}
+{% endif %}
 
 
 @app.websocket("/ws")

@@ -87,6 +87,7 @@ redes_neuronales = [
     "torch>=2.0",
     "torchmetrics[visual]",
     "tensorboard",
+    "captum>=0.7",    # explicabilidad (Integrated Gradients, LayerIG)
     "polars",         # carga eficiente de datos con dtypes explícitos
     "pyarrow",        # backend requerido por polars para conversión a pandas
 ]

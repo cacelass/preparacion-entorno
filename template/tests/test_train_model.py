@@ -266,6 +266,35 @@ def test_build_model_returns_correct_architecture():
     assert out.shape == (BATCH, OUTPUT_DIM)
 
 
+def test_lstm_get_embeddings():
+    model = LSTMClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    X = torch.randn(BATCH, 5, INPUT_DIM)
+    emb = model.get_embeddings(X)
+    assert emb.shape == (BATCH, 64)  # hidden_dim=64 por defecto
+
+
+def test_gru_get_embeddings():
+    model = GRUClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    X = torch.randn(BATCH, 5, INPUT_DIM)
+    emb = model.get_embeddings(X)
+    assert emb.shape == (BATCH, 64)  # hidden_dim=64 por defecto
+
+
+def test_transformer_get_embeddings():
+    model = TransformerClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    X = torch.randn(BATCH, 5, INPUT_DIM)
+    emb = model.get_embeddings(X)
+    assert emb.shape == (BATCH, 5, 64)  # (batch, seq_len, d_model=64)
+
+
+def test_transformer_get_attention_weights():
+    model = TransformerClassifier(input_dim=INPUT_DIM, output_dim=OUTPUT_DIM)
+    X = torch.randn(BATCH, 5, INPUT_DIM)
+    att = model.get_attention_weights(X)
+    assert att is not None
+    assert att.dim() == 4  # (batch, heads, seq_len, seq_len)
+
+
 def _make_nn_splits():
     import pandas as pd
     from sklearn.model_selection import train_test_split

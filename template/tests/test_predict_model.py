@@ -365,5 +365,27 @@ def test_predict_new_reg_returns_floats(patch_paths):
                            epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
     preds = predict_new(trained[MODEL_NAME], X_te, num_classes=1)
     assert len(preds) == len(X_te)
+
+
+def test_explain_models_nn_runs(patch_paths):
+    """explain_models debe ejecutarse sin errores."""
+    from {{ project_slug }}.models.predict_model import explain_models as _expl
+    X_tr, X_te, y_tr, y_te = _make_splits_clf()
+    n_cls = int(y_tr.nunique())
+    trained = train_models(X_tr, y_tr,
+                           input_dim=X_tr.shape[1], output_dim=n_cls,
+                           epochs=2, batch_size=32, checkpoint_every=0, val_split=0.2)
+    _expl(trained, X_te, feature_names=[f"f{i}" for i in range(X_te.shape[1])])
+    pngs = list(patch_paths["FIGURES_DIR"].glob("attribution_bar_*.png"))
+    assert len(pngs) == len(trained)
+
+
+def test_reliability_diagram_saves_png(patch_paths):
+    """_plot_reliability_diagram debe guardar PNG sin errores."""
+    from {{ project_slug }}.models.predict_model import _plot_reliability_diagram
+    y_true = np.array([0, 0, 1, 1, 0])
+    probas = np.array([0.1, 0.3, 0.7, 0.9, 0.4])
+    _plot_reliability_diagram(probas, y_true, "test_model", T=1.2)
+    assert (patch_paths["FIGURES_DIR"] / "reliability_test_model.png").exists()
 {% endif %}
 {% endif %}

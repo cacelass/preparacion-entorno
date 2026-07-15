@@ -339,6 +339,19 @@ def run_full_pipeline() -> None:
     )
 {% endif %}
 
+    print('\n6. Explicabilidad Captum...')
+    from {{ project_slug }}.models.predict_model import explain_models as _explain_nn
+    try:
+        import pandas as _pd
+        from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR as _PDIR
+        try:
+            _fn = _pd.read_csv(_PDIR / 'X_train.csv').columns.tolist()
+        except FileNotFoundError:
+            _fn = [f'feature_{i}' for i in range(X_test.shape[1])]
+        _explain_nn(models, X_test, feature_names=_fn)
+    except Exception as _e:
+        print(f'    Explicabilidad omitida: {_e}')
+
     tb.close()
     print('\n' + '=' * 60)
     print('Pipeline completado.')

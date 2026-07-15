@@ -9,6 +9,7 @@ Instrucciones, correcciones y preferencias guardadas por el usuario para recorda
 - Usar mensajes convencionales (feat:, fix:, chore:, docs:)
 - `ecommits` no está instalado en el entorno — hacer commits manuales
 - Taggear tras commits grandes: `git tag -a vX.Y.Z -m "mensaje"`
+- "comitea" significa commitear inmediatamente (no preguntar, no esperar cambio a code mode)
 
 ## Memory Agent (Jul 2026)
 
