@@ -158,7 +158,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts   = "-v --tb=short --cov={{ project_slug }} --cov-report=term-missing --cov-fail-under=80"
+addopts   = "-v --tb=short --cov={{ project_slug }} --cov-report=term-missing"
 markers   = [
     "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
 ]

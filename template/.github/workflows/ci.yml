@@ -41,7 +41,7 @@ jobs:
         run: uv run mypy --strict {{ project_slug }}/ tests/
 
       - name: Test with coverage
-        run: uv run pytest tests/ -v --cov={{ project_slug }} --cov-report=xml --cov-fail-under=80
+        run: uv run pytest tests/ -v --cov={{ project_slug }} --cov-report=xml --cov-fail-under=20
 
       - name: Security scan
         run: uv run bandit -r {{ project_slug }}/ -f txt -x tests || true

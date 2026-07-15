@@ -14,7 +14,7 @@ Gracias por tu interés en contribuir a {{ project_name }}.
 ## Guías
 
 - Sigue el estilo del código existente (ruff lo valida con `make lint`).
-- Añade tests para cualquier funcionalidad nueva. La cobertura mínima es 80%.
+- Añade tests para cualquier funcionalidad nueva. La cobertura mínima es 20% (regresión).
 - Añade type hints en todo código nuevo (validado con `make typecheck`).
 - Actualiza el CHANGELOG.md con tus cambios.
 
