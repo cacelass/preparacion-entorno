@@ -101,7 +101,7 @@ class DockerTool:
                     )
                 )
 
-            if upper.startswith("RUN") and "apt-get update" in upper and "&&" not in line:
+            if upper.startswith("RUN") and " APT-GET UPDATE" in upper and "&&" not in line:
                 findings.append(
                     DockerfileFinding(
                         i, "warning",

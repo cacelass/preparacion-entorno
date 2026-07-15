@@ -8,7 +8,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 from agents.context import get_context
 from agents.orchestrator import Orchestrator
@@ -22,7 +22,6 @@ class StackStep:
     kwargs: dict[str, Any] = field(default_factory=dict)
     auto_commit_message: str | None = None
     run_if: Callable[[list[AgentResult]], bool] | None = None
-    result_key: str | None = None
 
 
 @dataclass
@@ -31,7 +30,6 @@ class StackResult:
     steps: list[StackStep]
     results: list[AgentResult]
     failed_at: int | None = None
-    step_outputs: dict[str, AgentResult] = field(default_factory=dict)
 
     @property
     def summary(self) -> str:
@@ -55,12 +53,7 @@ class StackResult:
 
 class GStack:
     """
-    Pila de operaciones que se ejecutan secuencialmente, con paso de
-    resultados entre pasos y branching condicional.
-
-    Puedes acceder al resultado de un paso anterior con ``prev(key)`` dentro
-    del kwargs del siguiente paso. Los pasos también pueden declarar un
-    ``run_if`` como predicado sobre resultados anteriores.
+    Pila de operaciones que se ejecutan secuencialmente con branching condicional.
 
     Parámetros
     ----------
@@ -78,8 +71,6 @@ class GStack:
         self.auto_commit = auto_commit
         self.commit_on_error = commit_on_error
         self.log_events = log_events
-        # `context` explícito para quien orquesta sobre otro proyecto (o un
-        # test con contexto propio); sin él, el del proceso, como siempre.
         self._ctx = context or get_context()
         self._orch = Orchestrator(context=self._ctx)
 
@@ -89,26 +80,23 @@ class GStack:
 
         kwargs especiales (no se pasan al agente):
             auto_commit_message : str — sobreescribe el mensaje de commit auto
-            result_key         : str — clave para acceder al resultado luego
             run_if             : callable — ``run_if=lambda results: results[-1].success``
         """
         msg = kwargs.pop("auto_commit_message", None)
-        key = kwargs.pop("result_key", None)
         predicate = kwargs.pop("run_if", None)
         self._steps.append(StackStep(
             agent=agent, action=action, kwargs=kwargs,
-            auto_commit_message=msg, result_key=key, run_if=predicate,
+            auto_commit_message=msg, run_if=predicate,
         ))
         return self
 
     def insert(self, index: int, agent: str, action: str, **kwargs) -> GStack:
         """Inserta un paso en una posición concreta."""
         msg = kwargs.pop("auto_commit_message", None)
-        key = kwargs.pop("result_key", None)
         predicate = kwargs.pop("run_if", None)
         self._steps.insert(index, StackStep(
             agent=agent, action=action, kwargs=kwargs,
-            auto_commit_message=msg, result_key=key, run_if=predicate,
+            auto_commit_message=msg, run_if=predicate,
         ))
         return self
 
@@ -117,21 +105,16 @@ class GStack:
             return StackResult(success=True, steps=[], results=[])
 
         results: list[AgentResult] = []
-        step_outputs: dict[str, AgentResult] = {}
 
         for i, step in enumerate(self._steps):
             if step.run_if is not None and not step.run_if(results):
-                skipped = AgentResult(True, step.agent, "__skipped__", f"Paso omitido por run_if", data=None)
+                skipped = AgentResult(True, step.agent, "__skipped__", "Paso omitido por run_if", data=None)
                 results.append(skipped)
                 self._log_event(step, skipped, i)
                 continue
 
-            resolved = self._resolve_kwargs(step.kwargs, step_outputs)
-            result = self._orch.run(step.agent, step.action, **resolved)
+            result = self._orch.run(step.agent, step.action, **step.kwargs)
             results.append(result)
-
-            if step.result_key:
-                step_outputs[step.result_key] = result
 
             self._log_event(step, result, i)
 
@@ -140,34 +123,13 @@ class GStack:
                     self._commit_step(i, step, success=False)
                 return StackResult(
                     success=False, steps=self._steps, results=results,
-                    failed_at=i, step_outputs=step_outputs,
+                    failed_at=i,
                 )
 
             if self.auto_commit:
                 self._commit_step(i, step, success=True)
 
-        return StackResult(success=True, steps=self._steps, results=results, step_outputs=step_outputs)
-
-    def _resolve_kwargs(self, kwargs: dict, outputs: dict[str, AgentResult]) -> dict:
-        """Resuelve referencias ``prev(key).data`` en kwargs."""
-        import re
-        resolved = {}
-        for k, v in kwargs.items():
-            if isinstance(v, str) and v.startswith("prev("):
-                match = re.match(r"prev\((\w+)\)(?:\.(\w+))?", v)
-                if match:
-                    key = match.group(1)
-                    attr = match.group(2)
-                    prev_result = outputs.get(key)
-                    if prev_result is not None:
-                        resolved[k] = prev_result.data if attr == "data" else prev_result
-                    else:
-                        resolved[k] = v
-                else:
-                    resolved[k] = v
-            else:
-                resolved[k] = v
-        return resolved
+        return StackResult(success=True, steps=self._steps, results=results)
 
     def _log_event(self, step: StackStep, result: AgentResult, index: int) -> None:
         if not self.log_events:

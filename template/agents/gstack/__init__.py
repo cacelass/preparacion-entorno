@@ -6,7 +6,6 @@ se ejecuta secuencialmente, con gestión automática de commits entre cada paso.
 
 Características
 ---------------
-- Result passing: referencias ``prev(key).data`` entre pasos
 - Branching condicional: ``run_if=lambda results: ...``
 - Event logging: cada acción se registra en ``workspace/gstack/events.jsonl``
 
@@ -26,13 +25,6 @@ Uso con auto-commit (cada paso genera un commit automático):
     stack.push("data", "eda_report", filename="dataset.csv")
     stack.push("ml", "check_overfitting")
     result = stack.run()
-
-Result passing entre pasos
---------------------------
-    stack.push("review", "review_package", path=".", result_key="review")
-    stack.push("data", "eda_report", filename=prev("review").data["file"])
-    #                                      ~~~~
-    # Referencia al campo .data del resultado del paso con result_key="review"
 
 Branching condicional
 ---------------------

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from agents.agents.doctor_agent import DoctorAgent
@@ -13,7 +15,9 @@ def doctor_context(tmp_path):
     (tmp_path / "mi_paquete" / "utils" / "__init__.py").write_text("")
     (tmp_path / "tests").mkdir()
     (tmp_path / "data" / "raw").mkdir(parents=True)
-    (tmp_path / "pyproject.toml").write_text('[project]\nname = "mi_paquete"\nrequires-python = ">=3.10"\n')
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "mi_paquete"\nrequires-python = ">=3.10"\n'
+    )
     return SharedContext(root=tmp_path, config=ProjectConfig(project_slug="mi_paquete"))
 
 
@@ -29,3 +33,96 @@ def test_disk_usage_reports(doctor_context):
     agent = DoctorAgent(context=doctor_context)
     result = agent.disk_usage()
     assert result.success
+
+
+def test_checkup_all_ok_on_healthy_project(doctor_context):
+    (doctor_context.root / "mi_paquete" / "__init__.py").write_text("")
+    agent = DoctorAgent(context=doctor_context)
+    result = agent.checkup()
+    assert isinstance(result.data, dict)
+    assert "python" in result.data
+    assert "structure" in result.data
+    assert result.data["structure"]["ok"]
+
+
+def test_checkup_missing_pyproject(tmp_path):
+    (tmp_path / "pkg").mkdir()
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug="pkg"))
+    agent = DoctorAgent(context=ctx)
+    result = agent.checkup()
+    assert not result.data["python"]["ok"]
+
+
+def test_checkup_no_project_slug_fails(tmp_path):
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug=""))
+    agent = DoctorAgent(context=ctx)
+    result = agent.checkup()
+    assert not result.data["project_config"]["ok"]
+
+
+def test_checkup_missing_package_init(tmp_path):
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "pkg"\nrequires-python = ">=3.10"\n')
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug="pkg"))
+    agent = DoctorAgent(context=ctx)
+    result = agent.checkup()
+    assert not result.data["structure"]["ok"]
+
+
+def test_checkup_no_tests_dir_is_ok(tmp_path):
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug="pkg"))
+    agent = DoctorAgent(context=ctx)
+    result = agent.checkup()
+    assert result.data["tests"]["ok"]
+
+
+def test_checkup_tests_dir_empty_is_fail(tmp_path):
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "pkg"\nrequires-python = ">=3.10"\n')
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug="pkg"))
+    agent = DoctorAgent(context=ctx)
+    result = agent.checkup()
+    assert not result.data["tests"]["ok"]
+    assert "no contiene tests" in result.data["tests"]["message"]
+
+
+def test_disk_usage_nonexistent_dirs(tmp_path):
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug="pkg"))
+    agent = DoctorAgent(context=ctx)
+    result = agent.disk_usage()
+    assert result.success
+    assert "no existe" in str(result.data)
+
+
+def test_disk_usage_with_files(tmp_path):
+    ctx = SharedContext(root=tmp_path, config=ProjectConfig(project_slug="pkg"))
+    (ctx.data_dir / "raw").mkdir(parents=True)
+    (ctx.data_dir / "raw" / "dataset.csv").write_text("a,b,c\n1,2,3\n")
+    agent = DoctorAgent(context=ctx)
+    result = agent.disk_usage()
+    assert "no existe" not in result.data.get("data", "")
+
+
+def test_summary_with_minimal_project(doctor_context):
+    agent = DoctorAgent(context=doctor_context)
+    result = agent.summary()
+    assert result.success
+    assert "mi_paquete" in result.data["project"]
+    assert result.data["ml_type"] == "supervisado"
+
+
+def test_human_size_bytes():
+    assert DoctorAgent._human_size(0) == "0.0 B"
+
+
+def test_human_size_kb():
+    assert DoctorAgent._human_size(1500) == "1.5 KB"
+
+
+def test_human_size_mb():
+    assert DoctorAgent._human_size(2_500_000) == "2.4 MB"
+
+
+def test_human_size_gb():
+    assert DoctorAgent._human_size(2_500_000_000) == "2.3 GB"

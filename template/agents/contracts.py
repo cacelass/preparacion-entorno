@@ -382,6 +382,24 @@ CONTRACTS: dict[str, Contract] = {
         needs=("la expresión cron a analizar",),
         collaborates=(),
     ),
+    "memory": Contract(
+        role="Memoria proactiva: observa trayectorias de agentes y mantiene un banco de memoria estructurado contra el decaimiento del estado en tareas largas.",
+        can=(
+            "observar el log de auditoría y extraer hechos, estado y trazas",
+            "buscar recuerdos por texto o tipo (facts/state/traces)",
+            "inyectar recordatorios relevantes en el contexto del agente activo",
+            "tomar una instantánea del estado actual del proyecto",
+            "almacenar una nota arbitraria en la memoria",
+            "olvidar entradas específicas del banco de memoria",
+        ),
+        cannot=(
+            "modificar el workspace de otros agentes — solo escribe en agents/workspace/memory/",
+            "ejecutar acciones de dominio — solo observa e inyecta contexto",
+        ),
+        needs=("el log de auditoría para observar",),
+        owns=("agents/workspace/memory/",),
+        collaborates=("audit",),
+    ),
 }
 
 

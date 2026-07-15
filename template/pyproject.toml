@@ -33,6 +33,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "hypothesis",
     "invoke",
     "mypy",
     "nbdime",

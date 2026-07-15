@@ -22,9 +22,9 @@ Cómo añadir un agente nuevo sin tocar el resto del sistema
             ...
 
 3. Nada más. `AgentRegistry.discover()` importa todos los módulos de
-   `agents.agents` (y `agents.external`, y los entry points instalados)
-   automáticamente, lo que ejecuta el decorador y registra la clase. El
-   `Orchestrator` y la CLI lo verán sin cambios de código.
+   `agents.agents` (y `agents.external`) automáticamente, lo que ejecuta
+   el decorador y registra la clase. El `Orchestrator` y la CLI lo verán
+   sin cambios de código.
 """
 
 from __future__ import annotations
@@ -46,18 +46,15 @@ class AgentRegistry:
 
     def discover(self, *, force: bool = False) -> None:
         """
-        Importa todos los módulos de `agents.agents` (núcleo del template),
+        Importa todos los módulos de `agents.agents` (núcleo del template) y
         `agents.external` (agentes locales de terceros, ver
-        `agents/external/README.md`) y cualquier entry point del grupo
-        `dskit.agents` expuesto por paquetes instalados, para que se
-        auto-registren.
+        `agents/external/README.md`) para que se auto-registren.
         """
         if self._discovered and not force:
             return
 
         self._discover_package("agents.agents")
         self._discover_package("agents.external")
-        self._discover_entry_points()
 
         self._discovered = True
 
@@ -71,35 +68,6 @@ class AgentRegistry:
             if module_info.name.rsplit(".", 1)[-1].startswith("_"):
                 continue  # módulos privados / plantillas de ejemplo (p.ej. _template_agent.py)
             importlib.import_module(module_info.name)
-
-    @staticmethod
-    def _discover_entry_points() -> None:
-        """
-        Importa agentes expuestos como entry point `dskit.agents` por
-        paquetes instalados en el entorno (ver `agents/external/README.md`,
-        Opción 2). Usa `importlib.metadata` de la librería estándar — sin
-        dependencias nuevas.
-
-        Nota de compatibilidad: el argumento `group=` de
-        `entry_points()` se añadió en Python 3.10. Si en algún momento este
-        proyecto soporta una versión anterior, revisa la documentación de
-        `importlib.metadata` para la API equivalente en esa versión — no
-        está cubierta aquí a propósito, para no fingir una compatibilidad
-        que no se ha probado.
-        """
-        import importlib.metadata as metadata
-
-        try:
-            eps = metadata.entry_points(group="dskit.agents")
-        except TypeError:
-            # Firma antigua (pre-3.10): entry_points() sin `group` devuelve un dict-like.
-            eps = metadata.entry_points().get("dskit.agents", [])
-
-        for entry_point in eps:
-            try:
-                entry_point.load()  # el propio import ejecuta @register_agent sobre la clase
-            except Exception:  # noqa: BLE001 — un entry point de terceros roto no debe tumbar el resto
-                continue
 
     def register(self, agent_cls: type["BaseAgent"]) -> type["BaseAgent"]:
         name = getattr(agent_cls, "name", None)

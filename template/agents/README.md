@@ -206,6 +206,14 @@ herramientas de cada uno.
 
 | Agente | Responsabilidad | Herramientas que usa |
 |---|---|---|
+**Idea para más adelante — result passing entre pasos de GStack:**
+Cuando varios pasos de una stack necesitan compartir datos (p. ej. un paso
+`data.eda_report` produce un filename que necesita el paso siguiente
+`ml.check_overfitting`), conviene un mecanismo de referencias entre pasos
+similar a `prev(key).data`. Se eliminó del template porque ningún pipeline
+lo necesitaba aún — pero es una extensión directa de `StackStep` con un campo
+`result_key` y una resolución en tiempo de ejecución.
+
 | `plan` | **Jefe de proyecto**: encargo → orden de trabajo → preguntas → delegación → resumen de qué verificar. No ejecuta nada de dominio él mismo. | Orchestrator, GStack |
 | `audit` | **Auditor del equipo**: uso, tasa de éxito y duración por agente/acción, fallos recientes, sugerencias de mejora con datos. | `agents/audit.py` (log JSONL) |
 | `supervisor` | Coordina workers en **competición**: lanza N variantes de una tarea y arbitra cuál gana (secuencial → `plan`). | agente `research` |
@@ -270,6 +278,12 @@ Créala en `agents/tools/`, decórala con `@register_tool("nombre")` si quieres
 que aparezca en `python -m agents tools`, e impórtala desde el agente que la
 necesite. Nunca dupliques una herramienta existente entre agentes.
 
+**Idea para más adelante — base class para herramientas con estado:**
+Si una herramienta necesita conexión (DuckDB, API externa, etc.), tiene
+sentido crear una `BaseTool(ABC)` con `name`/`description` y ciclo de vida
+(`connect`, `close`). Se eliminó del template porque ninguna herramienta lo
+necesitaba aún — pero es un extract class fácil cuando surja el segundo caso.
+
 ### Agentes externos
 
 `agents/external/` acepta dos vías (ver `agents/external/README.md`):
@@ -283,6 +297,14 @@ necesite. Nunca dupliques una herramienta existente entre agentes.
    importarlo. La validación es estructural, no de seguridad — revisa el
    código tú mismo si el origen no es de confianza. Ver
    `agents/prompts/installer_agent.md`.
+
+**Nota sobre la vía 2 (entry points):** Este template incluyó en su momento
+el descubrimiento automático de entry points `dskit.agents` via
+`importlib.metadata`, pero se eliminó por ser infraestructura especulativa
+sin ningún paquete externo que la usara. Si en el futuro aparece un agente
+publicado como paquete pip, re-añadir el método
+`AgentRegistry._discover_entry_points()` es trivial (< 15 líneas,
+documentado en el historial git).
 
 Ninguna de las tres vías requiere tocar `orchestrator.py`, `cli.py` ni
 ningún otro agente.
