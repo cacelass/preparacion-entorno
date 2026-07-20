@@ -39,7 +39,7 @@ def auto_develop(*, auto_commit: bool = True) -> StackResult:
     stack.push("review", "review_package", path=".", result_key="review")
     stack.push(
         "test", "run_tests",
-        run_if=lambda r: r[-1].success if r else True,
+        run_if=lambda r, m: r[-1].success if r else True,
     )
     stack.push("git", "commit_with_changelog", message="chore: auto-commit tras develop pipeline")
     return stack.run()

@@ -116,21 +116,29 @@ información, hazlo.
 | `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |
 | `memory` | **Memoria proactiva**: observa trayectorias de agentes, mantiene un banco estructurado (facts/state/traces) e inyecta contexto para combatir *behavioral state decay* en tareas largas |
 
-## Skills del asistente
+## Workflows por dominio
 
-Los prompts de los agentes (`agents/prompts/*.md`) también funcionan como
-skills para asistentes de IA (Claude Code, opencode, Cursor, Copilot...).
+Los workflow skills documentan pipelines completos de dominio (múltiples
+agentes, rutas de archivos, pasos secuenciales). Se cargan bajo demanda
+con `skill <name>` cuando la tarea abarca todo un dominio.
+
+| Skill | Cuándo cargarlo | Agentes que orquesta |
+|-------|-----------------|----------------------|
+| `data_workflow` | Pipeline de datos: ingesta → features | `data`, `graph`, `knowledge` |
+| `ml_workflow` | Ciclo de modelo: entrenar → evaluar | `ml`, `mlflow`, `graph`, `knowledge` |
+| `dev_workflow` | Desarrollo: review → test → commit → release | `review`, `test`, `git` |
+{% if use_api %}| `api_workflow` | API REST: diseño → código → test | `api`, `test`, `refactor`, `docker` |
+{% endif %}{% if use_docker %}| `docker_workflow` | Docker: build → lint → compose | `docker`, `cicd` |
+{% endif %}{% if use_monitoring %}| `monitoring_workflow` | Monitorización: dashboard → alerts | varios |
+{% endif %}{% if use_optuna %}| `optuna_workflow` | Hyperparameter tuning: search → best | `ml`, `mlflow` |
+{% endif %}{% if graphify_mode != "no" %}| `knowledge_workflow` | Grafo de conocimiento + vault | `knowledge`, `git` |
+{% endif %}
+
+Los prompts fuente viven en `agents/prompts/` y se instalan como skills con:
 
 ```bash
-# Instalar skills localmente en .opencode/skills/
 make skills
-
-# Instalar skills del ecosistema (Node.js requerido)
-npx autoskills -y
 ```
-
-Esto hace que el asistente entienda tu stack y los roles de cada agente sin
-configuración adicional.
 
 ## Roles y límites — `agents/contracts.py`
 
@@ -255,6 +263,66 @@ agents/
 - `agents/README.md` — documentación completa del sistema de agentes
 - `agents/prompts/` — fichas de cada agente
 - `CHANGELOG.md` — historial de cambios del template
+
+## Integración con opencode
+
+Este proyecto tiene un **subagente gateway** (`orquestador`) configurado en `opencode.json`.
+Presiona Tab en opencode para cambiar a él. El orquestador delega en los 27 agentes Python
+vía `uv run python -m agents [ask|run|pipeline|doctor]`.
+
+```
+[opencode assistant]  ←  Tab  →  [orquestador subagent]
+                                       │
+                                  delegates via CLI (--json mode)
+                                       │
+                              [Python agent system]
+                              ├── Orchestrator.dispatch() ← routing por keywords
+                              ├── 27 agents (git, test, review, docker...)
+                              ├── GStack pipelines (develop, fix, release...)
+                              └── audit trail + contracts
+```
+
+### Setup
+
+```bash
+make skills          # copy agent prompts → .opencode/skills/
+make opencode-init   # verifica que el agente orquestador está configurado
+make agents-eval     # smoke + routing + contracts (verifica que todo funciona)
+```
+
+### Protocolo ninja (token-optimizado)
+
+1. **Gateway loader** (`.opencode/agents/orquestador.md`, ~68 líneas) — siempre en contexto. Árbol de decisión, tabla de comandos, protocolo A2A, workflows por dominio y skills disponibles.
+
+2. **Skills on demand** (`.opencode/skills/*.md`) — NO se cargan automáticamente. Usa `skill <name>` para cargar un workflow de dominio (pipeline completo) o un agente individual (~15 líneas).
+
+3. **Ejecución** (`uv run python -m agents --json ...`) — los agentes Python hacen el trabajo real. Usa `--json` para salida estructurada que el LLM parsea sin ambigüedad.
+
+```
+[usuario] → orquestador.md (68 líneas, siempre en contexto)
+                ↓ decide: ask/run/pipeline/doctor
+                ↓ carga skill on demand (tool skill) si necesita detalle
+                ↓ ejecuta: uv run python -m agents --json <comando>
+                ↓ procesa resultado con protocolo A2A
+          → [usuario]
+```
+
+### Evaluaciones
+
+```bash
+make agents-eval                          # smoke + routing + contracts
+uv run python -m agents.evals.runner      # igual, más detallado
+uv run python -m agents.evals.runner --json   # reporte JSON
+uv run python -m agents.evals.runner --smoke  # solo smoke
+```
+
+### Mantenimiento
+
+- `make skills` regenera `.opencode/skills/` desde `agents/prompts/`
+- Si añades un agente nuevo: regístralo en `.opencode/agents/orquestador.md` y en `AGENTS.md`
+- Si añades un workflow skill: regístralo en `.opencode/agents/orquestador.md` (con Jinja2 condicional), en `AGENTS.md` y en `agents/evals/runner.py`
+- Ejecuta `make agents-eval` para verificar que todo funciona
+- Los prompts originales en `agents/prompts/` son la fuente de verdad para skills
 
 ## Vault Obsidian — memoria compartida del equipo
 

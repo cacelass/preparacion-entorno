@@ -54,3 +54,14 @@ Checklist de áreas clave a inspeccionar y herramientas a incorporar, según rev
 - `make recommended-all` en proyectos generados como alias
 - `uv pip install eticas-audit` para fairness/bias (ITACA)
 - `npm install -g @synsci/openscience` para AI workbench científico
+
+## Workflow Skills (Jul 2026)
+
+- 8 workflow skills creados como Jinja2 en `template/agents/prompts/`: data, ml, dev, api, docker, monitoring, optuna, knowledge
+- Cada workflow tiene condicionales `{% if %}` por copier options (`ml_type`, `use_api`, `use_docker`, `use_monitoring`, `use_optuna`, `graphify_mode`)
+- Template gateway (`.opencode/agents/orquestador.md`) usa Jinja2 para incluir workflows condicionalmente
+- Root gateway lista los 8 workflows con nota "si el proyecto tiene X"
+- `AGENTS.md` template tiene tabla de workflows con Jinja2 condicional
+- Eval runner en `template/agents/evals/runner.py` verifica smoke/routing/contracts de 27 agentes Python, NO de workflows (son documentales)
+- Regenerar skills: `make skills` (o `cp template/agents/prompts/*.md .opencode/skills/`)
+- Mantenimiento: añadir workflow = registrar en orquestador.md (Jinja2 cond), AGENTS.md, evals/runner.py

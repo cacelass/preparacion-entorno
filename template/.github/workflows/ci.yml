@@ -43,6 +43,14 @@ jobs:
       - name: Test with coverage
         run: uv run pytest tests/ -v --cov={{ project_slug }} --cov-report=xml --cov-fail-under=20
 
+      - name: Agent tests
+        run: uv run pytest agents/tests/ -v --tb=short
+        continue-on-error: true
+
+      - name: Agent evals
+        run: uv run python -m agents.evals.runner --json
+        continue-on-error: true
+
       - name: Security scan
         run: uv run bandit -r {{ project_slug }}/ -f txt -x tests || true
         continue-on-error: true

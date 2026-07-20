@@ -6,7 +6,7 @@ se ejecuta secuencialmente, con gestión automática de commits entre cada paso.
 
 Características
 ---------------
-- Branching condicional: ``run_if=lambda results: ...``
+- Branching condicional: ``run_if=lambda results, result_map: results[-1].success``
 - Event logging: cada acción se registra en ``workspace/gstack/events.jsonl``
 
 Uso básico
@@ -28,7 +28,7 @@ Uso con auto-commit (cada paso genera un commit automático):
 
 Branching condicional
 ---------------------
-    stack.push("test", "run_tests", run_if=lambda r: r[-1].success if r else True)
+    stack.push("test", "run_tests", run_if=lambda r, m: r[-1].success if r else True)
     # El paso solo se ejecuta si el anterior fue exitoso
 
 Pipelines predefinidos

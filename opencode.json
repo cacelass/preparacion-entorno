@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/deepseek-v4-flash-free",
+  "agent": {
+    "orquestador": {
+      "description": "Gateway al sistema de 27 agentes Python: analiza la tarea y delega al agente dskit adecuado (git, test, review, docker, doctor, plan...)",
+      "mode": "primary",
+      "instructions": [
+        ".opencode/agents/orquestador.md"
+      ]
+    }
+  }
+}

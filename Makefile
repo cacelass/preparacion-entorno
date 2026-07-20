@@ -1,4 +1,4 @@
-.PHONY: setup update lint test typecheck format security precommit skills help
+.PHONY: setup update lint test typecheck format security precommit skills opencode-init opencode-check help
 
 .DEFAULT_GOAL := help
 
@@ -17,6 +17,9 @@ help:
 	@echo "  make security     bandit scan"
 	@echo "  make precommit    instalar/actualizar hooks de pre-commit"
 	@echo "  make skills       instala prompts como skills en .opencode/skills/"
+	@echo "  make opencode-init  configura subagentes opencode (orquestador gateway)"
+	@echo "  make opencode-check valida consistencia entre skills y gateway"
+	@echo "  make eval-agents  ejecuta evaluación de agentes (smoke+routing+contracts)"
 	@echo ""
 
 setup:
@@ -24,7 +27,7 @@ setup:
 	uv run pre-commit install
 	@echo "  dskit listo."
 
-update: setup skills
+update: setup skills opencode-init
 	@echo "  dskit actualizado."
 
 lint:
@@ -56,6 +59,50 @@ skills:
 		echo "   skill: $$name"; \
 	done
 	@echo "  Skills instaladas en .opencode/skills/"
+
+opencode-init: skills
+	@mkdir -p .opencode/agents
+	@if [ ! -f .opencode/agents/orquestador.md ]; then \
+		echo "  ERROR: falta .opencode/agents/orquestador.md — copia desde template/"; \
+		exit 1; \
+	fi
+	@echo "  opencode configurado. Agente orquestador disponible."
+	@echo "  Usa Tab en opencode para cambiar al agente 'orquestador'."
+
+opencode-check:
+	@echo "▶  Verificando configuración opencode..."
+	@errors=0
+	@if [ ! -f opencode.json ]; then \
+		echo "  ✘ falta opencode.json"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ opencode.json"; \
+	fi
+	@if [ ! -f .opencode/agents/orquestador.md ]; then \
+		echo "  ✘ falta .opencode/agents/orquestador.md"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ .opencode/agents/orquestador.md"; \
+	fi
+	@count=$$(ls .opencode/skills/*.md 2>/dev/null | wc -l); \
+	if [ "$$count" -lt 20 ]; then \
+		echo "  ✘ skills insuficientes ($$count/29 esperados) — ejecuta make skills"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ $$count skills instaladas"; \
+	fi
+	@count2=$$(ls template/agents/prompts/*.md 2>/dev/null | wc -l); \
+	if [ "$$errors" -eq 0 ]; then \
+		echo "  ✔ Todo correcto ($$count2 prompts fuente)."; \
+	else \
+		echo "  ✘ $$errors error(es) encontrados."; \
+		exit 1; \
+	fi
+
+eval-agents:
+	@echo "▶  Ejecutando evaluación de agentes..."
+	@cd template && uv run python -m agents.evals.runner 2>/dev/null || \
+		echo "  (necesita template renderizado con dependencias)"
 
 test:
 	uv run pytest -x -q 2>/dev/null || echo "  (no hay tests propios de dskit)"

@@ -308,6 +308,11 @@ _exclude:
   - "{% if not use_docker %}Dockerfile{% endif %}"
   - "{% if not use_docker %}docker-compose.yml{% endif %}"
   - "{% if not use_docker %}.dockerignore{% endif %}"
+  - "{% if not use_api %}agents/prompts/api_workflow.md{% endif %}"
+  - "{% if not use_docker %}agents/prompts/docker_workflow.md{% endif %}"
+  - "{% if not use_monitoring %}agents/prompts/monitoring_workflow.md{% endif %}"
+  - "{% if not use_optuna %}agents/prompts/optuna_workflow.md{% endif %}"
+  - "{% if graphify_mode == 'no' %}agents/prompts/knowledge_workflow.md{% endif %}"
   - "{% if graphify_mode != 'graphify + obsidian vault' %}vault{% endif %}"
 
 _subdirectory: template

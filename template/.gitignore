@@ -135,6 +135,9 @@ docs/_build/
 # --- Graphify ---
 graphify-out/
 
+# --- OpenCode skills (generados por make skills) ---
+.opencode/skills/
+
 # --- Misc ---
 *.manifest
 *.spec

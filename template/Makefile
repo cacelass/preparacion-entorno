@@ -7,8 +7,9 @@
         mlflow \
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
-        agents-list agents-run agents-doctor agents-memory \
-        skills recommended-tools recommended-all \
+        agents-list agents-run agents-doctor agents-memory agents-eval \
+        skills opencode-init opencode-check \
+        recommended-tools recommended-all \
         clean clean-models clean-figures clean-all \
         run info help
 
@@ -96,9 +97,12 @@ help:
 	@echo "    make agents-run      ejecutar un agente"
 	@echo "    make agents-doctor   diagnóstico completo con agentes"
 	@echo "    make agents-memory   estado de la memoria de agentes"
+	@echo "    make agents-eval     smoke + routing + contracts (eval de agentes)"
 	@echo ""
 	@echo "  Skills del asistente"
 	@echo "    make skills          instalar skills locales en .opencode/skills/"
+	@echo "    make opencode-init   configurar subagentes opencode (orquestador)"
+	@echo "    make opencode-check  validar consistencia de la configuración"
 	@echo ""
 	@echo "  Ecosistema"
 	@echo "    make recommended-tools  mostrar herramientas recomendadas"
@@ -307,6 +311,10 @@ agents-memory:
 	@echo "▶  Estado de la memoria de agentes"
 	uv run python -m agents run memory status
 
+agents-eval:
+	@echo "▶  Evaluación del sistema de agentes (smoke + routing + contracts)"
+	uv run python -m agents.evals.runner
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Skills — configuración del asistente de IA
 # ─────────────────────────────────────────────────────────────────────────────
@@ -322,6 +330,48 @@ skills:
 	@echo ""
 	@echo "   Para soporte multi-asistente, también se pueden instalar como:"
 	@echo "     npx autoskills -y    (si usas Node.js, instala skills de skills.sh)"
+
+opencode-init: skills
+	@echo "▶  Configurando subagentes de opencode..."
+	@mkdir -p .opencode/agents
+	@if [ ! -f .opencode/agents/orquestador.md ]; then \
+		echo "  ERROR: falta .opencode/agents/orquestador.md — copia desde template/"; \
+		exit 1; \
+	fi
+	@echo "   opencode configurado. Agente 'orquestador' disponible."
+	@echo "   Usa Tab en opencode para cambiar al agente orquestador."
+	@echo ""
+
+opencode-check:
+	@echo "▶  Verificando configuración opencode..."
+	@errors=0
+	@if [ ! -f opencode.json ]; then \
+		echo "  ✘ falta opencode.json"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ opencode.json"; \
+	fi
+	@if [ ! -f .opencode/agents/orquestador.md ]; then \
+		echo "  ✘ falta .opencode/agents/orquestador.md"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ .opencode/agents/orquestador.md"; \
+	fi
+	@count=$$(ls .opencode/skills/*.md 2>/dev/null | wc -l); \
+	if [ "$$count" -lt 20 ]; then \
+		echo "  ✘ skills insuficientes ($$count/29+ esperados) — ejecuta make skills"; \
+		errors=$$((errors + 1)); \
+	else \
+		echo "  ✔ $$count skills instaladas"; \
+	fi
+	@count2=$$(ls agents/prompts/*.md 2>/dev/null | wc -l); \
+	echo "  ✔ $$count2 prompts fuente disponibles."
+	@if [ "$$errors" -eq 0 ]; then \
+		echo "  ✔ Todo correcto."; \
+	else \
+		echo "  ✘ $$errors error(es) encontrados."; \
+		exit 1; \
+	fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Recomendados — instala herramientas del ecosistema (agents/README.md)

@@ -32,5 +32,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# --- OpenCode skills (generados) ---
+.opencode/skills/
+
 # --- Git ---
 !.well-known/
+uv

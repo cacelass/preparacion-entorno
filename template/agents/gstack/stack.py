@@ -21,7 +21,8 @@ class StackStep:
     action: str
     kwargs: dict[str, Any] = field(default_factory=dict)
     auto_commit_message: str | None = None
-    run_if: Callable[[list[AgentResult]], bool] | None = None
+    result_key: str | None = None
+    run_if: Callable[[list[AgentResult], dict[str, AgentResult]], bool] | None = None
 
 
 @dataclass
@@ -80,23 +81,26 @@ class GStack:
 
         kwargs especiales (no se pasan al agente):
             auto_commit_message : str — sobreescribe el mensaje de commit auto
-            run_if             : callable — ``run_if=lambda results: results[-1].success``
+            result_key          : str — nombre para referenciar el resultado en pasos siguientes
+            run_if              : callable — ``run_if=lambda results, result_map: results[-1].success``
         """
         msg = kwargs.pop("auto_commit_message", None)
+        rkey = kwargs.pop("result_key", None)
         predicate = kwargs.pop("run_if", None)
         self._steps.append(StackStep(
             agent=agent, action=action, kwargs=kwargs,
-            auto_commit_message=msg, run_if=predicate,
+            auto_commit_message=msg, result_key=rkey, run_if=predicate,
         ))
         return self
 
     def insert(self, index: int, agent: str, action: str, **kwargs) -> GStack:
         """Inserta un paso en una posición concreta."""
         msg = kwargs.pop("auto_commit_message", None)
+        rkey = kwargs.pop("result_key", None)
         predicate = kwargs.pop("run_if", None)
         self._steps.insert(index, StackStep(
             agent=agent, action=action, kwargs=kwargs,
-            auto_commit_message=msg, run_if=predicate,
+            auto_commit_message=msg, result_key=rkey, run_if=predicate,
         ))
         return self
 
@@ -105,16 +109,21 @@ class GStack:
             return StackResult(success=True, steps=[], results=[])
 
         results: list[AgentResult] = []
+        result_map: dict[str, AgentResult] = {}
 
         for i, step in enumerate(self._steps):
-            if step.run_if is not None and not step.run_if(results):
+            if step.run_if is not None and not step.run_if(results, result_map):
                 skipped = AgentResult(True, step.agent, "__skipped__", "Paso omitido por run_if", data=None)
                 results.append(skipped)
+                if step.result_key:
+                    result_map[step.result_key] = skipped
                 self._log_event(step, skipped, i)
                 continue
 
             result = self._orch.run(step.agent, step.action, **step.kwargs)
             results.append(result)
+            if step.result_key:
+                result_map[step.result_key] = result
 
             self._log_event(step, result, i)
 

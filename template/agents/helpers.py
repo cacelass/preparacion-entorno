@@ -1,8 +1,8 @@
 """
 agents.helpers — Funciones auxiliares para agentes.
 
-Incluye el helper de delegación entre agentes, que permite que un agente
-invoque la acción de otro agente programáticamente.
+Incluye el mecanismo canónico de delegación entre agentes (``delegate_to``).
+Usa esto EN VEZ de importar directamente la clase de otro agente.
 """
 
 from __future__ import annotations
@@ -25,18 +25,21 @@ def _orch() -> Orchestrator:
 
 def delegate_to(agent: str, action: str, **kwargs) -> Any:
     """
-    Delega una tarea a otro agente y devuelve su resultado.
+    Delega una tarea a otro agente.
 
-    Útil cuando un agente necesita información de otro: por ejemplo,
-    ``DataAgent`` puede delegar en ``GitAgent`` para saber qué archivos
-    cambiaron, o ``DoctorAgent`` puede delegar en múltiples agentes para
-    el checkup.
+    Es el mecanismo canónico de comunicación entre agentes.
+    Usa esto en vez de importar ``SomeAgent`` y llamarlo directamente.
 
     Ejemplo::
 
         from agents.helpers import delegate_to
 
         result = delegate_to("git", "analyze_diff")
-        files = result.data  # dict con añadidos/modificados/borrados
+        files = result.data
+
+        result = delegate_to("documentation", "update_changelog", version="2.0.0")
     """
-    return _orch().run(agent, action, **kwargs)
+    result = _orch().run(agent, action, **kwargs)
+    if hasattr(result, "data"):
+        return result
+    return type("AgentResult", (), {"success": False, "data": None, "message": str(result)})()
