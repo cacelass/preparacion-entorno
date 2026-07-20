@@ -181,6 +181,13 @@ use_calibration:
   default: false
   when: "{{ ml_type == 'redes_neuronales' }}"
 
+# --- Conformal Prediction (supervisado, hibrido, redes_neuronales) ---
+use_conformal:
+  type: bool
+  help: "Añadir Conformal Prediction (sets/intervalos con garantia de cobertura, distribution-free)?"
+  default: false
+  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' or ml_type == 'redes_neuronales' }}"
+
 # --- Explicabilidad ---
 
 graphify_mode:
