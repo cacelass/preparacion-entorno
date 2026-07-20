@@ -43,6 +43,7 @@ BASE = {
     "use_catboost": False,
     "use_monitoring": False,
     "use_calibration": False,
+    "use_conformal": False,
     "graphify_mode": "no",
 }
 
@@ -68,6 +69,7 @@ VALID_KEYS = {
     "use_catboost",
     "use_monitoring",
     "use_calibration",
+    "use_conformal",
     "graphify_mode",
     "project_slug",
     "project_name",

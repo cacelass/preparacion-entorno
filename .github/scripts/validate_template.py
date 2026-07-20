@@ -53,6 +53,7 @@ DEFAULTS = dict(
     use_catboost=False,
     use_monitoring=False,
     use_calibration=False,
+    use_conformal=False,
     graphify_mode="no",
 )
 
