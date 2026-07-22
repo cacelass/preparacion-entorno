@@ -135,6 +135,7 @@ setup:
 {% endif %}{% if use_duckdb %}		--extra duckdb \
 {% endif %}{% if use_optuna %}		--extra optuna \
 {% endif %}{% if use_monitoring %}		--extra monitoring \
+{% endif %}{% if use_rag %}		--extra rag \
 {% endif %}		&& echo "  Extras instalados."
 	@uv run pre-commit install 2>/dev/null || echo "  (pre-commit no disponible)"
 	@echo ""
@@ -314,6 +315,10 @@ agents-memory:
 agents-eval:
 	@echo "▶  Evaluación del sistema de agentes (smoke + routing + contracts)"
 	uv run python -m agents.evals.runner
+
+index-rag:
+	@echo "▶  Indexando documentación del proyecto en ChromaDB..."
+	uv run python -m agents run rag index
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Skills — configuración del asistente de IA

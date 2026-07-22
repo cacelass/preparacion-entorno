@@ -66,6 +66,7 @@ class KnowledgeAgent(BaseAgent):
         return {
             "setup_vault": ["obsidian", "boveda", "vault", "crea la boveda", "estructura"],
             "build": ["construye", "genera el grafo", "indexa", "graphify"],
+            "build_and_index": ["construye e indexa", "build rag", "grafo y rag", "indexa todo"],
             "summarize_parents": ["resume", "nodo padre", "padres", "resumen", "correlacion"],
             "sync": ["sincroniza", "actualiza", "update"],
             "status": ["estado", "situacion"],
@@ -76,6 +77,7 @@ class KnowledgeAgent(BaseAgent):
             "status": self.status,
             "setup_vault": self.setup_vault,
             "build": self.build,
+            "build_and_index": self.build_and_index,
             "summarize_parents": self.summarize_parents,
             "sync": self.sync,
         }
@@ -298,6 +300,32 @@ class KnowledgeAgent(BaseAgent):
         return AgentResult(
             True, self.name, "build", msg,
             data={"graph": graph_stats, "obsidian": exported_to}, warnings=warnings,
+        )
+
+    def build_and_index(self, *, vault_dir: str | None = None) -> AgentResult:
+        """Build graphify graph + index RAG in one step."""
+        build_result = self.build(vault_dir=vault_dir, export_obsidian=True)
+        rag_msg = None
+        try:
+            from agents.tools.rag_tool import RagTool
+            if RagTool.available():
+                rag_result = RagTool.index_project(self.ctx.root)
+                if "error" not in rag_result:
+                    rag_msg = f"RAG: {rag_result['new_chunks']} fragmentos nuevos de {rag_result['sources']} fuente(s)"
+                else:
+                    rag_msg = f"RAG: {rag_result['error']}"
+            else:
+                rag_msg = "RAG: chromadb no instalado (uv sync --extra rag)"
+        except ImportError:
+            rag_msg = "RAG: no disponible"
+
+        msg = build_result.message
+        if rag_msg:
+            msg += f" | {rag_msg}"
+        return AgentResult(
+            build_result.success, self.name, "build_and_index", msg,
+            data={"build": build_result.data, "rag": rag_msg},
+            warnings=build_result.warnings,
         )
 
     def summarize_parents(self, *, min_children: int = 3, top: int = 10, no_cache: bool = False) -> AgentResult:

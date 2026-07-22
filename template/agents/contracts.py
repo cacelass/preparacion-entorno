@@ -157,6 +157,23 @@ CONTRACTS: dict[str, Contract] = {
         owns=("graphify-out/ (poda de nodos, con .bak)",),
         collaborates=("knowledge",),
     ),
+    "rag": Contract(
+        role="RAG semántico local: indexa código, prompts, docs, vault y URLs externas; busca en lenguaje natural con ChromaDB + embeddings ONNX.",
+        can=(
+            "indexar el proyecto (código, prompts, docs, vault, README, CHANGELOG) en ChromaDB",
+            "indexar URLs externas (documentación de librerías, tutoriales)",
+            "buscar en el índice con consultas en lenguaje natural",
+            "devolver fragmentos relevantes con puntuación de similitud",
+        ),
+        cannot=(
+            "construir o modificar el grafo graphify → knowledge",
+            "buscar papers académicos nuevos → research",
+            "ejecutar código ni modificar archivos del proyecto",
+        ),
+        needs=("que exista un índice (ejecutar 'rag index' primero)",),
+        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored)",),
+        collaborates=("knowledge", "docsearch", "plan"),
+    ),
     "research": Contract(
         role="Investigador externo: busca papers (arXiv/OpenAlex) relacionados con el proyecto. Solo lee.",
         can=("extraer keywords del proyecto, buscar papers y rankearlos (necesita internet)",),

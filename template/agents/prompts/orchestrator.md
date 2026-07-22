@@ -7,7 +7,7 @@ coincidencia de palabras clave.
 
 ## Cómo funciona el ruteo
 
-1. `Orchestrator.select_agent(query)` → puntúa los 27 agentes, elige el de mayor score
+1. `Orchestrator.select_agent(query)` → puntúa los {% if use_rag %}29{% else %}28{% endif %} agentes, elige el de mayor score
 2. Si el score máximo es < `MIN_CONFIDENCE (0.15)`, no selecciona ninguno
 3. `Orchestrator.dispatch(query)` → selecciona agente + adivina acción + ejecuta
 4. Si la acción necesita argumentos obligatorios, devuelve `needs=[...]` en vez de inventar
@@ -20,6 +20,6 @@ coincidencia de palabras clave.
 - El gateway opencode (subagente `orquestador`) es quien invoca este sistema.
   Tú (skill) eres documentación de contexto — no tomes decisiones de routing.
 
-## Agentes (27)
+## Agentes ({% if use_rag %}29{% else %}28{% endif %})
 
 Ver `agents/agents/` o ejecutar `uv run python -m agents list`.

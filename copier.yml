@@ -188,6 +188,12 @@ use_conformal:
   default: false
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' or ml_type == 'redes_neuronales' }}"
 
+# --- RAG semántico (ChromaDB + embeddings ONNX) ---
+use_rag:
+  type: bool
+  help: "Añadir RAG semántico local? (chromadb + embeddings ONNX) Busca en código, prompts, docs y URLs externas en lenguaje natural.\n         make index-rag para construir el indice. Sin API key, funciona offline."
+  default: true
+
 # --- Explicabilidad ---
 
 graphify_mode:
@@ -291,6 +297,9 @@ _tasks:
     {% if use_monitoring %}
     && uv run python -c 'import evidently; print("evidently", evidently.__version__)'
     {% endif %}
+    {% if use_rag %}
+    && uv run python -c 'import chromadb; print("chromadb OK")'
+    {% endif %}
 
 _exclude:
   - "**/.gitkeep"
@@ -314,6 +323,11 @@ _exclude:
   - "{% if not use_optuna %}agents/prompts/optuna_workflow.md{% endif %}"
   - "{% if graphify_mode == 'no' %}agents/prompts/knowledge_workflow.md{% endif %}"
   - "{% if graphify_mode != 'graphify + obsidian vault' %}vault{% endif %}"
+  - "{% if not use_rag %}agents/prompts/rag_workflow.md{% endif %}"
+  - "{% if not use_rag %}agents/agents/rag_agent.py{% endif %}"
+  - "{% if not use_rag %}agents/tools/rag_tool.py{% endif %}"
+  - "{% if not use_rag %}agents/prompts/rag_agent.md{% endif %}"
+  - "{% if not use_rag %}agents/tests/test_rag_agent.py{% endif %}"
 
 _subdirectory: template
 _templates_suffix: ""

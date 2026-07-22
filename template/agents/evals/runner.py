@@ -90,6 +90,10 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("guarda esto en la memoria", "memory"),
     ("planea el proyecto", "plan"),
     ("entrena el modelo", "ml"),
+    ("busca en la documentación del proyecto", "rag"),
+    ("indexa el código fuente", "rag"),
+    ("busca en todas las fuentes de documentación", "doc"),
+    ("dónde está documentado el módulo de datos", "doc"),
 ]
 
 

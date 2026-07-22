@@ -8,6 +8,13 @@
       "instructions": [
         ".opencode/agents/orquestador.md"
       ]
-    }
+    }{% if use_rag %},
+    "doc": {
+      "description": "Documentación del proyecto: busca en graphify (grafo estructural), RAG (índice semántico) y vault Obsidian (notas markdown)",
+      "mode": "primary",
+      "instructions": [
+        ".opencode/agents/doc_agent.md"
+      ]
+    }{% endif %}
   }
 }

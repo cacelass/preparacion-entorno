@@ -35,6 +35,10 @@ Thumbs.db
 # --- OpenCode skills (generados) ---
 .opencode/skills/
 
+# --- RAG index (ChromaDB) ---
+.rag-index/
+
 # --- Git ---
 !.well-known/
 uv
+gh

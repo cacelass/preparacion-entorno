@@ -138,6 +138,9 @@ graphify-out/
 # --- OpenCode skills (generados por make skills) ---
 .opencode/skills/
 
+# --- RAG index (base de datos vectorial ChromaDB) ---
+.rag-index/
+
 # --- Misc ---
 *.manifest
 *.spec

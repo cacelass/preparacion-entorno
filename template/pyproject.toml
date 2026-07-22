@@ -150,6 +150,14 @@ graphify = [
 ]
 {% endif %}
 
+{% if use_rag %}
+# RAG: búsqueda semántica local con ChromaDB + embeddings ONNX
+# Modelo all-MiniLM-L6-v2 vía ONNX (descarga única ~23MB, sin GPU ni API key)
+rag = [
+    "chromadb>=1.10",
+]
+{% endif %}
+
 [tool.setuptools]
 packages = ["{{ project_slug }}"]
 

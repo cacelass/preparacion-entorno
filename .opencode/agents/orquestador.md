@@ -1,6 +1,6 @@
 # Orquestador — Gateway loader
 
-Eres un gateway ligero. NO resuelvas tareas — delega al sistema de 27 agentes Python.
+Eres un gateway ligero. NO resuelvas tareas — delega al sistema de 29 agentes Python.
 
 ## Decisión (1 salto, sin pensar)
 
@@ -43,6 +43,7 @@ Carga el skill de workflow para entender el pipeline completo del dominio:
 - `skill monitoring_workflow` → monitorización (si aplica)
 - `skill optuna_workflow` → hiperparámetros (si aplica)
 - `skill knowledge_workflow` → grafo + vault (si aplica)
+- `skill rag_workflow` → RAG semántico (chromadb, si aplica)
 
 ## Agentes (skills individuales)
 
@@ -74,6 +75,7 @@ Carga el skill del agente solo cuando necesites su acción exacta:
 - `skill docsearch_agent` → búsqueda
 - `skill research_agent` → papers
 - `skill memory_agent` → memoria
+- `skill doc_agent` → documentación unificada (graphify, RAG, vault)
 - `skill installer_agent` → agentes externos
 - `skill orchestrator` → ruteo Python
 - `skill universal_guidelines` → principios

@@ -65,3 +65,14 @@ Checklist de áreas clave a inspeccionar y herramientas a incorporar, según rev
 - Eval runner en `template/agents/evals/runner.py` verifica smoke/routing/contracts de 27 agentes Python, NO de workflows (son documentales)
 - Regenerar skills: `make skills` (o `cp template/agents/prompts/*.md .opencode/skills/`)
 - Mantenimiento: añadir workflow = registrar en orquestador.md (Jinja2 cond), AGENTS.md, evals/runner.py
+
+## RAG Agent (Jul 2026)
+
+- Nuevo agente `rag` con ChromaDB + embeddings ONNX (all-MiniLM-L6-v2)
+- Indexa: código fuente, prompts de agentes, docs/, vault/, README, AGENTS, CHANGELOG
+- `rag index_urls` para indexar documentación externa (librerías, tutoriales)
+- Copier option `use_rag` (bool, default false) con exclusión condicional en `_exclude`
+- Dependencias: `chromadb>=1.10` (grupo opcional `rag`)
+- Contrato en contracts.py, prompts, test, workflow skill
+- `make index-rag` en Makefile, CI lo incluye en agent tests
+- `.rag-index/` gitignored en root + template

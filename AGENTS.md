@@ -20,7 +20,7 @@
 ## OpenCode integration
 
 This project has an opencode **subagent gateway** (`orquestador`) configured in `opencode.json`.
-Press Tab in opencode to switch to it. The orquestador delegates to 27 Python agents
+Press Tab in opencode to switch to it. The orquestador delegates to 29 Python agents
 via `uv run python -m agents [ask|run|pipeline|doctor]`.
 
 ### Architecture
@@ -32,7 +32,7 @@ via `uv run python -m agents [ask|run|pipeline|doctor]`.
                                        │
                               [Python agent system]
                               ├── Orchestrator.dispatch() ← routing por keywords
-                              ├── 27 agents (git, test, review, docker...)
+                              ├── 29 agents (git, test, review, docker, rag, doc...)
                               ├── GStack pipelines (develop, fix, release...)
                               ├── Workflows por dominio (data, ml, dev, api, docker...)
                               └── audit trail + contracts

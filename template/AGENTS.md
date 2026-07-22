@@ -115,6 +115,8 @@ información, hazlo.
 | `docsearch` | Busca/navega el grafo de conocimiento, poda nodos irrelevantes |
 | `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |
 | `memory` | **Memoria proactiva**: observa trayectorias de agentes, mantiene un banco estructurado (facts/state/traces) e inyecta contexto para combatir *behavioral state decay* en tareas largas |
+| `doc` | **Documentación unificada**: busca en graphify (estructura), RAG (semántica) y vault Obsidian (notas) |
+{% if use_rag %}| `rag` | **RAG semántico local**: indexa código, prompts, docs y vault en ChromaDB; busca en lenguaje natural y también indexa URLs externas |{% endif %}
 
 ## Workflows por dominio
 
@@ -132,6 +134,7 @@ con `skill <name>` cuando la tarea abarca todo un dominio.
 {% endif %}{% if use_monitoring %}| `monitoring_workflow` | Monitorización: dashboard → alerts | varios |
 {% endif %}{% if use_optuna %}| `optuna_workflow` | Hyperparameter tuning: search → best | `ml`, `mlflow` |
 {% endif %}{% if graphify_mode != "no" %}| `knowledge_workflow` | Grafo de conocimiento + vault | `knowledge`, `git` |
+{% endif %}{% if use_rag %}| `rag_workflow` | RAG semántico: index → search → URLs externas | `rag`, `plan`, `docsearch` |
 {% endif %}
 
 Los prompts fuente viven en `agents/prompts/` y se instalan como skills con:
@@ -267,7 +270,7 @@ agents/
 ## Integración con opencode
 
 Este proyecto tiene un **subagente gateway** (`orquestador`) configurado en `opencode.json`.
-Presiona Tab en opencode para cambiar a él. El orquestador delega en los 27 agentes Python
+Presiona Tab en opencode para cambiar a él. El orquestador delega en los {% if use_rag %}29{% else %}28{% endif %} agentes Python
 vía `uv run python -m agents [ask|run|pipeline|doctor]`.
 
 ```
@@ -277,7 +280,7 @@ vía `uv run python -m agents [ask|run|pipeline|doctor]`.
                                        │
                               [Python agent system]
                               ├── Orchestrator.dispatch() ← routing por keywords
-                              ├── 27 agents (git, test, review, docker...)
+                              ├── {% if use_rag %}29 agents (git, test, review, docker, rag, doc...){% else %}28 agents (git, test, review, docker, doc...){% endif %}
                               ├── GStack pipelines (develop, fix, release...)
                               └── audit trail + contracts
 ```
