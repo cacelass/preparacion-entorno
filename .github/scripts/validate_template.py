@@ -54,6 +54,7 @@ DEFAULTS = dict(
     use_monitoring=False,
     use_calibration=False,
     use_conformal=False,
+    use_rag=False,
     graphify_mode="no",
 )
 
@@ -76,6 +77,7 @@ COMBOS: list[tuple[str, dict]] = [
             use_lightgbm=True,
             use_catboost=True,
             use_monitoring=True,
+            use_rag=True,
         ),
     ),
     (
@@ -87,6 +89,7 @@ COMBOS: list[tuple[str, dict]] = [
             use_optuna=True,
             use_api=True,
             use_monitoring=True,
+            use_rag=True,
         ),
     ),
     ("nosup", dict(ml_type="no_supervisado", task_type="clasificacion")),
@@ -100,6 +103,7 @@ COMBOS: list[tuple[str, dict]] = [
             use_optuna=True,
             use_monitoring=True,
             use_docker=True,
+            use_rag=True,
         ),
     ),
     (
@@ -199,6 +203,7 @@ COMBOS: list[tuple[str, dict]] = [
             use_api=True,
             use_docker=True,
             use_monitoring=True,
+            use_rag=True,
         ),
     ),
     (
@@ -223,6 +228,7 @@ COMBOS: list[tuple[str, dict]] = [
             use_optuna=True,
             use_api=True,
             use_monitoring=True,
+            use_rag=True,
         ),
     ),
     (
@@ -245,6 +251,7 @@ COMBOS: list[tuple[str, dict]] = [
             use_optuna=True,
             use_api=True,
             use_monitoring=True,
+            use_rag=True,
         ),
     ),
 ]
