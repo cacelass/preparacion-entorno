@@ -284,6 +284,7 @@ _tasks:
     {% if use_duckdb %}--extra duckdb{% endif %}
     {% if use_optuna %}--extra optuna{% endif %}
     {% if use_monitoring %}--extra monitoring{% endif %}
+    {% if use_rag %}--extra rag{% endif %}
     && uv run python -c 'import sklearn; print("scikit-learn OK")'
     {% if ml_type == 'redes_neuronales' %}
     && uv run python -c 'import torch; print("torch", torch.__version__)'
