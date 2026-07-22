@@ -1727,26 +1727,35 @@ def load_checkpoint(input_dim: int, output_dim: int, checkpoint_path: str):
 import numpy as np
 import joblib
 
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-{% if task_type == "regresion" %}
-from sklearn.ensemble import RandomForestRegressor
-{% endif %}
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
-{% if task_type == "regresion" %}
-from sklearn.neighbors import KNeighborsRegressor
-{% endif %}
-from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
 
+{% if task_type == "clasificacion" %}
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+{% else %}
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
+{% endif %}
+
 {% if use_xgboost or model_type == "XGBoost" %}
+{% if task_type == "clasificacion" %}
 from xgboost import XGBClassifier
+{% else %}
+from xgboost import XGBRegressor
+{% endif %}
 {% endif %}
 {% if use_lightgbm or model_type == "LightGBM" %}
+{% if task_type == "clasificacion" %}
 from lightgbm import LGBMClassifier
+{% else %}
+from lightgbm import LGBMRegressor
+{% endif %}
 {% endif %}
 {% if use_catboost or model_type == "CatBoost" %}
 {% if task_type == "clasificacion" %}
@@ -1765,7 +1774,7 @@ from {{ project_slug }}.utils.paths import MODELS_DIR
 
 def _build_models(strategy: str) -> dict:
     """
-    Clasificadores adaptados a la estrategia híbrida elegida.
+    Modelos adaptados a la estrategia híbrida elegida.
 
     'pca_clf' / 'umap_clf'
         Espacio reducido (pocas dimensiones). SVM y LogReg son muy competitivos.
@@ -1778,35 +1787,36 @@ def _build_models(strategy: str) -> dict:
     'semi_supervisado'
         Espacio original con etiquetas propagadas. Todos los modelos válidos.
     """
-    base = {
-        "LogisticRegression": LogisticRegression(
-            max_iter=1000,
-            class_weight="balanced",
-            random_state=42,
-        ),
+    base = {}
 {% if task_type == "clasificacion" %}
-        "RandomForest": RandomForestClassifier(
-            n_estimators=200,
-            max_depth=10,
-            max_features="sqrt",
-            max_samples=0.8,
-            class_weight="balanced",
-            random_state=42,
-            n_jobs=-1,
-        ),
-        "KNN": KNeighborsClassifier(n_neighbors=7, weights="distance"),
-{% else %}
-        "RandomForest": RandomForestRegressor(
-            n_estimators=200,
-            max_depth=10,
-            max_features="sqrt",
-            max_samples=0.8,
-            random_state=42,
-            n_jobs=-1,
-        ),
-        "KNN": KNeighborsRegressor(n_neighbors=7, weights="distance"),
+    base["LogisticRegression"] = LogisticRegression(
+        max_iter=1000,
+        class_weight="balanced",
+        random_state=42,
+    )
 {% endif %}
-    }
+{% if task_type == "clasificacion" %}
+    base["RandomForest"] = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=10,
+        max_features="sqrt",
+        max_samples=0.8,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1,
+    )
+    base["KNN"] = KNeighborsClassifier(n_neighbors=7, weights="distance")
+{% else %}
+    base["RandomForest"] = RandomForestRegressor(
+        n_estimators=200,
+        max_depth=10,
+        max_features="sqrt",
+        max_samples=0.8,
+        random_state=42,
+        n_jobs=-1,
+    )
+    base["KNN"] = KNeighborsRegressor(n_neighbors=7, weights="distance")
+{% endif %}
 
     if strategy in ("pca_clf", "umap_clf"):
 {% if task_type == "clasificacion" %}
@@ -1848,6 +1858,7 @@ def _build_models(strategy: str) -> dict:
 {% if use_xgboost or model_type == "XGBoost" %}
     # XGBoost: robusto ante outliers, regularización nativa, muy competitivo
     # en espacios reducidos (pca/umap) y con features de distancia (kmeans).
+{% if task_type == "clasificacion" %}
     base["XGBoost"] = XGBClassifier(
         n_estimators=300,
         max_depth=6,
@@ -1860,11 +1871,26 @@ def _build_models(strategy: str) -> dict:
         random_state=42,
         n_jobs=-1,
     )
+{% else %}
+    base["XGBoost"] = XGBRegressor(
+        n_estimators=300,
+        max_depth=6,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        reg_alpha=0.1,
+        reg_lambda=1.0,
+        eval_metric="rmse",
+        random_state=42,
+        n_jobs=-1,
+    )
+{% endif %}
 {% endif %}
 
 {% if use_lightgbm or model_type == "LightGBM" %}
     # LightGBM: leaf-wise, más rápido que XGBoost con datasets grandes.
     # Especialmente bueno cuando hay features categóricas o alta cardinalidad.
+{% if task_type == "clasificacion" %}
     base["LightGBM"] = LGBMClassifier(
         n_estimators=300,
         num_leaves=31,
@@ -1879,6 +1905,21 @@ def _build_models(strategy: str) -> dict:
         n_jobs=-1,
         verbose=-1,
     )
+{% else %}
+    base["LightGBM"] = LGBMRegressor(
+        n_estimators=300,
+        num_leaves=31,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        min_child_samples=20,
+        reg_alpha=0.1,
+        reg_lambda=1.0,
+        random_state=42,
+        n_jobs=-1,
+        verbose=-1,
+    )
+{% endif %}
 {% endif %}
 
 {% if use_catboost or model_type == "CatBoost" %}
@@ -1948,7 +1989,7 @@ def train_models(
     cv_evaluate: bool = True,
 ) -> dict:
     """
-    Entrena clasificadores sobre el espacio transformado por la estrategia híbrida.
+    Entrena modelos {{ task_type }} sobre el espacio transformado por la estrategia híbrida.
 
     Parameters
     ----------
@@ -1958,7 +1999,7 @@ def train_models(
                    Valores: 'pca_clf' | 'umap_clf' | 'kmeans_features' |
                              'iso_feature' | 'semi_supervisado'
     tune_knn     : si True, optimiza k de KNN por cross-validation antes de entrenar.
-    cv_evaluate  : si True, muestra F1_weighted (5-fold CV) de cada modelo.
+    cv_evaluate  : si True, muestra métrica CV (5-fold) de cada modelo.
 
     Returns
     -------
