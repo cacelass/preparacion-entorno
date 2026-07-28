@@ -59,15 +59,16 @@ DEFAULTS = dict(
     graphify_mode="no",
 )
 
-COMBOS: list[tuple[str, dict]] = [
-    ("sup+clf", dict(ml_type="supervisado", task_type="clasificacion")),
-    ("sup+reg", dict(ml_type="supervisado", task_type="regresion")),
+# Combos que ya rompieron algo alguna vez. All-pairs cubre interacciones de 2
+# variables; estos van fijos porque fallaron por interacciones de 3+ y no hay
+# garantia de que el generador los reproduzca.
+PINNED: list[tuple[str, dict]] = [
+    # Encontro 12 errores de lint que la matriz elegida a mano no veia.
     (
-        "sup+clf+ALL",
+        "pinned:todo-activado",
         dict(
             ml_type="supervisado",
             task_type="clasificacion",
-            model_type="RandomForest",
             use_mlflow=True,
             use_optuna=True,
             use_duckdb=True,
@@ -79,183 +80,81 @@ COMBOS: list[tuple[str, dict]] = [
             use_catboost=True,
             use_monitoring=True,
             use_rag=True,
+            use_conformal=True,
+            graphify_mode="graphify + obsidian vault",
         ),
     ),
-    (
-        "sup+reg+ALL",
-        dict(
-            ml_type="supervisado",
-            task_type="regresion",
-            use_mlflow=True,
-            use_optuna=True,
-            use_api=True,
-            use_monitoring=True,
-            use_rag=True,
-        ),
-    ),
-    ("nosup", dict(ml_type="no_supervisado", task_type="clasificacion")),
-    (
-        "nosup+ALL",
-        dict(
-            ml_type="no_supervisado",
-            task_type="clasificacion",
-            cluster_model="KMeans",
-            use_api=True,
-            use_optuna=True,
-            use_monitoring=True,
-            use_docker=True,
-            use_rag=True,
-        ),
-    ),
-    (
-        "nn+MLP+clf",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="clasificacion",
-            nn_model="MLP",
-            optimizer_type="AdamW",
-            nn_loss_fn="Auto",
-        ),
-    ),
-    (
-        "nn+MLP+reg+SGD+MSE",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="regresion",
-            nn_model="MLP",
-            optimizer_type="SGD",
-            nn_loss_fn="MSELoss",
-        ),
-    ),
-    (
-        "nn+CNN1D+clf+Adam+CE",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="clasificacion",
-            nn_model="CNN1D",
-            optimizer_type="Adam",
-            nn_loss_fn="CrossEntropyLoss",
-            use_mlflow=True,
-            use_api=True,
-        ),
-    ),
-    (
-        "nn+CNN1D+reg+L1",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="regresion",
-            nn_model="CNN1D",
-            optimizer_type="Adam",
-            nn_loss_fn="L1Loss",
-        ),
-    ),
-    (
-        "nn+LSTM+clf+RMS+BCE",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="clasificacion",
-            nn_model="LSTM",
-            optimizer_type="RMSProp",
-            nn_loss_fn="BCEWithLogitsLoss",
-            use_optuna=True,
-            use_calibration=True,
-        ),
-    ),
-    (
-        "nn+LSTM+reg+RMS",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="regresion",
-            nn_model="LSTM",
-            optimizer_type="RMSProp",
-            nn_loss_fn="Auto",
-        ),
-    ),
-    (
-        "nn+GRU+clf+SGD",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="clasificacion",
-            nn_model="GRU",
-            optimizer_type="SGD",
-            nn_loss_fn="Auto",
-        ),
-    ),
-    (
-        "nn+GRU+reg+Adag+L1",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="regresion",
-            nn_model="GRU",
-            optimizer_type="Adagrad",
-            nn_loss_fn="L1Loss",
-        ),
-    ),
-    (
-        "nn+Transf+clf+ALL",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="clasificacion",
-            nn_model="Transformer",
-            optimizer_type="AdamW",
-            nn_loss_fn="Auto",
-            use_mlflow=True,
-            use_optuna=True,
-            use_api=True,
-            use_docker=True,
-            use_monitoring=True,
-            use_rag=True,
-        ),
-    ),
-    (
-        "nn+Transf+reg+MSE",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="regresion",
-            nn_model="Transformer",
-            optimizer_type="AdamW",
-            nn_loss_fn="MSELoss",
-        ),
-    ),
-    (
-        "nn+MLP+reg+ALL",
-        dict(
-            ml_type="redes_neuronales",
-            task_type="regresion",
-            nn_model="MLP",
-            optimizer_type="AdamW",
-            nn_loss_fn="Auto",
-            use_mlflow=True,
-            use_optuna=True,
-            use_api=True,
-            use_monitoring=True,
-            use_rag=True,
-        ),
-    ),
-    (
-        "hibrido+clf",
-        dict(
-            ml_type="hibrido",
-            task_type="clasificacion",
-            use_shap=True,
-            use_xgboost=True,
-            use_lightgbm=True,
-        ),
-    ),
-    ("hibrido+reg", dict(ml_type="hibrido", task_type="regresion")),
-    (
-        "hibrido+reg+ALL",
-        dict(
-            ml_type="hibrido",
-            task_type="regresion",
-            use_mlflow=True,
-            use_optuna=True,
-            use_api=True,
-            use_monitoring=True,
-            use_rag=True,
-        ),
-    ),
+    # hibrido+regresion entrenaba clasificadores sobre un target continuo.
+    ("pinned:hibrido-regresion", dict(ml_type="hibrido", task_type="regresion")),
+    # Minimo absoluto: todo apagado.
+    ("pinned:minimo", dict(ml_type="supervisado", task_type="clasificacion")),
 ]
+
+#: Variables cuyas condiciones `when:` gobiernan al resto.
+DRIVERS = ["ml_type"]
+
+_SUP_HIB = {"supervisado", "hibrido"}
+_SOLO_SUP_HIB = ("model_type", "use_shap", "use_xgboost", "use_lightgbm", "use_catboost")
+_SOLO_NN = ("nn_model", "optimizer_type", "nn_loss_fn", "use_calibration")
+
+
+def aplica(var: str, combo: dict) -> bool:
+    """Traduce las condiciones `when:` de copier.yml a codigo."""
+    ml = combo.get("ml_type")
+    if ml is None:
+        return True
+    if var in _SOLO_SUP_HIB:
+        return ml in _SUP_HIB
+    if var == "cluster_model":
+        return ml == "no_supervisado"
+    if var in _SOLO_NN:
+        return ml == "redes_neuronales"
+    if var == "task_type":
+        return ml != "no_supervisado"
+    if var == "use_conformal":
+        return ml in _SUP_HIB or ml == "redes_neuronales"
+    return True
+
+
+def variables_de_copier() -> tuple[dict[str, list], dict]:
+    """
+    Lee las opciones directamente de copier.yml.
+
+    Leerlas en vez de copiarlas a mano es lo que impide la deriva: una opcion
+    nueva entra sola en la matriz, y no puede pasar lo de `use_rag` — que
+    existia desde hacia versiones y no aparecia en ninguna combinacion.
+    """
+    import yaml
+
+    doc = yaml.safe_load((Path(__file__).parent.parent.parent / "copier.yml").read_text())
+    variables: dict[str, list] = {}
+    defaults: dict = {}
+    for nombre, spec in doc.items():
+        if nombre.startswith("_") or not isinstance(spec, dict) or "type" not in spec:
+            continue
+        if "choices" in spec:
+            valores = list(spec["choices"])
+        elif spec["type"] == "bool":
+            valores = [True, False]
+        else:
+            continue  # los str libres no ramifican el render
+        variables[nombre] = valores
+        defaults[nombre] = spec.get("default", valores[0])
+    return variables, defaults
+
+
+def construir_combos() -> list[tuple[str, dict]]:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from pairwise import etiqueta, generate
+
+    variables, defaults = variables_de_copier()
+    generados = generate(variables, defaults, aplica, DRIVERS)
+    claves = ["ml_type", "task_type", "graphify_mode"]
+    combos = [(f"{i:03d}:{etiqueta(c, claves)}", c) for i, c in enumerate(generados)]
+    return PINNED + combos
+
+
+COMBOS: list[tuple[str, dict]] = construir_combos()
 
 ALL_FILES = sorted(
     [
@@ -339,8 +238,29 @@ def validate_claude_mirror() -> list[str]:
 env = Environment(loader=BaseLoader(), undefined=StrictUndefined, keep_trailing_newline=True)
 bugs: list[tuple[str, str, str]] = []
 
+
+def informe_cobertura() -> str:
+    """Cuantos pares de (variable, valor) cubre la matriz. Si baja, se nota."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    from pairwise import _pairs
+
+    variables, _ = variables_de_copier()
+    objetivo = _pairs(variables, aplica, list(variables), DRIVERS)
+    cubiertos = set()
+    claves = list(variables)
+    for _, combo in COMBOS:
+        for i, a in enumerate(claves):
+            for b in claves[i + 1 :]:
+                if a in combo and b in combo and aplica(a, combo) and aplica(b, combo):
+                    cubiertos.add((a, combo[a], b, combo[b]))
+    falta = objetivo - cubiertos
+    pct = 100 * (1 - len(falta) / len(objetivo)) if objetivo else 100.0
+    return f"{len(objetivo) - len(falta)}/{len(objetivo)} pares ({pct:.1f}%)"
+
+
 print(f"BASE         : {BASE}")
-print(f"Combinaciones: {len(COMBOS)}")
+print(f"Combinaciones: {len(COMBOS)}  ({len(PINNED)} fijas + all-pairs)")
+print(f"Cobertura    : {informe_cobertura()}")
 print(f"Ficheros     : {len(ALL_FILES)}")
 print(f"Checks totales: {len(COMBOS) * len(ALL_FILES)}")
 print()

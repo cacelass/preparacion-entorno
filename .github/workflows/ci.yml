@@ -11,7 +11,7 @@ env:
 
 jobs:
   validate-template:
-    name: Render + AST (1180 checks)
+    name: Render + AST (all-pairs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,11 @@ jobs:
 
       - name: Validar copier.yml
         run: python .github/scripts/check_copier.py
+
+      # El generador decide QUE se prueba. Si se rompe en silencio, la
+      # cobertura cae y todo sigue en verde.
+      - name: Autotest del generador all-pairs
+        run: python .github/scripts/pairwise.py --self-test
 
       - name: Render + AST
         run: python .github/scripts/validate_template.py
