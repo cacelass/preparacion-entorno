@@ -115,10 +115,14 @@ class TestStatus:
 
     def test_status_available(self, monkeypatch):
         monkeypatch.setattr("agents.tools.rag_tool.HAS_CHROMA", True)
-        monkeypatch.setattr(
-            "agents.tools.rag_tool.RagTool._client",
-            lambda root: type("FakeClient", (), {"get_collection": lambda self, name: type("FakeCol", (), {"count": lambda self: 42})()}),
-        )
+        # Ojo: el doble tiene que ser una INSTANCIA. Devolver la clase deja
+        # `get_collection` sin enlazar, y el `name` que le pasa `_collection`
+        # cae en el `self` → TypeError que no tiene nada que ver con el codigo.
+        fake_collection = type("FakeCol", (), {"count": lambda self: 42})()
+        fake_client = type(
+            "FakeClient", (), {"get_collection": lambda self, name: fake_collection}
+        )()
+        monkeypatch.setattr("agents.tools.rag_tool.RagTool._client", lambda root: fake_client)
         info = RagTool.status(Path("/tmp"))
         assert info.get("available") is True
 

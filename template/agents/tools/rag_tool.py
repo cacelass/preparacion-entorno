@@ -87,22 +87,42 @@ class RagTool:
     def _add_chunk(chunks: list, text: str, source: str, line: int,
                    section_type: str = "fallback") -> None:
         """
-        Añade el chunk solo si `_make_chunk` lo consideró válido.
+        Apila el chunk. Aquí vive la POLÍTICA de tamaño, no en `_make_chunk`.
 
-        `_make_chunk` devuelve None cuando el texto no llega a
-        `_MIN_CHUNK_CHARS`, pero los llamadores lo apilaban igual y dejaban
-        `None` dentro de la lista. `index_project` lo tapaba filtrando al
-        final; cualquier otro consumidor (los tests, sin ir más lejos)
-        reventaba al indexar el resultado.
+        **La estructura gana al tamaño.** Un corte estructural —un encabezado,
+        una función, una clase— es una unidad semántica y se indexa aunque sea
+        corta: una sección de 40 caracteres es buscable, y perderla es peor que
+        guardar un chunk pequeño. El suelo solo aplica a los cortes `fallback`,
+        que parten por tamaño a ciegas: ahí un fragmento diminuto no significa
+        nada y solo mete ruido en el índice.
         """
         chunk = RagTool._make_chunk(text, source, line, section_type)
-        if chunk is not None:
-            chunks.append(chunk)
+        if chunk is None:
+            return
+        if section_type == "fallback" and len(chunk["text"]) < _MIN_CHUNK_CHARS:
+            return
+        chunks.append(chunk)
+
+    @staticmethod
+    def _ensure_not_empty(chunks: list, content: str, source: str,
+                          section_type: str = "fallback") -> list:
+        """
+        Un documento nunca desaparece del índice por ser corto.
+
+        Si ningún fragmento llegó al suelo, se emite uno con el texto entero:
+        una nota de 90 caracteres sigue siendo buscable, y perderla sin aviso
+        es peor que indexar un chunk pequeno.
+        """
+        if chunks or not content.strip():
+            return chunks
+        chunk = RagTool._make_chunk(content, source, 0, section_type)
+        return [chunk] if chunk is not None else []
 
     @staticmethod
     def _make_chunk(text: str, source: str, line: int, section_type: str = "fallback") -> dict[str, Any] | None:
+        """Construye el chunk. Sin política: solo rechaza el texto vacío."""
         text = text.strip()
-        if len(text) < _MIN_CHUNK_CHARS:
+        if not text:
             return None
         return {
             "id": RagTool._chunk_id(source, line, text, section_type),
@@ -136,10 +156,7 @@ class RagTool:
                 else:
                     text = ""
 
-                if text.strip() and len(text.strip()) >= _MIN_CHUNK_CHARS:
-                    chunk = RagTool._make_chunk(text, source, current_start, current_type)
-                    if chunk:
-                        chunks.append(chunk)
+                RagTool._add_chunk(chunks, text, source, current_start, current_type)
 
                 current_func = [line]
                 current_start = i
@@ -153,13 +170,11 @@ class RagTool:
         else:
             text = ""
 
-        if text.strip() and len(text.strip()) >= _MIN_CHUNK_CHARS:
-            chunk = RagTool._make_chunk(text, source, current_start, current_type)
-            if chunk:
-                chunks.append(chunk)
+        RagTool._add_chunk(chunks, text, source, current_start, current_type)
 
         if not chunks:
             chunks = RagTool._chunk_by_size(content, source)
+        chunks = RagTool._ensure_not_empty(chunks, content, source, "fallback")
 
         # Extract docstrings as independent chunks
         doc_chunks = []
@@ -201,11 +216,7 @@ class RagTool:
                 level = len(m.group(1))
                 if current_section:
                     text = "\n".join(current_section)
-                    if len(text) >= _MIN_CHUNK_CHARS:
-                        RagTool._add_chunk(chunks, text, source, current_start, "heading")
-                    elif chunks:
-                        chunks[-1]["text"] += "\n" + text
-                        chunks[-1]["metadata"]["char_len"] = len(chunks[-1]["text"])
+                    RagTool._add_chunk(chunks, text, source, current_start, "heading")
                 current_section = [line]
                 current_start = i
                 current_level = level
@@ -227,16 +238,17 @@ class RagTool:
 
         if current_section:
             text = "\n".join(current_section)
-            if len(text) >= _MIN_CHUNK_CHARS:
-                RagTool._add_chunk(chunks, text, source, current_start, "heading" if current_level > 0 else "paragraph")
-            elif chunks:
-                chunks[-1]["text"] += "\n" + text
-                chunks[-1]["metadata"]["char_len"] = len(chunks[-1]["text"])
+            RagTool._add_chunk(
+                chunks, text, source, current_start,
+                "heading" if current_level > 0 else "paragraph",
+            )
 
         if not chunks:
             chunks = RagTool._chunk_by_size(content, source)
 
-        return chunks
+        return RagTool._ensure_not_empty(
+            chunks, content, source, "heading" if current_level > 0 else "paragraph"
+        )
 
     @staticmethod
     def _chunk_by_size(content: str, source: str) -> list[dict[str, Any]]:
