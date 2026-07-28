@@ -43,9 +43,10 @@ jobs:
       - name: Test with coverage
         run: uv run pytest tests/ -v --cov={{ project_slug }} --cov-report=xml --cov-fail-under=20
 
+      # Bloqueante a proposito: el arnes exige evidencia para cerrar una
+      # feature, pero sus propios tests podian romperse sin que CI se enterase.
       - name: Agent tests
         run: uv run pytest agents/tests/ -v --tb=short
-        continue-on-error: true
 
       # La puerta del arnés, en CI. Sin --quick no aportaría nada: los tests
       # ya se ejecutaron arriba y el fallo saldría dos veces.
@@ -59,9 +60,12 @@ jobs:
       - name: Prompts in sync
         run: uv run python -m agents.prompts_sync
 
+      # Solo las suites deterministas. `smoke` ejecuta la accion principal de
+      # cada agente y depende del estado del proyecto (datos en data/raw/, un
+      # modelo entrenado, un repo git): en uno recien generado falla por
+      # motivos legitimos, asi que ahi no mide nada.
       - name: Agent evals
-        run: uv run python -m agents.evals.runner --json
-        continue-on-error: true
+        run: uv run python -m agents.evals.runner --harness --routing --contracts
 
       - name: Security scan
         run: uv run bandit -r {{ project_slug }}/ -f txt -x tests || true
