@@ -44,6 +44,7 @@ success=true               → muestra resultado. Si data es dict/lista, format�
 
 Carga el skill de workflow solo cuando la tarea sea de ese dominio. Cada workflow documenta el pipeline completo, paths y agentes involucrados.
 
+- `skill agents_reference` → catálogo completo: agentes, workflows, GStack, vault
 - `skill harness_workflow` → ciclo del arnés (init.sh→backlog→implementar→revisar)
 - `skill data_workflow` → pipeline de datos (ingesta→features)
 - `skill ml_workflow` → ciclo de modelo (train→evaluar)

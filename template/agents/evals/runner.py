@@ -186,9 +186,10 @@ def _harness() -> list[dict]:
         path = root / ".opencode" / "agents" / f"{name}.md"
         check(f"agente:{name}", path.is_file(), "definido" if path.is_file() else "FALTA su definición")
 
-    workflow = root / "agents" / "prompts" / "harness_workflow.md"
-    check("harness_workflow", workflow.is_file(),
-          "skill presente" if workflow.is_file() else "FALTA agents/prompts/harness_workflow.md")
+    for skill in ("harness_workflow", "agents_reference"):
+        ruta = root / "agents" / "prompts" / f"{skill}.md"
+        check(skill, ruta.is_file(),
+              "skill presente" if ruta.is_file() else f"FALTA agents/prompts/{skill}.md")
 
     agents_md = root / "AGENTS.md"
     if agents_md.is_file():
