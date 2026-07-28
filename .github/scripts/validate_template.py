@@ -8,6 +8,7 @@ que cada fichero .py generado pasa ast.parse() sin errores de sintaxis.
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -264,6 +265,77 @@ ALL_FILES = sorted(
     ]
 )
 
+BACKLOG_STATUS = ("pending", "in_progress", "done", "blocked")
+BACKLOG_REQUIRED = ("id", "title", "description", "acceptance_criteria", "status")
+
+
+def validate_backlog(doc: object) -> list[str]:
+    """
+    Mismo contrato que verifica init.sh en el proyecto generado: si el backlog
+    del template no lo cumple, el arnés nace bloqueado.
+    """
+    if not isinstance(doc, dict):
+        return ["se esperaba un objeto JSON en la raíz"]
+    features = doc.get("features")
+    if not isinstance(features, list) or not features:
+        return ["falta la clave 'features' con una lista no vacía"]
+
+    problems: list[str] = []
+    ids: set[str] = set()
+    for i, feat in enumerate(features):
+        if not isinstance(feat, dict):
+            problems.append(f"feature #{i} no es un objeto")
+            continue
+        missing = [k for k in BACKLOG_REQUIRED if k not in feat]
+        if missing:
+            problems.append(f"feature #{i} sin campos: {', '.join(missing)}")
+            continue
+        if feat["id"] in ids:
+            problems.append(f"id duplicado: {feat['id']}")
+        ids.add(feat["id"])
+        if feat["status"] not in BACKLOG_STATUS:
+            problems.append(f"{feat['id']}: status '{feat['status']}' no válido")
+        criteria = feat["acceptance_criteria"]
+        if not isinstance(criteria, list) or not criteria:
+            problems.append(f"{feat['id']}: acceptance_criteria vacío o no es lista")
+
+    for feat in features:
+        if not isinstance(feat, dict):
+            continue
+        for dep in feat.get("depends_on", []):
+            if dep not in ids:
+                problems.append(f"{feat.get('id')}: depends_on '{dep}' no existe en este combo")
+
+    return problems
+
+
+def validate_claude_mirror() -> list[str]:
+    """
+    Los agentes del arnés se escriben una vez en `.opencode/agents/` y viajan
+    también en `.claude/agents/` con frontmatter, porque cada asistente los
+    busca en su sitio. Son ficheros versionados, no generados al vuelo: si se
+    desincronizan, Claude Code y opencode se comportan distinto sobre el mismo
+    proyecto y nadie se entera. Este check lo impide.
+    """
+    problems: list[str] = []
+    for nombre in ("lider", "explorer", "implementer", "reviewer"):
+        fuente = BASE / ".opencode" / "agents" / f"{nombre}.md"
+        espejo = BASE / ".claude" / "agents" / f"{nombre}.md"
+        if not fuente.exists():
+            problems.append(f"falta .opencode/agents/{nombre}.md")
+            continue
+        if not espejo.exists():
+            problems.append(f"falta .claude/agents/{nombre}.md — ejecuta 'make assistants-sync'")
+            continue
+        cuerpo = fuente.read_text(errors="replace").strip()
+        texto = espejo.read_text(errors="replace")
+        if not texto.startswith("---"):
+            problems.append(f".claude/agents/{nombre}.md sin frontmatter YAML")
+        if cuerpo not in texto:
+            problems.append(f".claude/agents/{nombre}.md desincronizado de su fuente en .opencode/")
+    return problems
+
+
 env = Environment(loader=BaseLoader(), undefined=StrictUndefined, keep_trailing_newline=True)
 bugs: list[tuple[str, str, str]] = []
 
@@ -306,6 +378,31 @@ for label, combo in COMBOS:
                 msg = f"PY_SYNTAX L{ln}: {exc.msg}\n{snippet}"
                 bugs.append((label, rel, msg))
                 print(f"  ✗ PY_SYN [{label}] {rel}:\n{snippet}")
+
+        # Los .json con condicionales Jinja2 se rompen fácil (comas colgantes).
+        # .vscode/ queda fuera: son JSONC, VS Code acepta comentarios //.
+        elif rel.endswith(".json") and not rel.startswith(".vscode/"):
+            try:
+                doc = json.loads(rendered)
+            except json.JSONDecodeError as exc:
+                lines = rendered.splitlines()
+                ln = exc.lineno
+                snippet = "\n".join(
+                    f"    {i + 1}: {lines[i]}"
+                    for i in range(max(ln - 3, 0), min(ln + 2, len(lines)))
+                )
+                msg = f"JSON L{ln}: {exc.msg}\n{snippet}"
+                bugs.append((label, rel, msg))
+                print(f"  ✗ JSON    [{label}] {rel}:\n{snippet}")
+            else:
+                if rel == "featureslist.json":
+                    for problem in validate_backlog(doc):
+                        bugs.append((label, rel, f"BACKLOG: {problem}"))
+                        print(f"  ✗ BACKLOG [{label}] {rel}: {problem}")
+
+for problem in validate_claude_mirror():
+    bugs.append(("*", ".claude/agents/", problem))
+    print(f"  ✗ MIRROR  {problem}")
 
 print()
 print(f"Bugs encontrados: {len(bugs)}")

@@ -22,9 +22,11 @@ class RagAgent(BaseAgent):
         "puede indexar URLs externas."
     )
     capabilities = [
-        "rag", "semantico", "semantic", "indexar", "index", "buscar",
+        "rag", "semantico", "semantic", "indexar", "index",
         "consulta semantic", "embedding", "chroma", "vector",
-        "documentacion", "encuentra en la documentacion",
+        "indice semantico", "busca en la documentacion",
+        "encuentra en la documentacion",
+        "indexa",
     ]
 
     def action_aliases(self) -> dict:

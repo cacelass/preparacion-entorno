@@ -33,8 +33,9 @@ class DocSearchAgent(BaseAgent):
         "referencias o nodos innecesarios."
     )
     capabilities = [
-        "buscar", "busca", "search", "navegar",
-        "referencias", "podar", "prune", "limpiar", "consulta", "query", "vecinos",
+        "docsearch", "navegar", "navega el grafo", "busca en el grafo",
+        "referencias", "podar", "prune", "limpiar nodos", "vecinos",
+        "busca en el grafo de conocimiento",
     ]
 
     def action_aliases(self) -> dict:

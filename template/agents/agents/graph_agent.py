@@ -24,6 +24,7 @@ class GraphAgent(BaseAgent):
     capabilities = [
         "grafico", "grafico", "figura", "plot", "reports/figures",
         "visualizacion", "chart", "resolucion", "calidad imagen",
+        "figuras", "figuras del reporte",
     ]
 
     def actions(self) -> dict:

@@ -59,7 +59,8 @@ class KnowledgeAgent(BaseAgent):
     )
     capabilities = [
         "conocimiento", "knowledge", "grafo", "graph", "graphify", "obsidian",
-        "boveda", "vault", "indexar", "nodo padre", "resumen del grafo",
+        "boveda", "vault", "nodo padre", "resumen del grafo",
+        "sincroniza el grafo",
     ]
 
     def action_aliases(self) -> dict:

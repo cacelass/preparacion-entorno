@@ -26,6 +26,7 @@ class RefactorAgent(BaseAgent):
     capabilities = [
         "refactor", "refactorizar", "type hint", "tipado", "mutable default",
         "except desnudo", "bare except", "weights_only", "autofix",
+        "refactoriza", "type hints",
     ]
 
     def actions(self) -> dict:
@@ -36,14 +37,33 @@ class RefactorAgent(BaseAgent):
             "fix_weights_only": self.fix_weights_only,
         }
 
+    #: Directorios que este agente NUNCA reescribe, venga como venga `within`.
+    #: No es paranoia: `uv` instala los paquetes en `.venv/` enlazándolos por
+    #: hardlink a su caché global, así que reescribir un fichero dentro de
+    #: `.venv/` corrompe la copia cacheada y, con ella, TODOS los proyectos que
+    #: instalen esa versión después. Un `--within .` descuidado bastaba para
+    #: dejar la máquina con un numpy roto y ningún rastro de por qué.
+    FORBIDDEN_DIRS = frozenset({
+        ".venv", "venv", ".env", "env", "site-packages", "dist-packages",
+        "node_modules", "__pycache__", ".git", ".tox", ".mypy_cache",
+        ".pytest_cache", ".ruff_cache", "build", "dist", ".rag-index",
+    })
+
     def _py_files(self, within: str | None) -> list[Path]:
         target = within or self.ctx.config.project_slug
-        base = self.ctx.root / target
-        if not base.exists():
+        base = (self.ctx.root / target).resolve()
+        root = self.ctx.root.resolve()
+
+        # Fuera del proyecto no se toca nada, ni con rutas relativas ni con
+        # enlaces simbólicos que apunten hacia afuera.
+        if not base.exists() or not base.is_relative_to(root):
             return []
+        if self.FORBIDDEN_DIRS.intersection(base.parts):
+            return []
+
         return [
             p for p in base.rglob("*.py")
-            if "__pycache__" not in p.parts
+            if not self.FORBIDDEN_DIRS.intersection(p.parts)
         ]
 
     def _apply_and_commit(self, path: Path, old_text: str, new_text: str, kind: str) -> dict:

@@ -1,0 +1,119 @@
+{
+  "$comment": "Backlog del arnés. Fuente de verdad de QUÉ hay que hacer. Los agentes leen la primera feature pendiente, la marcan in_progress y no la marcan done hasta que ./init.sh pasa en verde. Estados válidos: pending | in_progress | done | blocked.",
+  "version": 1,
+  "project": "{{ project_name }}",
+  "features": [
+    {
+      "id": "DATA-001",
+      "title": "EDA del dataset principal",
+      "description": "Cargar el dataset en data/raw/, generar un informe exploratorio y documentar los hallazgos: tipos, nulos, cardinalidad, distribuciones y correlaciones. Detectar fugas de información antes de construir features.",
+      "acceptance_criteria": [
+        "make data se ejecuta sin errores y deja los datos en data/processed/",
+        "uv run python -m agents run data eda_report --filename <dataset> devuelve success=true",
+        "El informe de fugas no reporta correlaciones sospechosas con el target sin justificar",
+        "Los hallazgos quedan escritos en progress/ y en la documentación del proyecto"
+      ],
+      "status": "pending",
+      "depends_on": []
+    },
+    {
+      "id": "FEAT-001",
+      "title": "Pipeline de features reproducible",
+      "description": "Implementar la construcción de features en {{ project_slug }}/features/ de forma determinista: mismo input, mismo output. Sin fugas del conjunto de test.",
+      "acceptance_criteria": [
+        "make features se ejecuta sin errores",
+        "Ejecutar make features dos veces produce artefactos idénticos",
+        "Existe un test que verifica el shape y las columnas del output",
+        "El escalado/encoding se ajusta solo con datos de train"
+      ],
+      "status": "pending",
+      "depends_on": ["DATA-001"]
+    },
+    {
+      "id": "MODEL-001",
+{% if ml_type == "no_supervisado" %}      "title": "Baseline de clustering evaluado",
+      "description": "Ajustar el modelo de clustering, elegir el número de grupos con criterio explícito (silhouette, codo, BIC) y dejar registrado por qué. Un baseline honesto antes de complicar nada.",
+      "acceptance_criteria": [
+        "make train se ejecuta sin errores y guarda el modelo en models/",
+        "El número de clusters está justificado con una métrica, no elegido a ojo",
+        "Existe una figura del resultado en reports/figures/ y no está vacía",
+        "make test pasa y la cobertura no baja"
+      ],
+{% else %}      "title": "Baseline entrenado y evaluado",
+      "description": "Entrenar el modelo baseline con validación honesta (split o CV sin fugas) y registrar las métricas de {{ task_type }}. No optimizar nada hasta tener este número de referencia.",
+      "acceptance_criteria": [
+        "make train se ejecuta sin errores y guarda el modelo en models/",
+        "Las métricas de validación quedan registradas y son reproducibles con seed fija",
+        "uv run python -m agents run ml check_overfitting no reporta sobreajuste sin explicar",
+        "make test pasa y la cobertura no baja"
+      ],
+{% endif %}      "status": "pending",
+      "depends_on": ["FEAT-001"]
+    },
+    {
+      "id": "QA-001",
+      "title": "Batería de calidad en verde",
+      "description": "Dejar make check (lint + typecheck + test) pasando de punta a punta. Es la condición que ./init.sh verifica antes de dejar trabajar a cualquier agente.",
+      "acceptance_criteria": [
+        "make lint pasa sin errores",
+        "make typecheck pasa con mypy --strict",
+        "make test pasa con cobertura >= 80%",
+        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "pending",
+      "depends_on": []
+    }{% if use_optuna %},
+    {
+      "id": "TUNE-001",
+      "title": "Búsqueda de hiperparámetros con Optuna",
+      "description": "Definir el espacio de búsqueda y ejecutar el estudio de Optuna sobre el baseline. El resultado solo cuenta si mejora la métrica de validación del baseline de forma reproducible.",
+      "acceptance_criteria": [
+        "make tune se ejecuta sin errores y persiste el estudio",
+        "Los mejores hiperparámetros quedan registrados y son reproducibles",
+        "La métrica de validación mejora sobre MODEL-001, o se documenta que no mejora",
+        "make test sigue pasando"
+      ],
+      "status": "pending",
+      "depends_on": ["MODEL-001"]
+    }{% endif %}{% if use_api %},
+    {
+      "id": "API-001",
+      "title": "API REST sirviendo el modelo",
+      "description": "Exponer el modelo entrenado vía FastAPI con validación de entrada y errores explícitos cuando aún no hay pesos en models/.",
+      "acceptance_criteria": [
+        "make serve arranca la API sin errores",
+        "GET /health responde 200 y POST /predict devuelve una predicción válida",
+        "POST /predict con payload inválido devuelve 422, no 500",
+        "tests/test_api.py pasa"
+      ],
+      "status": "pending",
+      "depends_on": ["MODEL-001"]
+    }{% endif %}{% if use_docker %},
+    {
+      "id": "DOCKER-001",
+      "title": "Imagen Docker reproducible",
+      "description": "Empaquetar el proyecto en una imagen que arranque el chat sin pasos manuales. La imagen debe construir desde cero en una máquina limpia.",
+      "acceptance_criteria": [
+        "make docker-run construye la imagen y levanta el servicio",
+        "uv run python -m agents run docker lint_dockerfile no reporta errores bloqueantes",
+        "El contenedor no corre como root",
+        "El servicio responde en el puerto documentado"
+      ],
+      "status": "pending",
+      "depends_on": ["MODEL-001"]
+    }{% endif %}{% if use_monitoring %},
+    {
+      "id": "MON-001",
+      "title": "Detección de drift en producción",
+      "description": "Configurar el informe de drift contra el dataset de referencia y definir el umbral a partir del cual hay que reentrenar.",
+      "acceptance_criteria": [
+        "make monitor genera el informe sin errores",
+        "El dataset de referencia está versionado y documentado",
+        "El umbral de alerta está definido explícitamente, no implícito en el código",
+        "tests/test_monitoring.py pasa"
+      ],
+      "status": "pending",
+      "depends_on": ["MODEL-001"]
+    }{% endif %}
+  ]
+}

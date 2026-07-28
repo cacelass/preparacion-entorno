@@ -8,6 +8,7 @@
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
         agents-list agents-run agents-doctor agents-memory agents-eval \
+        init harness-check backlog prompts-sync prompts-check assistants-sync \
         skills opencode-init opencode-check \
         recommended-tools recommended-all \
         clean clean-models clean-figures clean-all \
@@ -92,12 +93,20 @@ help:
 	@echo "  Documentación"
 	@echo "    make docs           sphinx-apidoc + html"
 	@echo ""
+	@echo "  Arnés (harness)"
+	@echo "    make init            puerta de entrada: ¿se puede trabajar? (init.sh)"
+	@echo "    make harness-check   valida la estructura del arnés sin correr tests"
+	@echo "    make backlog         muestra el estado de featureslist.json"
+	@echo ""
 	@echo "  Agentes"
 	@echo "    make agents-list     listar agentes disponibles"
 	@echo "    make agents-run      ejecutar un agente"
 	@echo "    make agents-doctor   diagnóstico completo con agentes"
 	@echo "    make agents-memory   estado de la memoria de agentes"
 	@echo "    make agents-eval     smoke + routing + contracts (eval de agentes)"
+	@echo "    make prompts-sync    regenera los prompts desde el codigo y contracts.py"
+	@echo "    make prompts-check   falla si un prompt se ha desincronizado"
+	@echo "    make assistants-sync espeja los subagentes a .claude/agents/"
 	@echo ""
 	@echo "  Skills del asistente"
 	@echo "    make skills          instalar skills locales en .opencode/skills/"
@@ -235,9 +244,9 @@ smoke:
 	@echo "▶  Test de humo — pipeline con datos sintéticos"
 	uv run pytest tests/ -v -m smoke --tb=short
 
-check: lint typecheck test
+check: lint typecheck test harness-check
 	@echo ""
-	@echo "  ✅ check pasado: lint + typecheck + test OK"
+	@echo "  ✅ check pasado: lint + typecheck + test + arnés OK"
 
 lint:
 	uv run ruff check $(MODULE)/ tests/
@@ -297,6 +306,23 @@ docs:
 	$(MAKE) html -C docs
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Arnés (harness) — ver el protocolo en AGENTS.md
+# ─────────────────────────────────────────────────────────────────────────────
+init:
+	@chmod +x init.sh 2>/dev/null || true
+	@./init.sh
+
+harness-check:
+	@chmod +x init.sh 2>/dev/null || true
+	@./init.sh --quick
+
+backlog:
+	@uv run $(PYTHON) -c "import json; d=json.load(open('featureslist.json')); \
+	print(); print('  Backlog de {{ project_name }}'); print(); \
+	[print('  [%-11s] %-10s %s' % (f['status'], f['id'], f['title'])) for f in d['features']]; \
+	print()"
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Sistema de agentes
 # ─────────────────────────────────────────────────────────────────────────────
 agents-list:
@@ -315,6 +341,13 @@ agents-memory:
 agents-eval:
 	@echo "▶  Evaluación del sistema de agentes (smoke + routing + contracts)"
 	uv run python -m agents.evals.runner
+
+prompts-sync assistants-sync:
+	@echo "▶  Regenerando prompts y subagentes desde el código y los contratos..."
+	uv run python -m agents.prompts_sync --write
+
+prompts-check:
+	@uv run python -m agents.prompts_sync
 
 index-rag:
 	@echo "▶  Indexando documentación del proyecto en ChromaDB..."
@@ -362,6 +395,13 @@ opencode-check:
 	else \
 		echo "  ✔ .opencode/agents/orquestador.md"; \
 	fi
+	@for a in lider implementer reviewer explorer; do \
+		if [ ! -f ".opencode/agents/$$a.md" ]; then \
+			echo "  ✘ falta .opencode/agents/$$a.md (agente del arnés)"; \
+		else \
+			echo "  ✔ .opencode/agents/$$a.md"; \
+		fi; \
+	done
 	@count=$$(ls .opencode/skills/*.md 2>/dev/null | wc -l); \
 	if [ "$$count" -lt 20 ]; then \
 		echo "  ✘ skills insuficientes ($$count/29+ esperados) — ejecuta make skills"; \

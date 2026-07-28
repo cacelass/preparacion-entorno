@@ -1,7 +1,8 @@
 """
 agents.tools.rag_tool — RAG semántico local con ChromaDB + ONNX embedding.
 
-Indexa documentación del proyecto (código, prompts, docs, vault, README) y
+Indexa documentación del proyecto (código, prompts, docs, vault, README, y la
+memoria del arnés: progress/ y featureslist.json) y
 permite búsqueda semántica. Sin GPU, sin API key, funciona offline.
 
 Dependencias: chromadb (con embedding all-MiniLM-L6-v2 vía ONNX).
@@ -10,6 +11,7 @@ Dependencias: chromadb (con embedding all-MiniLM-L6-v2 vía ONNX).
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import time
 from pathlib import Path
@@ -43,6 +45,8 @@ def _file_type(source: str) -> str:
         return "prompt"
     if "/vault/" in source or source.startswith("vault/"):
         return "vault"
+    if source.startswith("progress/") or source == "featureslist.json":
+        return "harness"
     return "doc"
 
 
@@ -80,7 +84,23 @@ class RagTool:
         return hashlib.md5(f"{source}:{line}:{section_type}:{text[:80]}".encode()).hexdigest()[:16]
 
     @staticmethod
-    def _make_chunk(text: str, source: str, line: int, section_type: str = "fallback") -> dict[str, Any]:
+    def _add_chunk(chunks: list, text: str, source: str, line: int,
+                   section_type: str = "fallback") -> None:
+        """
+        Añade el chunk solo si `_make_chunk` lo consideró válido.
+
+        `_make_chunk` devuelve None cuando el texto no llega a
+        `_MIN_CHUNK_CHARS`, pero los llamadores lo apilaban igual y dejaban
+        `None` dentro de la lista. `index_project` lo tapaba filtrando al
+        final; cualquier otro consumidor (los tests, sin ir más lejos)
+        reventaba al indexar el resultado.
+        """
+        chunk = RagTool._make_chunk(text, source, line, section_type)
+        if chunk is not None:
+            chunks.append(chunk)
+
+    @staticmethod
+    def _make_chunk(text: str, source: str, line: int, section_type: str = "fallback") -> dict[str, Any] | None:
         text = text.strip()
         if len(text) < _MIN_CHUNK_CHARS:
             return None
@@ -182,7 +202,7 @@ class RagTool:
                 if current_section:
                     text = "\n".join(current_section)
                     if len(text) >= _MIN_CHUNK_CHARS:
-                        chunks.append(RagTool._make_chunk(text, source, current_start, "heading"))
+                        RagTool._add_chunk(chunks, text, source, current_start, "heading")
                     elif chunks:
                         chunks[-1]["text"] += "\n" + text
                         chunks[-1]["metadata"]["char_len"] = len(chunks[-1]["text"])
@@ -200,7 +220,7 @@ class RagTool:
                                 sub_para = current_section[j:j+20]
                                 sub_text = "\n".join(sub_para)
                                 if sub_text.strip() and len(sub_text) >= _MIN_CHUNK_CHARS:
-                                    chunks.append(RagTool._make_chunk(sub_text, source, current_start, "paragraph"))
+                                    RagTool._add_chunk(chunks, sub_text, source, current_start, "paragraph")
                             current_section = [""]
                             continue
                 current_section.append(line)
@@ -208,7 +228,7 @@ class RagTool:
         if current_section:
             text = "\n".join(current_section)
             if len(text) >= _MIN_CHUNK_CHARS:
-                chunks.append(RagTool._make_chunk(text, source, current_start, "heading" if current_level > 0 else "paragraph"))
+                RagTool._add_chunk(chunks, text, source, current_start, "heading" if current_level > 0 else "paragraph")
             elif chunks:
                 chunks[-1]["text"] += "\n" + text
                 chunks[-1]["metadata"]["char_len"] = len(chunks[-1]["text"])
@@ -237,7 +257,7 @@ class RagTool:
             if current_len >= _MAX_CHUNK_CHARS:
                 text = " ".join(current_sentences)
                 if len(text) >= _MIN_CHUNK_CHARS:
-                    chunks.append(RagTool._make_chunk(text, source, chunk_start, "fallback"))
+                    RagTool._add_chunk(chunks, text, source, chunk_start, "fallback")
                 current_sentences = []
                 current_len = 0
                 chunk_start = i
@@ -245,14 +265,14 @@ class RagTool:
         if current_sentences:
             text = " ".join(current_sentences)
             if len(text) >= _MIN_CHUNK_CHARS:
-                chunks.append(RagTool._make_chunk(text, source, chunk_start, "fallback"))
+                RagTool._add_chunk(chunks, text, source, chunk_start, "fallback")
 
         if not chunks:
             words = content.split()
             for i in range(0, len(words), CHUNK_SIZE - CHUNK_OVERLAP):
                 text = " ".join(words[i : i + CHUNK_SIZE])
                 if len(text) >= _MIN_CHUNK_CHARS:
-                    chunks.append(RagTool._make_chunk(text, source, i, "fallback"))
+                    RagTool._add_chunk(chunks, text, source, i, "fallback")
 
         return chunks
 
@@ -303,6 +323,34 @@ class RagTool:
                     all_chunks.extend(RagTool.chunk_md(text, str(md_file.relative_to(root))))
                 except Exception:
                     pass
+
+        # Memoria del arnés: el histórico de features cerradas y sus decisiones
+        # es justo lo que un agente nuevo necesita buscar en lenguaje natural
+        # ("¿por qué elegimos K=4?") sin releer todo progress/.
+        progress_dir = root / "progress"
+        if progress_dir.exists():
+            for md_file in sorted(progress_dir.glob("*.md")):
+                try:
+                    text = md_file.read_text(encoding="utf-8")
+                    all_chunks.extend(RagTool.chunk_md(text, str(md_file.relative_to(root))))
+                except Exception:
+                    pass
+
+        backlog = root / "featureslist.json"
+        if backlog.exists():
+            try:
+                doc = json.loads(backlog.read_text(encoding="utf-8"))
+                lines = []
+                for feat in doc.get("features", []):
+                    criteria = "\n".join(f"- {c}" for c in feat.get("acceptance_criteria", []))
+                    lines.append(
+                        f"## {feat.get('id')} — {feat.get('title')} [{feat.get('status')}]\n\n"
+                        f"{feat.get('description', '')}\n\nCriterios de aceptación:\n{criteria}\n"
+                    )
+                if lines:
+                    all_chunks.extend(RagTool.chunk_md("\n".join(lines), "featureslist.json"))
+            except Exception:
+                pass
 
         for doc_file in ("README.md", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md"):
             fp = root / doc_file

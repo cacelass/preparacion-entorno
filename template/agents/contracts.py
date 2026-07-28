@@ -49,6 +49,40 @@ puede LEERLO, pero solo `knowledge` lo ESCRIBE. El vault contiene:
 Regla: si un agente necesita contexto sobre el proyecto, primero lee
 `vault/00_META/IA_index.md`. Si necesita contexto sobre otro agente, lee
 `vault/05_AGENTES/<Agent>.md`.
+
+El arnés: quién razona y quién ejecuta
+--------------------------------------
+El arnés (ver `AGENTS.md` y `agents/prompts/harness_workflow.md`) tiene dos
+capas y la división es estricta:
+
+- **Razonan** — agentes markdown en `.opencode/agents/` (`lider`, `explorer`,
+  `implementer`, `reviewer`). Deciden QUÉ feature toca, cómo implementarla y
+  si el trabajo vale. No aparecen en `CONTRACTS` porque no son código: no
+  tienen módulo en `agents/agents/` y `validate_contracts()` audita el registro.
+- **Ejecuta** — el agente Python `harness` (abajo en este mismo diccionario).
+  Es el dueño real de `featureslist.json` y `progress/`: cambiar un estado,
+  escribir el histórico o ejecutar la puerta son operaciones deterministas, y
+  un LLM editando JSON a mano se equivoca.
+
+Por eso la regla del arnés no es una instrucción sino código:
+`harness.finish()` rechaza cerrar una feature si `./init.sh` no pasa o si no
+se aporta evidencia. No hay forma de saltársela pidiéndoselo al modelo.
+
+Recursos del arnés que no tienen dueño en `CONTRACTS`:
+
+- `init.sh` — dueño: el humano; `reviewer` puede endurecerlo (añadir checks).
+- `.opencode/agents/*.md` — cada agente es dueño de su propia definición.
+
+Las tres memorias del proyecto no se solapan, cada una tiene su plazo:
+
+| Soporte | Dueño | Alcance |
+|---------|-------|---------|
+| `progress/` | `harness` | La feature en curso y el histórico de features |
+| `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
+| `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
+
+Si un agente Python necesita saber en qué se está trabajando, LEE
+`progress/current.md` — no lo escribe.
 """
 
 from __future__ import annotations
@@ -416,6 +450,42 @@ CONTRACTS: dict[str, Contract] = {
         needs=("el log de auditoría para observar",),
         owns=("agents/workspace/memory/",),
         collaborates=("audit",),
+    ),
+    "doc": Contract(
+        role="Documentación unificada: responde dónde está algo consultando grafo, índice semántico y vault.",
+        can=(
+            "buscar en las tres fuentes a la vez (graphify, RAG, vault) y fusionar resultados",
+            "consultar el grafo estructural de graphify",
+            "buscar en el vault Obsidian por texto",
+            "informar de qué fuentes están disponibles y cuáles no",
+        ),
+        cannot=(
+            "escribir documentación → eso es de 'documentation' (README, CHANGELOG) o 'knowledge' (vault)",
+            "construir el grafo ni el índice → delega en 'knowledge' y 'rag'",
+            "responder si ninguna fuente está disponible → lo dice, no inventa",
+        ),
+        needs=("la pregunta en lenguaje natural",),
+        collaborates=("rag", "knowledge", "docsearch"),
+    ),
+    "harness": Contract(
+        role="Dueño mecánico del arnés: mantiene el backlog y el progreso, y ejecuta la puerta init.sh.",
+        can=(
+            "leer y actualizar featureslist.json (abrir, cerrar, bloquear y añadir features)",
+            "escribir progress/current.md y añadir entradas a progress/history.md",
+            "guardar los informes de los subagentes en progress/<agente>-<FEATURE-ID>.md",
+            "ejecutar ./init.sh y devolver el veredicto estructurado",
+            "rechazar el cierre de una feature si la puerta no pasa o si no hay evidencia",
+        ),
+        cannot=(
+            "decidir QUÉ feature toca ni cómo implementarla → eso lo razonan los agentes "
+            "markdown del arnés (lider, explorer, implementer, reviewer)",
+            "escribir código del producto → 'refactor' y el implementer",
+            "ejecutar los tests por su cuenta → los ejecuta init.sh, o el agente 'test'",
+            "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
+        ),
+        needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),
+        owns=("featureslist.json", "progress/"),
+        collaborates=("plan", "test", "review", "memory"),
     ),
 }
 

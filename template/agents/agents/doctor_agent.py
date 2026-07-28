@@ -15,6 +15,52 @@ from agents.core.registry import register_agent
 from agents.tools.process_tool import run_command
 
 
+def _satisfies_requires_python(current: tuple[int, ...], requires: str) -> bool:
+    """
+    ¿Cumple `current` el `requires-python` del pyproject?
+
+    Antes se comprobaba con `current in requires`, es decir, subcadena: con
+    `requires-python = ">=3.12"`, un Python 3.13 daba FALLO (la cadena "3.13"
+    no aparece en ">=3.12") y un Python 3.1 daba OK (sí aparece). El
+    diagnóstico decía justo lo contrario de la realidad.
+
+    Se comparan tuplas de enteros y se soportan las cláusulas que aparecen en
+    la práctica, separadas por comas. Una cláusula que no se entienda se da
+    por buena: es un diagnóstico, no un resolutor de dependencias — mejor no
+    avisar que avisar en falso.
+    """
+    ops = (">=", "<=", "==", "!=", "~=", ">", "<")
+    for raw in requires.split(","):
+        clause = raw.strip()
+        if not clause:
+            continue
+        op = next((o for o in ops if clause.startswith(o)), None)
+        if op is None:
+            continue
+        try:
+            target = tuple(int(part) for part in clause[len(op):].strip().split(".") if part.isdigit())
+        except ValueError:
+            continue
+        if not target:
+            continue
+        head = current[: len(target)]
+        if op == ">=" and not head >= target:
+            return False
+        if op == ">" and not head > target:
+            return False
+        if op == "<=" and not head <= target:
+            return False
+        if op == "<" and not head < target:
+            return False
+        if op == "==" and head != target:
+            return False
+        if op == "!=" and head == target:
+            return False
+        if op == "~=" and (head < target or current[: len(target) - 1] != target[:-1]):
+            return False
+    return True
+
+
 @register_agent
 class DoctorAgent(BaseAgent):
     name = "doctor"
@@ -38,6 +84,7 @@ class DoctorAgent(BaseAgent):
             "tests": self._check_tests(),
             "lock": self._check_lock_sync(),
             "data": self._check_data(),
+            "harness": self._check_harness(),
         }
         ok = sum(1 for c in checks.values() if c.get("ok"))
         total = len(checks)
@@ -113,9 +160,13 @@ class DoctorAgent(BaseAgent):
         if pyproject is None:
             return {"ok": False, "message": "pyproject.toml no encontrado"}
         requires = pyproject.get("project", {}).get("requires-python", "")
-        current = f"{sys.version_info.major}.{sys.version_info.minor}"
-        ok = not requires or current in requires
-        return {"ok": ok, "message": f"Python {current} (requiere {requires})"}
+        current = sys.version_info[:2]
+        current_str = f"{current[0]}.{current[1]}"
+        if not requires:
+            return {"ok": True, "message": f"Python {current_str} (sin restricción)"}
+        ok = _satisfies_requires_python(current, requires)
+        estado = "cumple" if ok else "NO cumple"
+        return {"ok": ok, "message": f"Python {current_str} {estado} '{requires}'"}
 
     def _check_git(self) -> dict:
         try:
@@ -162,6 +213,35 @@ class DoctorAgent(BaseAgent):
         if n == 0:
             return {"ok": False, "message": "tests/ existe pero no contiene tests"}
         return {"ok": True, "message": f"{n} archivo(s) de test"}
+
+    def _check_harness(self) -> dict:
+        """
+        ¿Están las piezas del arnés? No ejecuta la puerta (eso es
+        `harness gate`): aquí solo se comprueba que el andamiaje existe, para
+        que un diagnóstico no tarde lo que tarda la suite de tests.
+        """
+        missing = [
+            rel
+            for rel in ("init.sh", "featureslist.json", "progress/current.md", "AGENTS.md")
+            if not (self.ctx.root / rel).exists()
+        ]
+        if missing:
+            return {"ok": False, "message": f"faltan piezas del arnés: {', '.join(missing)}"}
+
+        try:
+            import json
+
+            doc = json.loads((self.ctx.root / "featureslist.json").read_text(encoding="utf-8"))
+            features = doc.get("features", [])
+        except (OSError, json.JSONDecodeError) as exc:
+            return {"ok": False, "message": f"featureslist.json ilegible: {exc}"}
+
+        pending = sum(1 for f in features if f.get("status") == "pending")
+        running = [f.get("id") for f in features if f.get("status") == "in_progress"]
+        if len(running) > 1:
+            return {"ok": False, "message": f"{len(running)} features in_progress a la vez: {', '.join(running)}"}
+        activa = running[0] if running else "ninguna"
+        return {"ok": True, "message": f"arnés completo · en curso: {activa} · {pending} pendiente(s)"}
 
     def _check_lock_sync(self) -> dict:
         result = run_command(["uv", "lock", "--check"], cwd=self.ctx.root)

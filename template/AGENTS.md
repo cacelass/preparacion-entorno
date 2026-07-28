@@ -4,6 +4,143 @@ Este proyecto incluye un sistema de agentes autónomos que automatizan todo el
 ciclo de desarrollo: desde análisis de datos hasta release, pasando por
 revisión de código, tests, dependencias y despliegue.
 
+---
+
+# Protocolo del arnés — LEE ESTO PRIMERO
+
+Este fichero es el punto de entrada. Todo agente que trabaje en este proyecto
+sigue estos pasos **en orden**, antes de escribir una sola línea de código.
+
+```
+1. ./init.sh                    ¿el entorno está sano?   si no → PARA
+2. progress/current.md          ¿hay trabajo a medias?   si sí → retómalo
+3. featureslist.json            primera feature pendiente con deps en done
+4. marcar in_progress           en featureslist.json + rellenar current.md
+5. delegar                      explorer → implementer → reviewer
+6. verificar                    ./init.sh en verde + criterios uno a uno
+7. done                         featureslist.json + resumen en history.md
+```
+
+## La regla que no se salta
+
+**Ninguna feature se marca `done` sin que `./init.sh` pase en verde.**
+
+Y no es una instrucción: es código. `harness finish` ejecuta la puerta antes de
+tocar el backlog y devuelve `success=false` si está en rojo o si no le pasas
+evidencia. No hay forma de rodearlo pidiéndoselo amablemente al modelo — la
+única sería editar el JSON a mano, y eso está prohibido explícitamente.
+
+`./init.sh` verifica el entorno, los ficheros del arnés, el formato del backlog
+y ejecuta la suite de tests. Si sale `ENTORNO BLOQUEADO`, el agente para y lo
+reporta — no implementa encima de un proyecto roto ni arregla el arnés por su
+cuenta.
+
+```bash
+./init.sh            # verificación completa
+./init.sh --quick    # solo estructura, sin tests (no vale para cerrar features)
+./init.sh --json     # salida estructurada para consumo por agentes
+
+uv run python -m agents --json run harness gate    # lo mismo, vía agente
+```
+
+## Piezas del arnés
+
+| Fichero | Qué es |
+|---------|--------|
+| `AGENTS.md` | Este fichero. Punto de entrada y reglas del juego |
+| `CLAUDE.md` | Puntero a este fichero para Claude Code. No duplica nada |
+| `init.sh` | La puerta: decide si se puede trabajar. Exit != 0 → parar |
+| `featureslist.json` | Backlog: qué hay que hacer, con criterios de aceptación |
+| `progress/current.md` | Estado vivo de la feature en curso |
+| `progress/history.md` | Append-only: lo cerrado y con qué evidencia |
+| `progress/<agente>-<ID>.md` | Resultado de cada subagente |
+| `.opencode/agents/*.md` | Definición de cada agente del arnés |
+
+## Los agentes del arnés
+
+| Agente | Capa | Hace |
+|--------|------|------|
+| `lider` | razona (primary) | Orquesta el ciclo. No escribe código de producto |
+| `explorer` | razona (subagent) | Investiga en **solo lectura** y responde una pregunta |
+| `implementer` | razona (subagent) | Implementa **una** feature con sus tests |
+| `reviewer` | razona (subagent) | Aprueba o rechaza tras ejecutar la puerta |
+| `harness` | ejecuta (Python) | **Único** que escribe `featureslist.json` y `progress/` |
+
+Un recurso, un dueño: nadie edita el backlog ni el progreso a mano; todo pasa
+por `harness`. El `implementer` es el único que toca el código de producto.
+
+```bash
+uv run python -m agents --json run harness next          # ¿qué toca?
+uv run python -m agents --json run harness start --id DATA-001
+uv run python -m agents --json run harness record --agent explorer --id DATA-001 --content "..."
+uv run python -m agents --json run harness finish --id DATA-001 --evidence "$(make test 2>&1 | tail -5)"
+uv run python -m agents --json run harness block --id DATA-001 --reason "falta el dataset"
+uv run python -m agents --json run harness add --id API-002 --title "..." --criteria "a;b"
+```
+
+## Memoria externa: por qué existe `progress/`
+
+La ventana de contexto se degrada mucho antes de llenarse. Por eso el estado
+del trabajo vive en ficheros, no en la conversación:
+
+- **Al lanzar un subagente, no le heredes contexto.** Dale el ID de la feature,
+  sus criterios y las rutas que necesita. Nada más.
+- **Todo subagente registra su resultado con `harness record` antes de devolver
+  el control.** Si solo lo dice en su respuesta, se pierde.
+- **El siguiente agente lee `progress/`, no el repositorio entero.**
+
+Las tres memorias del proyecto no se pisan:
+
+| Dónde | Dueño | Plazo |
+|-------|-------|-------|
+| `progress/` | `harness` | La feature en curso y el histórico de features |
+| `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
+| `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
+{% if use_rag %}
+Y las tres son buscables: `progress/` y `featureslist.json` entran en el índice
+semántico, así que tras cerrar una feature basta con `make index-rag` para poder
+preguntarle al histórico en lenguaje natural:
+
+```bash
+uv run python -m agents --json run rag search --query "¿por qué elegimos este modelo?"
+uv run python -m agents --json run doc search --query "qué se decidió sobre las features"
+```
+{% endif %}
+Detalles del formato en `progress/README.md`.
+
+## Evidencia, no afirmaciones
+
+Un agente no declara que algo funciona: lo demuestra. Cada criterio de
+aceptación se cierra pegando la **salida real** del comando que lo prueba.
+«Los tests pasan» sin la salida de `pytest` es motivo de rechazo automático.
+
+## El arnés se automejora
+
+Estos ficheros son parte del repositorio, así que se corrigen como cualquier
+otro código. Si un fallo se cuela dos veces:
+
+- ¿Es una comprobación automatizable? → a `init.sh`, y deja de depender de que
+  alguien se acuerde.
+- ¿Es una regla del proyecto? → a este fichero.
+- ¿Es un criterio de revisión? → a `.opencode/agents/reviewer.md`.
+
+Deja constancia del cambio en `progress/history.md`.
+
+## Arranque
+
+```bash
+./init.sh                                    # verifica que se puede trabajar
+make init                                    # lo mismo, vía Makefile
+make harness-check                           # solo estructura del arnés
+```
+
+Y en el asistente, para arrancar el ciclo:
+
+> Lee `AGENTS.md` y sigue el protocolo: ejecuta `./init.sh`, lee `progress/` y
+> elige la primera feature pendiente.
+
+---
+
 ## Filosofía
 
 - **No es un chatbot.** Cada agente ejecuta tareas reales (git, docker, tests...),
@@ -86,6 +223,27 @@ información, hazlo.
 
 ## Agentes disponibles
 
+Un solo sistema con dos capas. **No son mundos separados: el arnés es la capa
+de decisión de tus agentes, no un sustituto de ellos.**
+
+- **Razonan** — `lider`, `explorer`, `implementer`, `reviewer`: markdown en
+  `.opencode/agents/`. Deciden *qué* se hace, *cómo* y *cuándo está hecho*.
+- **Ejecutan** — los {% if use_rag %}30{% else %}29{% endif %} agentes Python de la tabla de abajo. Acciones
+  deterministas, sin ambigüedad. Entre ellos, `harness` es el dueño mecánico
+  del backlog y del progreso.
+
+```
+[usuario] → lider (primary)
+              ├── explorer / implementer / reviewer   ← razonan, contexto limpio
+              └── orquestador (subagent)
+                      └── agentes Python: harness, plan, test, review, git...
+```
+
+La bisagra entre las dos capas es el agente `harness`: el líder **decide** que
+una feature está lista, pero es `harness finish` quien la **cierra** — y se
+niega si `init.sh` no pasa. Así la regla del arnés es código, no un prompt que
+el modelo pueda ignorar.
+
 | Agente | Hace |
 |--------|------|
 | `git` | Conventional Commits, changelog, release, PRs, tag_release completo |
@@ -116,6 +274,7 @@ información, hazlo.
 | `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |
 | `memory` | **Memoria proactiva**: observa trayectorias de agentes, mantiene un banco estructurado (facts/state/traces) e inyecta contexto para combatir *behavioral state decay* en tareas largas |
 | `doc` | **Documentación unificada**: busca en graphify (estructura), RAG (semántica) y vault Obsidian (notas) |
+| `harness` | **Dueño del arnés**: backlog (`featureslist.json`) y progreso (`progress/`); ejecuta la puerta y **rehúsa cerrar** una feature sin `init.sh` en verde y evidencia real |
 {% if use_rag %}| `rag` | **RAG semántico local**: indexa código, prompts, docs y vault en ChromaDB; busca en lenguaje natural y también indexa URLs externas |{% endif %}
 
 ## Workflows por dominio
@@ -126,6 +285,7 @@ con `skill <name>` cuando la tarea abarca todo un dominio.
 
 | Skill | Cuándo cargarlo | Agentes que orquesta |
 |-------|-----------------|----------------------|
+| `harness_workflow` | Ciclo del arnés: init.sh → backlog → implementar → revisar | `lider`, `explorer`, `implementer`, `reviewer`, `plan` |
 | `data_workflow` | Pipeline de datos: ingesta → features | `data`, `graph`, `knowledge` |
 | `ml_workflow` | Ciclo de modelo: entrenar → evaluar | `ml`, `mlflow`, `graph`, `knowledge` |
 | `dev_workflow` | Desarrollo: review → test → commit → release | `review`, `test`, `git` |
@@ -269,21 +429,26 @@ agents/
 
 ## Integración con opencode
 
-Este proyecto tiene un **subagente gateway** (`orquestador`) configurado en `opencode.json`.
-Presiona Tab en opencode para cambiar a él. El orquestador delega en los {% if use_rag %}29{% else %}28{% endif %} agentes Python
-vía `uv run python -m agents [ask|run|pipeline|doctor]`.
+El agente **primary** es el `lider` del arnés — es con quien hablas por defecto.
+El `orquestador` pasó a **subagente**: es el gateway a los {% if use_rag %}30{% else %}29{% endif %} agentes Python,
+al que el líder delega las acciones sueltas vía
+`uv run python -m agents [ask|run|pipeline|doctor]`.
 
 ```
-[opencode assistant]  ←  Tab  →  [orquestador subagent]
-                                       │
-                                  delegates via CLI (--json mode)
-                                       │
-                              [Python agent system]
-                              ├── Orchestrator.dispatch() ← routing por keywords
-                              ├── {% if use_rag %}29 agents (git, test, review, docker, rag, doc...){% else %}28 agents (git, test, review, docker, doc...){% endif %}
-                              ├── GStack pipelines (develop, fix, release...)
-                              └── audit trail + contracts
+[usuario] → lider (primary)
+              │
+              ├── explorer / implementer / reviewer  (subagentes, contexto limpio)
+              │        └── registran su informe con: run harness record
+              │
+              └── orquestador (subagent) ── routing por keywords
+                       │
+                       └── [Python agent system]
+                           ├── {% if use_rag %}30 agents (harness, git, test, review, docker, rag, doc...){% else %}29 agents (harness, git, test, review, docker, doc...){% endif %}
+                           ├── GStack pipelines (develop, fix, release...)
+                           └── audit trail + contracts
 ```
+
+Presiona Tab en opencode para cambiar entre agentes.
 
 ### Setup
 
@@ -322,8 +487,19 @@ uv run python -m agents.evals.runner --smoke  # solo smoke
 ### Mantenimiento
 
 - `make skills` regenera `.opencode/skills/` desde `agents/prompts/`
+- **Los prompts se derivan del código.** Cada `agents/prompts/<agente>_agent.md`
+  tiene la prosa escrita a mano (su criterio) y un bloque `AUTOGEN` con sus
+  acciones y sus límites, sacados de `actions()` y de `contracts.py`. Tras
+  tocar cualquiera de los dos: `make prompts-sync`. `make prompts-check` (y CI)
+  falla si se desincronizan — no vuelve a haber dos fuentes de verdad.
+- **Los agentes del arnés se escriben una sola vez.** La fuente es
+  `.opencode/agents/*.md`; `make assistants-sync` los espeja a
+  `.claude/agents/*.md` con el frontmatter que espera Claude Code. Nunca edites
+  `.claude/agents/` — está gitignorado y se sobrescribe.
 - Si añades un agente nuevo: regístralo en `.opencode/agents/orquestador.md` y en `AGENTS.md`
 - Si añades un workflow skill: regístralo en `.opencode/agents/orquestador.md` (con Jinja2 condicional), en `AGENTS.md` y en `agents/evals/runner.py`
+- Si añades un agente del **arnés**: crea su `.opencode/agents/<nombre>.md`, regístralo en `opencode.json`, en `HARNESS_AGENTS` de `agents/evals/runner.py` y en la lista de `init.sh`
+- Si un recurso nuevo tiene dueño, decláralo en `agents/contracts.py` (los del arnés van en el docstring del módulo, no en `CONTRACTS`)
 - Ejecuta `make agents-eval` para verificar que todo funciona
 - Los prompts originales en `agents/prompts/` son la fuente de verdad para skills
 

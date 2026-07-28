@@ -126,3 +126,33 @@ def test_human_size_mb():
 
 def test_human_size_gb():
     assert DoctorAgent._human_size(2_500_000_000) == "2.3 GB"
+
+
+# -- requires-python: comparar versiones, no subcadenas -------------------------
+
+import pytest
+
+from agents.agents.doctor_agent import _satisfies_requires_python
+
+
+@pytest.mark.parametrize(
+    "current,requires,esperado",
+    [
+        # El bug original: 3.13 con ">=3.12" daba FALLO por comparar subcadenas.
+        ((3, 13), ">=3.12", True),
+        ((3, 12), ">=3.12", True),
+        ((3, 11), ">=3.12", False),
+        # ...y el falso positivo simétrico: "3.1" es subcadena de ">=3.12".
+        ((3, 1), ">=3.12", False),
+        ((3, 13), ">=3.10,<4.0", True),
+        ((4, 0), ">=3.10,<4.0", False),
+        ((3, 12), "==3.12", True),
+        ((3, 13), "==3.12", False),
+        ((3, 12), "~=3.11", True),
+        ((4, 0), "~=3.11", False),
+        ((3, 13), "", True),
+        ((3, 13), "vete a saber", True),  # no se entiende → no se avisa en falso
+    ],
+)
+def test_requires_python_compara_versiones(current, requires, esperado):
+    assert _satisfies_requires_python(current, requires) is esperado

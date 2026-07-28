@@ -2,16 +2,44 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/deepseek-v4-flash-free",
   "agent": {
-    "orquestador": {
-      "description": "Gateway al sistema de 27 agentes Python: analiza la tarea y delega al agente dskit adecuado (git, test, review, docker, doctor, plan...)",
+    "lider": {
+      "description": "Punto de entrada del arnés: init.sh → progress → featureslist → delegar → verificar → done. No escribe código; orquesta subagentes con contexto mínimo y delega el trabajo determinista en los agentes Python.",
       "mode": "primary",
+      "instructions": [
+        ".opencode/agents/lider.md"
+      ]
+    },
+    "orquestador": {
+      "description": "Gateway al sistema de {% if use_rag %}30{% else %}29{% endif %} agentes Python: para acciones sueltas (git, test, review, docker, doctor, plan...) sin abrir feature. El líder delega aquí cuando no hay que razonar, solo ejecutar.",
+      "mode": "subagent",
       "instructions": [
         ".opencode/agents/orquestador.md"
       ]
+    },
+    "explorer": {
+      "description": "Arnés: investiga el proyecto en solo lectura y devuelve un informe corto en progress/. No modifica nada.",
+      "mode": "subagent",
+      "instructions": [
+        ".opencode/agents/explorer.md"
+      ]
+    },
+    "implementer": {
+      "description": "Arnés: implementa UNA feature del backlog con tests y deja la evidencia en progress/. Lo lanza el líder, no se usa suelto.",
+      "mode": "subagent",
+      "instructions": [
+        ".opencode/agents/implementer.md"
+      ]
+    },
+    "reviewer": {
+      "description": "Arnés: aprueba o rechaza el trabajo del implementer ejecutando init.sh y comprobando los criterios de aceptación uno a uno.",
+      "mode": "subagent",
+      "instructions": [
+        ".opencode/agents/reviewer.md"
+      ]
     }{% if use_rag %},
     "doc": {
-      "description": "Documentación del proyecto: busca en graphify (grafo estructural), RAG (índice semántico) y vault Obsidian (notas markdown)",
-      "mode": "primary",
+      "description": "Documentación del proyecto: busca en graphify (grafo estructural), RAG (índice semántico, incluye la memoria del arnés) y vault Obsidian (notas markdown)",
+      "mode": "subagent",
       "instructions": [
         ".opencode/agents/doc_agent.md"
       ]

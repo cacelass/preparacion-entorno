@@ -35,11 +35,14 @@ class DocAgent(BaseAgent):
         "Documentación unificada del proyecto: busca en el grafo graphify "
         "(estructura), el índice RAG (semántica) y el vault Obsidian (notas)."
     )
+    # Es el punto de entrada UNIFICADO: sus palabras son las que expresan
+    # "búscalo donde sea", no los nombres de las fuentes concretas — esos
+    # pertenecen a rag, knowledge y docsearch (un keyword, un dueño).
     capabilities = [
-        "documentacion", "documentación", "doc", "documentation", "buscar",
-        "search", "consulta", "query", "grafo", "graph", "vault",
-        "obsidian", "rag", "semantico", "semantic", "informacion",
-        "que hace", "como funciona", "explica",
+        "doc", "todas las fuentes", "busqueda unificada", "búsqueda unificada",
+        "documentacion unificada", "donde esta documentado",
+        "dónde está documentado", "que hace", "qué hace",
+        "como funciona", "cómo funciona", "explica", "informacion", "información",
     ]
 
     def action_aliases(self) -> dict:

@@ -253,7 +253,7 @@ python_version:
 
 dskit_version:
   type: str
-  default: "1.9.0"
+  default: "1.13.2"
   help: "Versión de dskit que generó el proyecto (no cambiar)"
 
 project_version:
@@ -276,6 +276,8 @@ _message_before_copy: >-
   Generando proyecto '{{ project_name }}' ({{ ml_type }})...
 
 _tasks:
+  # El arnés arranca con init.sh — asegura el bit de ejecución en el destino.
+  - "chmod +x init.sh"
   - >-
     uv sync --extra dev --extra {{ ml_type }}
     {% if use_mlflow %}--extra mlflow_tracking{% endif %}
@@ -301,6 +303,14 @@ _tasks:
     {% if use_rag %}
     && uv run python -c 'import chromadb; print("chromadb OK")'
     {% endif %}
+  # Los prompts llevan un bloque derivado del código y de contracts.py, y los
+  # subagentes se espejan a .claude/: se genera aquí para que el proyecto nazca
+  # al día. NO es bloqueante a propósito — es una comodidad, y quedarse sin
+  # poder generar el proyecto por ella sería mucho peor que generarlo sin los
+  # bloques. Si falla, `make prompts-sync` lo arregla.
+  - >-
+    uv run python -m agents.prompts_sync --write
+    || echo "  (aviso: no se pudieron generar los bloques de los prompts — ejecuta 'make prompts-sync')"
 
 _exclude:
   - "**/.gitkeep"

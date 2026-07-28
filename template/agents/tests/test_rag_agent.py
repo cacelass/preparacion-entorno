@@ -146,3 +146,46 @@ class TestSearchIntegration:
         results = RagTool.search(tmp_path, "test project")
         assert len(results) > 0
         assert any("README.md" in r["source"] for r in results)
+
+
+# -- memoria del arnés como fuente indexable ------------------------------------
+
+class TestHarnessMemoryIsIndexed:
+    """
+    El histórico del arnés (progress/) y el backlog son justo lo que un agente
+    nuevo necesita poder preguntar en lenguaje natural ("¿por qué elegimos
+    esto?") sin releerlo entero. Si dejan de indexarse, la memoria del arnés
+    deja de ser buscable y nadie se entera.
+    """
+
+    def test_progress_se_clasifica_como_harness(self):
+        from agents.tools.rag_tool import _file_type
+
+        assert _file_type("progress/history.md") == "harness"
+        assert _file_type("progress/explorer-DATA-001.md") == "harness"
+        assert _file_type("featureslist.json") == "harness"
+
+    def test_otras_fuentes_no_se_clasifican_como_harness(self):
+        from agents.tools.rag_tool import _file_type
+
+        assert _file_type("README.md") == "doc"
+        assert _file_type("vault/00_META/IA_index.md") == "vault"
+        assert _file_type("agents/prompts/git_agent.md") == "prompt"
+        assert _file_type("mi_paquete/data/loader.py") == "code"
+
+    def test_index_recoge_progress_y_backlog(self, tmp_path):
+        if not RagTool.available():
+            pytest.skip("chromadb no instalado")
+        (tmp_path / "progress").mkdir()
+        (tmp_path / "progress" / "history.md").write_text(
+            "# Historial\n\n## DATA-001 — EDA\n\n"
+            "Elegimos K=4 porque el silhouette caía a partir de ahí. " * 5
+        )
+        (tmp_path / "featureslist.json").write_text(
+            '{"features": [{"id": "X-1", "title": "Una feature de prueba", '
+            '"description": "' + "descripción larga " * 20 + '", '
+            '"acceptance_criteria": ["make test pasa"], "status": "pending"}]}'
+        )
+        RagTool.index_project(tmp_path)
+        sources = {r["source"] for r in RagTool.search(tmp_path, "por qué elegimos K=4")}
+        assert any("progress/" in s or s == "featureslist.json" for s in sources)

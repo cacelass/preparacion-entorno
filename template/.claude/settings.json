@@ -1,0 +1,27 @@
+{
+  "$comment": "Configuración de Claude Code para {{ project_name }}. El hook cierra el ciclo del arnés: al terminar la sesión se ejecuta la puerta para no dejar el proyecto en un estado roto sin que nadie se entere. Se usa --quick porque un SessionEnd no es el momento de esperar a la suite entera; la completa la ejecuta 'harness finish' antes de cerrar cualquier feature.",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./init.sh --quick || echo '⚠ El arnés no pasa: revisa antes de seguir (./init.sh)'"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(./init.sh:*)",
+      "Bash(make:*)",
+      "Bash(uv run python -m agents:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  }
+}

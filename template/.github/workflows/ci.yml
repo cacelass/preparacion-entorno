@@ -47,6 +47,18 @@ jobs:
         run: uv run pytest agents/tests/ -v --tb=short
         continue-on-error: true
 
+      # La puerta del arnés, en CI. Sin --quick no aportaría nada: los tests
+      # ya se ejecutaron arriba y el fallo saldría dos veces.
+      - name: Harness gate
+        run: |
+          chmod +x init.sh
+          ./init.sh --quick
+
+      # Los prompts de los agentes se derivan del código y de contracts.py.
+      # Si alguien añade una acción y no regenera, esto lo caza.
+      - name: Prompts in sync
+        run: uv run python -m agents.prompts_sync
+
       - name: Agent evals
         run: uv run python -m agents.evals.runner --json
         continue-on-error: true
