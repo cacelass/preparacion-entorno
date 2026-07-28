@@ -72,7 +72,7 @@ def test_polars_to_pandas_conversion(patch_paths):
 # ---------------------------------------------------------------------------
 def test_load_data_duckdb_csv(patch_paths):
     """load_data_duckdb carga un CSV y devuelve DataFrame correcto."""
-    duckdb = pytest.importorskip("duckdb")
+    pytest.importorskip("duckdb")  # solo como guarda: el nombre no se usa
     from {{ project_slug }}.data.make_dataset import load_data_duckdb
 
     sample = pd.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "c": ["x", "y", "z"]})

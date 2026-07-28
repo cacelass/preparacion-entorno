@@ -193,6 +193,17 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*"  = ["F401", "F811", "E402", "F841"]
 "docs/*"   = ["E402", "W292"]
+# E402 aqui no es un descuido. Son dos causas legitimas:
+#   1. Los bloques condicionales de la plantilla colocan imports a mitad de
+#      fichero segun las opciones elegidas — asi funciona la generacion.
+#   2. `warnings.filterwarnings()` y `optuna.logging.set_verbosity()` tienen
+#      que ejecutarse ANTES de importar las librerias ruidosas; moverlos
+#      arriba les quitaria el efecto.
+# W293: linea en blanco con sangria que deja el motor de plantillas al
+# colapsar un bloque condicional. `make format` la limpia.
+"tuning/tune_model.py"    = ["E402", "W293"]
+"monitoring/monitor.py"   = ["E402"]
+"{{ project_slug }}/models/predict_model.py" = ["E402"]
 
 [tool.isort]
 profile = "black"
