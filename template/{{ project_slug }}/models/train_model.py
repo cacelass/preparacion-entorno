@@ -1667,7 +1667,10 @@ def train_models(
 {% if use_calibration and task_type == 'clasificacion' %}
     # ── Calibración post-hoc (Temperature Scaling) ─────────────────────────
     try:
+        import torch.nn.functional as F
+
         from {{ project_slug }}.models.calibrate import TemperatureScaler
+
         scaler = TemperatureScaler()
         nll_before = F.cross_entropy(
             model(torch.cat([X_t, X_v])), torch.cat([y_t, y_v])

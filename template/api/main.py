@@ -259,7 +259,11 @@ def predict(request: PredictRequest) -> PredictResponse:
     # Usamos el primer modelo disponible (o el único si model_type != "todos")
     model_name = list(_state["models"].keys())[0]
     model      = _state["models"][model_name]
+{% if task_type == "clasificacion" %}
     pred       = int(model.predict(X)[0])
+{% else %}
+    pred       = float(model.predict(X)[0])
+{% endif %}
 
 {% if task_type == "clasificacion" %}
     prob: float | None = None
@@ -283,7 +287,7 @@ def predict(request: PredictRequest) -> PredictResponse:
     )
 {% else %}
     return PredictResponse(
-        prediction=float(model.predict(X)[0]),
+        prediction=pred,
         model_name=model_name,
     )
 {% endif %}

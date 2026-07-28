@@ -633,7 +633,10 @@ async def api_explain():
         attr = explain_model(model, X_dummy)
         imp = summarize_attributions(attr, agg="absmean")
         # Generar gráfico en base64
-        import io, base64, matplotlib
+        import base64
+        import io
+
+        import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots(figsize=(8, max(4, len(fn) * 0.3)))
