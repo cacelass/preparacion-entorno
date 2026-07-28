@@ -290,3 +290,77 @@ def test_add_sin_criterios_pide_criterios(harness):
     result = harness.add(id="C-001", title="Tercera")
     assert not result.success
     assert result.needs
+
+
+# -- el bucle evaluador-optimizador está acotado -------------------------------
+# implementer <-> reviewer es un patrón adversario, y esos bucles necesitan
+# tope: sin él, un reviewer exigente y un implementer que no acierta queman
+# contexto indefinidamente sin que nadie lleve la cuenta.
+
+def _rechazar(harness, veces: int) -> list:
+    return [
+        harness.record(agent="reviewer", id="A-001", verdict="rechazado",
+                       content=f"## Bloqueantes\nfalta el test {i}")
+        for i in range(veces)
+    ]
+
+
+def test_cada_rechazo_incrementa_la_ronda(harness):
+    harness.start(id="A-001")
+    r1, r2 = _rechazar(harness, 2)
+    assert r1.data["review_rounds"] == 1
+    assert r2.data["review_rounds"] == 2
+    assert r1.success and r2.success
+
+
+def test_avisa_en_la_ronda_previa_al_limite(harness):
+    harness.start(id="A-001")
+    _, r2 = _rechazar(harness, 2)
+    assert any("se bloquea" in w for w in r2.warnings)
+
+
+def test_al_agotar_el_bucle_bloquea_y_escala(harness):
+    harness.start(id="A-001")
+    resultados = _rechazar(harness, 3)
+    ultimo = resultados[-1]
+
+    assert not ultimo.success
+    assert ultimo.needs, "debe escalar al humano, no limitarse a fallar"
+    doc = json.loads((harness.ctx.root / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "blocked"
+    assert "3" in doc["features"][0]["blocked_reason"]
+
+
+def test_el_informe_se_guarda_aunque_se_agote_el_bucle(harness):
+    harness.start(id="A-001")
+    _rechazar(harness, 3)
+    informe = (harness.ctx.root / "progress" / "reviewer-A-001.md").read_text()
+    assert "falta el test 2" in informe, "el ultimo informe no debe perderse al bloquear"
+
+
+def test_una_aprobacion_no_cuenta_como_ronda(harness):
+    harness.start(id="A-001")
+    r = harness.record(agent="reviewer", id="A-001", verdict="aprobado", content="ok")
+    assert r.success
+    assert r.data["review_rounds"] is None
+
+
+def test_el_informe_de_otro_subagente_no_cuenta_como_ronda(harness):
+    harness.start(id="A-001")
+    r = harness.record(agent="implementer", id="A-001", verdict="fail", content="no pude")
+    assert r.success
+    assert r.data["review_rounds"] is None
+
+
+def test_reabrir_la_feature_reinicia_el_contador(harness):
+    harness.start(id="A-001")
+    _rechazar(harness, 3)                      # queda blocked
+    harness.start(id="A-001")                  # el humano la reabre
+
+    doc = json.loads((harness.ctx.root / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "in_progress"
+    assert doc["features"][0]["review_rounds"] == 0
+    assert "blocked_reason" not in doc["features"][0]
+
+    r = harness.record(agent="reviewer", id="A-001", verdict="rechazado", content="otra vez")
+    assert r.success and r.data["review_rounds"] == 1

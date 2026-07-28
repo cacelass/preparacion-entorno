@@ -26,6 +26,17 @@ from agents.tools.process_tool import run_command
 VALID_STATUS = ("pending", "in_progress", "done", "blocked")
 REQUIRED_FIELDS = ("id", "title", "description", "acceptance_criteria", "status")
 
+#: Rechazos seguidos del reviewer antes de bloquear la feature y escalar.
+#: Tres es suficiente para corregir un despiste; a partir de ahí el problema
+#: casi nunca es el código, sino el criterio o cómo está planteada la feature.
+MAX_REVIEW_ROUNDS = 3
+
+_RECHAZOS = ("rechazado", "rechaza", "rejected", "fail", "ko")
+
+
+def _es_rechazo(verdict: str) -> bool:
+    return verdict.strip().lower() in _RECHAZOS
+
 CURRENT_TEMPLATE = """# Tarea actual
 
 **Feature:** {fid}
@@ -276,6 +287,11 @@ class HarnessAgent(BaseAgent):
 
         feat["status"] = "in_progress"
         feat["started"] = date.today().isoformat()
+        # Abrir una feature reinicia el contador de rondas: si venía bloqueada
+        # por agotar el bucle, se reabre con las tres rondas enteras — el
+        # humano ya intervino, no tiene sentido heredar el castigo anterior.
+        feat["review_rounds"] = 0
+        feat.pop("blocked_reason", None)
         self._save(doc)
 
         self._progress_dir.mkdir(parents=True, exist_ok=True)
@@ -451,10 +467,55 @@ class HarnessAgent(BaseAgent):
             f"- **Veredicto:** {verdict}\n\n"
         )
         path.write_text(header + content.strip() + "\n", encoding="utf-8")
+
+        # El bucle implementer <-> reviewer es un patrón evaluador-optimizador,
+        # y esos bucles necesitan tope: sin él, un reviewer exigente y un
+        # implementer que no acierta queman contexto para siempre y nadie se
+        # entera de cuántas vueltas llevan. Al agotarse, la feature se bloquea
+        # sola y se escala al humano — en código, no confiando en que el líder
+        # lleve la cuenta.
+        rounds = None
+        if agent == "reviewer" and _es_rechazo(verdict):
+            doc, error = self._load()
+            if doc is None:
+                return self._fail("record", error)
+            feat = self._find(doc, id)
+            if feat is not None:
+                rounds = int(feat.get("review_rounds", 0)) + 1
+                feat["review_rounds"] = rounds
+                if rounds >= MAX_REVIEW_ROUNDS:
+                    feat["status"] = "blocked"
+                    feat["blocked_reason"] = (
+                        f"El reviewer rechazó {rounds} veces seguidas: el bucle se agotó."
+                    )
+                self._save(doc)
+
+                if rounds >= MAX_REVIEW_ROUNDS:
+                    return self._fail(
+                        "record",
+                        f"Informe guardado, pero '{id}' se bloquea: {rounds} rechazos seguidos.",
+                        data={"path": str(path.relative_to(self.ctx.root)),
+                              "verdict": verdict, "review_rounds": rounds},
+                        needs=[
+                            f"El reviewer ha rechazado '{id}' {rounds} veces. Repetir la misma "
+                            f"iteración no lo va a arreglar: lee progress/reviewer-{id}.md y "
+                            f"decide si el criterio es correcto, si la feature está mal "
+                            f"planteada o si hace falta partirla en varias."
+                        ],
+                    )
+
         return AgentResult(
             success=True, agent=self.name, action="record",
-            message=f"Informe guardado en progress/{path.name}",
-            data={"path": str(path.relative_to(self.ctx.root)), "verdict": verdict},
+            message=(
+                f"Informe guardado en progress/{path.name}"
+                + (f" · ronda de revisión {rounds}/{MAX_REVIEW_ROUNDS}" if rounds else "")
+            ),
+            warnings=(
+                [f"Van {rounds} rechazos de {MAX_REVIEW_ROUNDS}: a la siguiente se bloquea."]
+                if rounds and rounds == MAX_REVIEW_ROUNDS - 1 else []
+            ),
+            data={"path": str(path.relative_to(self.ctx.root)), "verdict": verdict,
+                  "review_rounds": rounds},
         )
 
     def add(self, *, id: str = "", title: str = "", description: str = "",

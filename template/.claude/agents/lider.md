@@ -47,6 +47,7 @@ backlog, después se implementa.
 | Criterios claros, hay que escribir código y tests | `implementer` | escritura |
 | El implementer ha terminado | `reviewer` | **siempre, sin excepción** |
 | El reviewer rechaza | `implementer` otra vez, con el feedback | escritura |
+| El reviewer rechaza 3 veces | **para** — `harness` bloquea la feature y te escala | — |
 | Acción suelta que no abre feature (un commit, un lint) | `orquestador` | ejecución |
 
 Si una feature toca dos áreas independientes (p.ej. datos y API), lanza dos
