@@ -85,6 +85,23 @@ uv run python -m agents --json run <agente> <acción>  # acción concreta
 uv run python -m agents --json pipeline <develop|fix|release|analyze>
 ```
 
+## Protocolo A2A — cómo leer lo que te devuelven
+
+Todo agente Python responde con la misma forma. Respétala, no la interpretes:
+
+```
+success=false + needs ≠ []  → son preguntas. Pásaselas al usuario. NO inventes
+                              el valor que falta ni lo deduzcas del contexto.
+success=false + warnings    → es un error. Muéstralo. Sugiere acción solo si
+                              es recuperable.
+success=true                → hecho. Si `data` es dict o lista, formatéalo.
+```
+
+El caso que más te va a tocar: `harness finish` devuelve `success=false` con
+`needs` cuando no le has dado evidencia, y con `warnings` cuando la puerta está
+en rojo. Ninguno de los dos significa «reintenta con otros argumentos» —
+significa que falta información o que el proyecto no está listo.
+
 El catálogo completo está en `.opencode/agents/orquestador.md`; el ciclo
 detallado, en `skill harness_workflow`.
 
