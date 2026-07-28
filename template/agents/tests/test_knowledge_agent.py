@@ -94,3 +94,25 @@ def test_sync_without_graph(know_context):
         assert result.success
     else:
         assert result.data.get("skipped") is True
+
+
+# -- poda del grafo: absorbida de `docsearch` ----------------------------------
+# `graphify-out/` tenia DOS duenos declarados: knowledge lo construia y
+# docsearch lo podaba. El test de contratos no lo detectaba porque cada uno lo
+# describia con una cadena distinta. La poda vive ahora donde el grafo.
+
+def test_prune_falla_sin_grafo(context):
+    from agents.agents.knowledge_agent import KnowledgeAgent
+
+    result = KnowledgeAgent(context=context).prune(node_types=["reference"])
+    assert not result.success
+
+
+def test_prune_exige_saber_que_podar(context, monkeypatch):
+    from agents.agents.knowledge_agent import KnowledgeAgent
+
+    agent = KnowledgeAgent(context=context)
+    monkeypatch.setattr(agent, "_require_graph", lambda accion: None)
+    result = agent.prune()
+    assert not result.success
+    assert "Indica qué podar" in result.message

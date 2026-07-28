@@ -33,7 +33,7 @@ def _smoke(orchestrator: Orchestrator) -> list[dict]:
     Verifica que responde sin lanzar excepción.
 
     Se elige la primera acción auto-ejecutable, no la primera a secas: si la
-    primera necesita un argumento (p. ej. `schedule.validate_cron(expression=)`)
+    primera necesita un argumento (p. ej. `cicd.validate_cron(expression=)`)
     el smoke fallaba siempre con un TypeError que no dice nada sobre la salud
     del agente, solo sobre el orden de su diccionario `actions()`.
     """
@@ -94,12 +94,12 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("valida el Makefile", "make"),
     ("extrae las celdas del notebook", "notebook"),
     ("refactoriza los type hints", "refactor"),
-    ("describe la expresión cron", "schedule"),
+    ("describe la expresión cron", "cicd"),
     ("audita al equipo de agentes", "audit"),
     ("busca papers sobre transformers", "research"),
     ("instala un agente externo", "installer"),
     ("sincroniza el grafo de conocimiento", "knowledge"),
-    ("busca en el grafo de conocimiento", "docsearch"),
+    ("busca en el grafo de conocimiento", "doc"),
     ("verifica el estado de MLflow", "mlflow"),
     ("comprueba los endpoints de la API", "api"),
     ("compite dos estrategias", "supervisor"),

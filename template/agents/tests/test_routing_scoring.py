@@ -70,9 +70,9 @@ def test_sin_capabilities_no_puntua(context):
 # -- especificidad ------------------------------------------------------------
 def test_la_frase_larga_gana_a_dos_palabras_genericas(context):
     """
-    Caso real: "busca en el grafo de conocimiento" pertenece a docsearch
-    (frase completa), no a knowledge (que acierta 'grafo' y 'conocimiento'
-    por separado).
+    Caso real: "busca en el grafo de conocimiento" debe ir al agente que
+    tiene la frase completa, no al que acierta 'grafo' y 'conocimiento' por
+    separado.
     """
     query = "busca en el grafo de conocimiento"
     especifico = _score(context, ["busca en el grafo"], query)

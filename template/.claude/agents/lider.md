@@ -65,7 +65,7 @@ Si una feature toca dos áreas independientes (p.ej. datos y API), lanza dos
 
 ## Apóyate en los agentes Python
 
-Este proyecto ya tiene {% if use_rag %}30{% else %}29{% endif %} agentes que hacen el trabajo determinista. **No lo hagas
+Este proyecto ya tiene {% if use_rag %}28{% else %}27{% endif %} agentes que hacen el trabajo determinista. **No lo hagas
 a mano ni se lo mandes a un subagente si ya existe el agente.**
 
 | Necesitas | Comando |

@@ -171,28 +171,14 @@ CONTRACTS: dict[str, Contract] = {
             "actualizar vault/04_VISUALIZACIONES/grafo_conocimiento.md tras cada build del grafo",
         ),
         cannot=(
-            "buscar o navegar por el grafo → docsearch",
+            "buscar o navegar por el grafo → doc (absorbió docsearch)",
             "buscar papers nuevos → research (knowledge los indexa cuando ya existen)",
         ),
         owns=(
-            "graphify-out/ (construcción y sync del grafo)",
+            "graphify-out/",
             "vault/ (bóveda Obsidian del proyecto — todo vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)",
         ),
-        collaborates=("docsearch", "research"),
-    ),
-    "docsearch": Contract(
-        role="Buscador del grafo de conocimiento: consulta, navega vecinos y poda nodos irrelevantes.",
-        can=(
-            "buscar en el grafo, listar vecinos/referencias, podar nodos innecesarios (con backup)",
-            "buscar en vault/00_META/ y vault/05_AGENTES/ como fuente secundaria de contexto",
-        ),
-        cannot=(
-            "construir o reconstruir el grafo → knowledge",
-            "buscar fuera del grafo (papers nuevos, web) → research",
-        ),
-        needs=("la consulta o el nodo del que partir",),
-        owns=("graphify-out/ (poda de nodos, con .bak)",),
-        collaborates=("knowledge",),
+        collaborates=("doc", "research"),
     ),
     "rag": Contract(
         role="RAG semántico local: indexa código, prompts, docs, vault y URLs externas; busca en lenguaje natural con ChromaDB + embeddings ONNX.",
@@ -209,7 +195,7 @@ CONTRACTS: dict[str, Contract] = {
         ),
         needs=("que exista un índice (ejecutar 'rag index' primero)",),
         owns=(".rag-index/ (índice vectorial ChromaDB, gitignored)",),
-        collaborates=("knowledge", "docsearch", "plan"),
+        collaborates=("knowledge", "doc", "plan"),
     ),
     "research": Contract(
         role="Investigador externo: busca papers (arXiv/OpenAlex) relacionados con el proyecto. Solo lee.",
@@ -345,7 +331,11 @@ CONTRACTS: dict[str, Contract] = {
     ),
     "cicd": Contract(
         role="Dueño de los workflows de GitHub Actions del proyecto generado.",
-        can=("generar y validar .github/workflows/*.yml cruzando los targets contra el Makefile real",),
+        can=(
+            "generar y validar .github/workflows/*.yml cruzando los targets contra el Makefile real",
+            "validar expresiones cron, describirlas en lenguaje natural y calcular sus próximas "
+            "ejecuciones — absorbido de `schedule`, que solo repetía lo que validate_cron ya devolvía",
+        ),
         cannot=(
             "modificar el Makefile → make",
             "hacer commit del workflow → git",
@@ -427,15 +417,6 @@ CONTRACTS: dict[str, Contract] = {
         ),
         collaborates=("env", "test", "data", "dependency", "git"),
     ),
-    "schedule": Contract(
-        role="Experto en cron: valida, describe y calcula próximas ejecuciones. No programa nada.",
-        can=("validar expresiones cron, describirlas en lenguaje natural, calcular próximas ejecuciones",),
-        cannot=(
-            "instalar crontabs o programar tareas reales en el sistema — solo analiza expresiones",
-        ),
-        needs=("la expresión cron a analizar",),
-        collaborates=(),
-    ),
     "memory": Contract(
         role="Memoria proactiva: observa trayectorias de agentes y mantiene un banco de memoria estructurado contra el decaimiento del estado en tareas largas.",
         can=(
@@ -455,12 +436,14 @@ CONTRACTS: dict[str, Contract] = {
         collaborates=("audit",),
     ),
     "doc": Contract(
-        role="Documentación unificada: responde dónde está algo consultando grafo, índice semántico y vault.",
+        role="Documentación unificada: responde dónde está algo consultando grafo, índice semántico y vault, y navega el grafo.",
         can=(
             "buscar en las tres fuentes a la vez (graphify, RAG, vault) y fusionar resultados",
             "consultar el grafo estructural de graphify",
             "buscar en el vault Obsidian por texto",
             "informar de qué fuentes están disponibles y cuáles no",
+            "navegar el grafo: vecinos de un nodo y listado de referencias "
+            "(absorbido de `docsearch`, cuya búsqueda repetía la de aquí)",
         ),
         cannot=(
             "escribir documentación → eso es de 'documentation' (README, CHANGELOG) o 'knowledge' (vault)",
@@ -468,7 +451,7 @@ CONTRACTS: dict[str, Contract] = {
             "responder si ninguna fuente está disponible → lo dice, no inventa",
         ),
         needs=("la pregunta en lenguaje natural",),
-        collaborates=("rag", "knowledge", "docsearch"),
+        collaborates=("rag", "knowledge"),
     ),
     "harness": Contract(
         role="Dueño mecánico del arnés: mantiene el backlog y el progreso, y ejecuta la puerta init.sh.",

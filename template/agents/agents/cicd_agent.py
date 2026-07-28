@@ -24,7 +24,13 @@ from agents.tools.schedule_tool import ScheduleTool
 class CICDAgent(BaseAgent):
     name = "cicd"
     description = "Genera y valida workflows de GitHub Actions, cruzando referencias contra el Makefile real del proyecto."
-    capabilities = ["ci", "cd", "cicd", "github actions", "workflow", "pipeline de integracion continua"]
+    # Absorbidas de `schedule`, que era redundante: validate_cron ya devolvia
+    # todo lo que hacian sus tres acciones.
+    capabilities = [
+        "ci", "cd", "cicd", "github actions", "workflow",
+        "pipeline de integracion continua",
+        "cron", "schedule", "programar", "temporizador", "scheduler", "calendarizar",
+    ]
 
     def action_aliases(self) -> dict:
         return {

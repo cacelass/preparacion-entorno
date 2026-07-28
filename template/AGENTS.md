@@ -225,7 +225,7 @@ información, hazlo.
 
 ## Referencia (bajo demanda)
 
-El catálogo — los {% if use_rag %}30{% else %}29{% endif %} agentes con su responsabilidad, los workflows por
+El catálogo — los {% if use_rag %}28{% else %}27{% endif %} agentes con su responsabilidad, los workflows por
 dominio, GStack, la arquitectura y el vault — vive aparte para no ocupar
 contexto en cada sesión:
 

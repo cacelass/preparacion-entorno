@@ -10,7 +10,7 @@
       ]
     },
     "orquestador": {
-      "description": "Gateway al sistema de {% if use_rag %}30{% else %}29{% endif %} agentes Python: para acciones sueltas (git, test, review, docker, doctor, plan...) sin abrir feature. El líder delega aquí cuando no hay que razonar, solo ejecutar.",
+      "description": "Gateway al sistema de {% if use_rag %}28{% else %}27{% endif %} agentes Python: para acciones sueltas (git, test, review, docker, doctor, plan...) sin abrir feature. El líder delega aquí cuando no hay que razonar, solo ejecutar.",
       "mode": "subagent",
       "instructions": [
         ".opencode/agents/orquestador.md"

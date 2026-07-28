@@ -73,3 +73,39 @@ def test_list_workflows_empty_by_default(context):
     result = agent.list_workflows()
     assert result.success
     assert result.data == []
+
+
+# -- cron: absorbido del agente `schedule`, que era redundante ------------------
+# `cicd.validate_cron` ya devolvia lo que hacian sus tres acciones (validar,
+# traducir a lenguaje humano y calcular proximas ejecuciones), asi que el
+# agente entero sobraba. Estos tests vienen de test_schedule_agent.py para no
+# perder la cobertura de ScheduleTool.
+
+def test_validate_cron_acepta_expresion_valida(context):
+    result = CICDAgent(context=context).validate_cron(expression="0 9 * * 1-5")
+    assert result.success
+
+
+def test_validate_cron_rechaza_basura(context):
+    result = CICDAgent(context=context).validate_cron(expression="not-a-cron")
+    assert not result.success
+
+
+def test_validate_cron_traduce_a_lenguaje_humano(context):
+    result = CICDAgent(context=context).validate_cron(expression="0 6 * * *")
+    assert result.success
+    assert result.data["human"], "debe describir la expresion, no solo validarla"
+
+
+def test_validate_cron_calcula_proximas_ejecuciones(context):
+    result = CICDAgent(context=context).validate_cron(expression="0 0 * * *")
+    assert result.success
+    # El test original hacia `len(result.data) == 3` y pasaba por casualidad:
+    # `data` es un dict de 3 claves, no 3 ejecuciones. Habria pasado igual
+    # aunque el calculo estuviera roto.
+    assert result.data["next_runs"]["next_runs"], "debe devolver ejecuciones futuras"
+
+
+def test_validate_cron_acepta_alias(context):
+    result = CICDAgent(context=context).validate_cron(expression="@daily")
+    assert result.success

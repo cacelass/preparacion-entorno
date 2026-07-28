@@ -81,6 +81,7 @@ class KnowledgeAgent(BaseAgent):
             "build_and_index": self.build_and_index,
             "summarize_parents": self.summarize_parents,
             "sync": self.sync,
+            "prune": self.prune,
         }
 
     # -------------------------------------------------------------------------
@@ -389,3 +390,64 @@ class KnowledgeAgent(BaseAgent):
                 data={"skipped": True},
             )
         return self.build(vault_dir=vault_dir, export_obsidian=True)
+
+    def prune(
+        self,
+        *,
+        node_types: list[str] | None = None,
+        node_ids: list[str] | None = None,
+        drop_isolated: bool = False,
+        dry_run: bool = True,
+    ) -> AgentResult:
+        """
+        Poda nodos del grafo por tipo (p. ej. ``references``) o por id, y
+        opcionalmente los nodos que queden aislados. Por seguridad es
+        ``dry_run=True`` por defecto: informa de qué quitaría sin escribir.
+        Pasa ``dry_run=False`` para persistir (deja un ``graph.json.bak``).
+        """
+        guard = self._require_graph("prune")
+        if guard:
+            return guard
+        if not node_types and not node_ids and not drop_isolated:
+            return AgentResult(
+                False, self.name, "prune",
+                "Indica qué podar: node_types=['reference'], node_ids=[...] o drop_isolated=True.",
+            )
+        try:
+            graph = GraphifyTool.load_graph(self.ctx.root)
+        except Exception as exc:  # noqa: BLE001
+            return AgentResult(False, self.name, "prune", f"No se pudo leer el grafo: {exc}")
+
+        pruned, stats = GraphifyTool.prune(
+            graph, node_types=node_types, node_ids=node_ids, drop_isolated=drop_isolated,
+        )
+
+        if dry_run:
+            return AgentResult(
+                True, self.name, "prune",
+                f"[dry-run] Se quitarían {stats['nodes_removed']} nodo(s) y "
+                f"{stats['edges_removed']} arista(s) "
+                f"(quedarían {stats['nodes_remaining']} nodos). "
+                f"Pasa dry_run=False para aplicarlo.",
+                data=stats,
+                warnings=["Nada escrito — esto es una simulación."],
+            )
+
+        GraphifyTool.save_graph(self.ctx.root, pruned, backup=True)
+        return AgentResult(
+            True, self.name, "prune",
+            f"Grafo podado: -{stats['nodes_removed']} nodo(s), "
+            f"-{stats['edges_removed']} arista(s). Quedan {stats['nodes_remaining']} nodos. "
+            f"Backup en graph.json.bak.",
+            data=stats,
+        )
+
+    def _require_graph(self, action: str) -> AgentResult | None:
+        if not GraphifyTool.graph_exists(self.ctx.root):
+            return AgentResult(
+                False, self.name, action,
+                "No hay grafo (graphify-out/graph.json). Ejecuta 'knowledge build' primero.",
+            )
+        return None
+
+    # -------------------------------------------------------------------------

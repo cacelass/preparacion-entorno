@@ -77,7 +77,6 @@ agents/
 │   ├── test_agent.py · dependency_agent.py · secrets_agent.py · mlflow_agent.py
 │   ├── api_agent.py · env_agent.py · make_agent.py · refactor_agent.py
 │   ├── doctor_agent.py             # diagnóstico integral del proyecto
-├── schedule_agent.py           # validación y descripción de cron
 │   └── _template_agent.py            # plantilla — no se auto-registra (prefijo `_`)
 ├── external/                          # agentes de terceros / tuyos, fuera del núcleo
 │   ├── README.md
@@ -198,7 +197,7 @@ uv run python -m agents tools
   tiene. Solo hace falta la primera vez, en un proyecto sin este sistema —
   pregunta por ella si la necesitas.
 
-## Los 30 agentes
+## Los 28 agentes
 
 Los ROLES (qué puede, qué no puede, qué necesita, qué posee) están en
 `agents/contracts.py` — esta tabla resume la responsabilidad y las
@@ -218,7 +217,6 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `audit` | **Auditor del equipo**: uso, tasa de éxito y duración por agente/acción, fallos recientes, sugerencias de mejora con datos. | `agents/audit.py` (log JSONL) |
 | `supervisor` | Coordina workers en **competición**: lanza N variantes de una tarea y arbitra cuál gana (secuencial → `plan`). | agente `research` |
 | `knowledge` | Dueño del grafo de conocimiento y la bóveda Obsidian: construir, resumir nodos padre, sync. | `graphify_tool` |
-| `docsearch` | Busca/navega el grafo de conocimiento y poda nodos irrelevantes (con backup). | `graphify_tool` |
 | `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto y los rankea. Necesita internet. | `research_tool` |
 | `git` | Conventional Commits, changelog, release notes, breaking changes, resumen de PR, **commit+changelog en un paso** (`commit_with_changelog`), **release completo** (`tag_release`: versión + changelog + CI/CD + commit + tag) | `git_tool` |
 | `data` | EDA: constantes, cardinalidad, missing, outliers, fuga de información, correlaciones | `data_io_tool`, `dataframe_analysis_tool` |
@@ -244,7 +242,6 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `audit` | **Auditor del equipo**: mide uso, tasa de éxito y duración por agente/acción sobre el log de ejecuciones, y propone mejoras con datos en vez de impresiones | `sqlite_tool` |
 | `supervisor` | Lanza varios workers en competición sobre la misma tarea y arbitra cuál es la mejor propuesta | `parallel_tool` |
 | `knowledge` | Construye y mantiene el grafo de conocimiento y la bóveda Obsidian. Único dueño de `vault/` | `graphify_tool` |
-| `docsearch` | Navega el grafo de conocimiento: busca nodos, recorre vecinos y poda lo irrelevante | `graphify_tool` |
 | `research` | Busca papers en arXiv/OpenAlex relacionados con el proyecto | `research_tool` |
 | `memory` | **Memoria proactiva**: observa las trayectorias de los agentes y mantiene un banco estructurado (facts/state/traces) para combatir el decaimiento de estado en tareas largas | `memory_tool` |
 | `doc` | **Documentación unificada**: responde dónde está algo consultando a la vez el grafo, el índice semántico y el vault | `graphify_tool`, `rag_tool` |

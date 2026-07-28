@@ -9,11 +9,12 @@ Combina tres fuentes de conocimiento:
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
+
+import hashlib
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
+from agents.tools.cache_tool import CacheTool
 
 try:
     from agents.tools.graphify_tool import GraphifyTool
@@ -43,6 +44,9 @@ class DocAgent(BaseAgent):
         "documentacion unificada", "donde esta documentado",
         "dónde está documentado", "que hace", "qué hace",
         "como funciona", "cómo funciona", "explica", "informacion", "información",
+        # Absorbidas de `docsearch`: navegacion del grafo.
+        "navegar", "navega el grafo", "busca en el grafo", "vecinos",
+        "referencias", "busca en el grafo de conocimiento",
     ]
 
     def action_aliases(self) -> dict:
@@ -61,6 +65,8 @@ class DocAgent(BaseAgent):
             "graph_query": self.graph_query,
             "rag_search": self.rag_search,
             "vault_grep": self.vault_grep,
+            "neighbors": self.neighbors,
+            "list_references": self.list_references,
             "index": self.index,
             "status": self.status,
         }
@@ -141,34 +147,124 @@ class DocAgent(BaseAgent):
             data=combined[:10], warnings=warnings,
         )
 
-    def graph_query(self, *, question: str) -> AgentResult:
-        """Consulta el grafo graphify (estructural)."""
-        if not HAS_GRAPHIFY:
+    def graph_query(self, *, question: str, budget: int | None = None,
+                    no_cache: bool = False) -> AgentResult:
+        """
+        Consulta el grafo graphify en lenguaje natural (cacheado).
+
+        Implementacion traida de `docsearch` al absorberlo: la que habia aqui
+        cacheaba tambien los fallos, asi que un error transitorio de graphify
+        quedaba servido desde cache para siempre.
+        """
+        guard = self._require_graph("graph_query")
+        if guard:
+            return guard
+        if not GraphifyTool.is_available(self.ctx.root):
             return AgentResult(
                 False, self.name, "graph_query",
-                "graphify no está disponible.",
+                "graphify no está instalado — no se puede consultar. Ejecuta el skill /graphify.",
             )
-        if not GraphifyTool.graph_exists(self.ctx.root):
-            return AgentResult(
-                False, self.name, "graph_query",
-                "No hay grafo. Ejecuta 'knowledge build' primero.",
-            )
+        CacheTool.set_cache_dir(GraphifyTool.cache_dir(self.ctx.root))
+
+        def _run() -> str:
+            proc = GraphifyTool.query(self.ctx.root, question, budget=budget)
+            if proc.returncode != 0:
+                # Lanza para NO cachear el fallo (un error transitorio de la
+                # consulta no debe quedar cacheado para siempre). El caller lo
+                # convierte en un AgentResult(success=False).
+                raise RuntimeError(proc.stderr.strip()[:200] or "graphify query devolvió error")
+            return proc.stdout.strip()
+
         try:
-            from agents.tools.cache_tool import CacheTool
-            mtime = int(GraphifyTool.graph_json(self.ctx.root).stat().st_mtime)
-            cache_key = f"graph_query_{mtime}_{question[:50]}"
-            result = CacheTool.disk_cache(name=cache_key)(
-                lambda: GraphifyTool.query(self.ctx.root, question)
-            )()
+            if no_cache:
+                answer = _run()
+            else:
+                # Clave estable con hashlib: hash() lleva PYTHONHASHSEED y cambia
+                # entre procesos, así que la caché en disco nunca acertaría entre
+                # invocaciones de la CLI.
+                digest = hashlib.md5(f"{question}|{budget}".encode()).hexdigest()[:16]
+                answer = CacheTool.disk_cache(name=f"query_{digest}")(_run)()
+        except RuntimeError as exc:
+            return AgentResult(False, self.name, "graph_query", f"graphify query falló: {exc}")
+
+        return AgentResult(
+            True, self.name, "graph_query",
+            answer or "graphify query no devolvió texto.",
+            data={"question": question, "answer": answer},
+        )
+
+    def neighbors(self, *, node: str, limit: int = 20) -> AgentResult:
+        """
+        Lista los nodos vecinos de ``node`` (por id o por label, insensible a
+        mayúsculas) — un paso de navegación por el árbol de conocimiento.
+        """
+        guard = self._require_graph("neighbors")
+        if guard:
+            return guard
+        try:
+            graph = GraphifyTool.load_graph(self.ctx.root)
+        except Exception as exc:  # noqa: BLE001
+            return AgentResult(False, self.name, "neighbors", f"No se pudo leer el grafo: {exc}")
+
+        nodes = GraphifyTool._node_index(graph)
+        target_id = node if node in nodes else None
+        if target_id is None:
+            wanted = node.lower()
+            for nid, n in nodes.items():
+                if str(n.get("label", "")).lower() == wanted:
+                    target_id = nid
+                    break
+        if target_id is None:
             return AgentResult(
-                True, self.name, "graph_query", str(result)[:500],
-                data={"answer": str(result)},
-            )
-        except Exception as exc:
-            return AgentResult(
-                False, self.name, "graph_query", f"Error al consultar grafo: {exc}",
+                False, self.name, "neighbors",
+                f"No hay ningún nodo con id o label '{node}'.",
             )
 
+        adj = GraphifyTool._adjacency(graph)
+        neighbor_ids = sorted(adj.get(target_id, set()))
+        neighbors = [
+            {"id": nid, "label": nodes.get(nid, {}).get("label", nid),
+             "type": nodes.get(nid, {}).get("type", "desconocido")}
+            for nid in neighbor_ids[:limit]
+        ]
+        return AgentResult(
+            True, self.name, "neighbors",
+            f"'{nodes.get(target_id, {}).get('label', target_id)}' tiene "
+            f"{len(neighbor_ids)} vecino(s)"
+            + (f" (mostrando {limit})" if len(neighbor_ids) > limit else "") + ".",
+            data={"node": target_id, "neighbors": neighbors, "total": len(neighbor_ids)},
+        )
+
+    def list_references(self) -> AgentResult:
+        """Lista los nodos de tipo 'reference' (referencias/citas externas)."""
+        guard = self._require_graph("list_references")
+        if guard:
+            return guard
+        try:
+            graph = GraphifyTool.load_graph(self.ctx.root)
+        except Exception as exc:  # noqa: BLE001
+            return AgentResult(False, self.name, "list_references", f"No se pudo leer el grafo: {exc}")
+
+        refs = [
+            {"id": str(n.get("id")), "label": n.get("label", n.get("id"))}
+            for n in graph["nodes"]
+            if str(n.get("type", "")).lower() in {"reference", "citation", "link", "url"}
+        ]
+        return AgentResult(
+            True, self.name, "list_references",
+            f"{len(refs)} referencia(s) en el grafo.",
+            data=refs,
+        )
+
+    def _require_graph(self, action: str) -> AgentResult | None:
+        if not GraphifyTool.graph_exists(self.ctx.root):
+            return AgentResult(
+                False, self.name, action,
+                "No hay grafo (graphify-out/graph.json). Ejecuta 'knowledge build' primero.",
+            )
+        return None
+
+    # -------------------------------------------------------------------------
     def rag_search(self, *, query: str, top_k: int = 10) -> AgentResult:
         """Búsqueda semántica pura vía RAG."""
         if not HAS_RAG:
