@@ -71,80 +71,109 @@ class DocAgent(BaseAgent):
             "status": self.status,
         }
 
+    def _buscar_grafo(self, query: str, avisos: list) -> list[dict]:
+        """Nodos del grafo cuyo label o id contienen la consulta."""
+        if not (HAS_GRAPHIFY and GraphifyTool.graph_exists(self.ctx.root)):
+            return []
+        try:
+            grafo = GraphifyTool.load_graph(self.ctx.root)
+        except Exception:  # noqa: BLE001
+            avisos.append("error al leer el grafo graphify")
+            return []
+        q = query.lower()
+        encontrados = [
+            n for n in grafo.get("nodes", [])
+            if q in n.get("label", "").lower() or q in n.get("id", "").lower()
+        ]
+        return [
+            {
+                # Ojo: la clave es `source_type`, no `source`. Antes se
+                # escribia `source` y el formateo de abajo comprueba
+                # `source_type`, asi que los resultados del grafo se contaban
+                # pero no se imprimian nunca.
+                "source_type": "graphify",
+                "label": n.get("label", n.get("id", "?")),
+                "type": n.get("type", "node"),
+            }
+            for n in encontrados[:10]
+        ]
+
+    def _buscar_rag(self, query: str, avisos: list) -> list[dict]:
+        """Coincidencias semanticas del indice vectorial."""
+        if not (HAS_RAG and RagTool.available()):
+            return []
+        try:
+            resultados = RagTool.search(self.ctx.root, query, top_k=5)
+        except Exception:  # noqa: BLE001
+            avisos.append("error al consultar RAG")
+            return []
+        for r in resultados:
+            r["source_type"] = "rag"
+        return resultados
+
+    def _buscar_vault(self, query: str, avisos: list) -> list[dict]:
+        """Grep literal sobre las notas del vault."""
+        vault = self.ctx.root / "vault"
+        if not vault.exists():
+            return []
+        q = query.lower()
+        encontrados = []
+        try:
+            for md in vault.rglob("*.md"):
+                texto = md.read_text(encoding="utf-8", errors="replace")
+                if q not in texto.lower():
+                    continue
+                for numero, linea in enumerate(texto.split("\n"), 1):
+                    if q in linea.lower():
+                        encontrados.append({
+                            "source_type": "vault",
+                            "file": str(md.relative_to(self.ctx.root)),
+                            "line": numero,
+                            "text": linea.strip()[:200],
+                        })
+        except Exception:  # noqa: BLE001
+            avisos.append("error al leer vault")
+        return encontrados
+
+    @staticmethod
+    def _formatear(resultado: dict) -> str:
+        tipo = resultado.get("source_type")
+        if tipo == "graphify":
+            return f"  [graphify] {resultado['label']} ({resultado['type']})"
+        if tipo == "rag":
+            return (f"  [rag] {resultado.get('source', '?')}:{resultado.get('line', '?')}"
+                    f" — {resultado.get('text', '')[:100]}")
+        return f"  [vault] {resultado['file']}:{resultado['line']} — {resultado['text']}"
+
     def search(self, *, query: str, sources: str = "all") -> AgentResult:
-        """Busca en todas las fuentes disponibles."""
+        """Busca en todas las fuentes disponibles y funde los resultados."""
         if not query.strip():
             return AgentResult(False, self.name, "search", "Proporciona una consulta.")
 
-        combined = []
-        warnings = []
+        avisos: list[str] = []
+        buscadores = {
+            "graph": self._buscar_grafo,
+            "rag": self._buscar_rag,
+            "vault": self._buscar_vault,
+        }
+        combinados: list[dict] = []
+        for nombre, buscador in buscadores.items():
+            if sources in ("all", nombre):
+                combinados.extend(buscador(query, avisos))
 
-        if sources in ("all", "graph") and HAS_GRAPHIFY and GraphifyTool.graph_exists(self.ctx.root):
-            try:
-                graph = GraphifyTool.load_graph(self.ctx.root)
-                matches = [
-                    n for n in graph.get("nodes", [])
-                    if query.lower() in n.get("label", "").lower()
-                       or query.lower() in n.get("id", "").lower()
-                ]
-                for n in matches[:10]:
-                    combined.append({
-                        "source": "graphify",
-                        "label": n.get("label", n.get("id", "?")),
-                        "type": n.get("type", "node"),
-                    })
-            except Exception:
-                warnings.append("error al leer el grafo graphify")
-
-        if sources in ("all", "rag") and HAS_RAG and RagTool.available():
-            try:
-                rag_results = RagTool.search(self.ctx.root, query, top_k=5)
-                for r in rag_results:
-                    r["source_type"] = "rag"
-                    combined.append(r)
-            except Exception:
-                warnings.append("error al consultar RAG")
-
-        if sources in ("all", "vault"):
-            vault_path = self.ctx.root / "vault"
-            if vault_path.exists():
-                try:
-                    for md_file in vault_path.rglob("*.md"):
-                        text = md_file.read_text(encoding="utf-8", errors="replace")
-                        if query.lower() in text.lower():
-                            for lineno, line in enumerate(text.split("\n"), 1):
-                                if query.lower() in line.lower():
-                                    combined.append({
-                                        "source": "vault",
-                                        "source_type": "vault",
-                                        "file": str(md_file.relative_to(self.ctx.root)),
-                                        "line": lineno,
-                                        "text": line.strip()[:200],
-                                    })
-                except Exception:
-                    warnings.append("error al leer vault")
-
-        if not combined:
+        if not combinados:
             return AgentResult(
                 True, self.name, "search",
                 "No se encontraron resultados en ninguna fuente.",
-                data=[], warnings=warnings,
+                data=[], warnings=avisos,
             )
 
-        lines = []
-        for r in combined[:10]:
-            if r.get("source_type") == "graphify":
-                lines.append(f"  [graphify] {r['label']} ({r['type']})")
-            elif r.get("source_type") == "rag":
-                lines.append(f"  [rag] {r.get('source','?')}:{r.get('line','?')} — {r.get('text','')[:100]}")
-            elif r.get("source_type") == "vault":
-                lines.append(f"  [vault] {r['file']}:{r['line']} — {r['text']}")
-
+        fuentes = len({r.get("source_type", "") for r in combinados})
+        lineas = [self._formatear(r) for r in combinados[:10]]
         return AgentResult(
             True, self.name, "search",
-            f"{len(combined)} resultado(s) de {len(set(r.get('source_type','') for r in combined))} fuente(s).\n"
-            + "\n".join(lines[:10]),
-            data=combined[:10], warnings=warnings,
+            f"{len(combinados)} resultado(s) de {fuentes} fuente(s).\n" + "\n".join(lineas),
+            data=combinados, warnings=avisos,
         )
 
     def graph_query(self, *, question: str, budget: int | None = None,
@@ -373,56 +402,58 @@ class DocAgent(BaseAgent):
             data=results, warnings=warnings,
         )
 
+    def _estado_grafo(self) -> tuple[dict, bool, str]:
+        """(datos, disponible, detalle) del grafo graphify."""
+        existe = HAS_GRAPHIFY and GraphifyTool.graph_exists(self.ctx.root)
+        datos = {
+            "available": HAS_GRAPHIFY and GraphifyTool.is_available(self.ctx.root),
+            "graph_exists": existe,
+        }
+        if not existe:
+            return datos, False, "no disponible"
+        try:
+            grafo = GraphifyTool.load_graph(self.ctx.root)
+            datos["nodes"] = len(grafo.get("nodes", []))
+            datos["edges"] = len(grafo.get("edges", []))
+        except Exception:  # noqa: BLE001
+            return datos, False, "grafo ilegible"
+        return datos, True, f"{datos['nodes']} nodos / {datos['edges']} aristas"
+
+    def _estado_rag(self) -> tuple[dict, bool, str]:
+        disponible = HAS_RAG and RagTool.available()
+        datos = {"available": disponible}
+        if not disponible:
+            return datos, False, "chromadb no instalado"
+        try:
+            datos["chunks"] = RagTool.status(self.ctx.root).get("total_chunks", 0)
+        except Exception:  # noqa: BLE001
+            return datos, True, "indice ilegible"
+        return datos, True, f"{datos['chunks']} fragmentos"
+
+    def _estado_vault(self) -> tuple[dict, bool, str]:
+        ruta = self.ctx.root / "vault"
+        existe = ruta.exists()
+        datos = {
+            "exists": existe,
+            "files": len(list(ruta.rglob("*.md"))) if existe else 0,
+        }
+        return datos, existe, f"{datos['files']} archivos" if existe else "no existe"
+
     def status(self) -> AgentResult:
         """Estado de cada fuente de documentación."""
-        sources = {}
-
-        graph_avail = HAS_GRAPHIFY and GraphifyTool.is_available(self.ctx.root)
-        graph_exists = HAS_GRAPHIFY and GraphifyTool.graph_exists(self.ctx.root)
-        sources["graphify"] = {
-            "available": graph_avail,
-            "graph_exists": graph_exists,
-        }
-        if graph_exists:
-            try:
-                g = GraphifyTool.load_graph(self.ctx.root)
-                sources["graphify"]["nodes"] = len(g.get("nodes", []))
-                sources["graphify"]["edges"] = len(g.get("edges", []))
-            except Exception:
-                pass
-
-        sources["rag"] = {"available": HAS_RAG and RagTool.available()}
-        if HAS_RAG and RagTool.available():
-            try:
-                info = RagTool.status(self.ctx.root)
-                sources["rag"]["chunks"] = info.get("total_chunks", 0)
-            except Exception:
-                pass
-
-        vault_path = self.ctx.root / "vault"
-        sources["vault"] = {
-            "exists": vault_path.exists(),
-            "files": len(list(vault_path.rglob("*.md"))) if vault_path.exists() else 0,
-        }
-
-        lines = []
-        for name, info in sources.items():
-            if name == "graphify":
-                avail = info.get("available", False) and info.get("graph_exists", False)
-                status = "✓" if avail else "✗"
-                details = f"{info.get('nodes', 0)} nodos / {info.get('edges', 0)} aristas" if avail else "no disponible"
-                lines.append(f"  {status} graphify — {details}")
-            elif name == "rag":
-                status = "✓" if info.get("available") else "✗"
-                details = f"{info.get('chunks', 0)} fragmentos" if info.get("available") else "chromadb no instalado"
-                lines.append(f"  {status} RAG — {details}")
-            elif name == "vault":
-                status = "✓" if info.get("exists") else "✗"
-                details = f"{info.get('files', 0)} archivos" if info.get("exists") else "no existe"
-                lines.append(f"  {status} vault — {details}")
+        comprobaciones = (
+            ("graphify", self._estado_grafo),
+            ("RAG", self._estado_rag),
+            ("vault", self._estado_vault),
+        )
+        fuentes, lineas = {}, []
+        for etiqueta, comprobar in comprobaciones:
+            datos, ok, detalle = comprobar()
+            fuentes[etiqueta.lower()] = datos
+            lineas.append(f"  {'✓' if ok else '✗'} {etiqueta} — {detalle}")
 
         return AgentResult(
             True, self.name, "status",
-            "Fuentes de documentación:\n" + "\n".join(lines),
-            data=sources,
+            "Fuentes de documentación:\n" + "\n".join(lineas),
+            data=fuentes,
         )
