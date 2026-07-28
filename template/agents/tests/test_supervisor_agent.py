@@ -75,3 +75,84 @@ def test_research_no_valid_backend():
     result = agent.research(backends=["invalid_backend"])
     assert not result.success
     assert "Ningún backend válido" in result.message
+
+
+# -- fan-in: sintetizar perspectivas, no competir ------------------------------
+
+class TestSynthesize:
+    """
+    `compete` elige un ganador entre alternativas; `synthesize` integra ángulos
+    distintos del mismo problema. Son cosas diferentes y no deben confundirse.
+    """
+
+    def _perspectivas(self):
+        return [
+            {"agent": "test", "action": "run_tests", "label": "calidad"},
+            {"agent": "doctor", "action": "checkup", "label": "entorno"},
+        ]
+
+    def test_sin_perspectivas_falla(self, context):
+        from agents.agents.supervisor_agent import SupervisorAgent
+        r = SupervisorAgent(context=context).synthesize(perspectives=[])
+        assert not r.success
+
+    def test_integra_todas_las_respuestas(self, context, monkeypatch):
+        from agents.agents.supervisor_agent import SupervisorAgent
+        from agents.core.base_agent import AgentResult
+
+        def fake_run(self, agent, action, **kw):
+            return AgentResult(True, agent, action, f"{agent} respondio", data={"n": 1})
+
+        monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
+        r = SupervisorAgent(context=context).synthesize(
+            perspectives=self._perspectivas(), parallel=False, question="¿como esta el proyecto?"
+        )
+        assert r.success
+        assert r.data["consensus"] == "unánime"
+        assert set(r.data["findings"]) == {"calidad", "entorno"}
+        assert r.data["question"] == "¿como esta el proyecto?"
+
+    def test_una_perspectiva_rota_no_tumba_al_resto(self, context, monkeypatch):
+        from agents.agents.supervisor_agent import SupervisorAgent
+        from agents.core.base_agent import AgentResult
+
+        def fake_run(self, agent, action, **kw):
+            if agent == "doctor":
+                raise RuntimeError("boom")
+            return AgentResult(True, agent, action, "ok")
+
+        monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
+        r = SupervisorAgent(context=context).synthesize(
+            perspectives=self._perspectivas(), parallel=False
+        )
+        assert r.success, "con una perspectiva viva sigue habiendo sintesis"
+        assert r.data["failed"] == ["entorno"]
+        assert "parcial" in r.data["consensus"]
+
+    def test_si_ninguna_responde_no_hay_sintesis(self, context, monkeypatch):
+        from agents.agents.supervisor_agent import SupervisorAgent
+        from agents.core.base_agent import AgentResult
+
+        def fake_run(self, agent, action, **kw):
+            return AgentResult(False, agent, action, "no pude", needs=["dame el dataset"])
+
+        monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
+        r = SupervisorAgent(context=context).synthesize(
+            perspectives=self._perspectivas(), parallel=False
+        )
+        assert not r.success
+        assert r.needs, "las preguntas de cada perspectiva deben subir, no perderse"
+
+    def test_acumula_avisos_de_cada_perspectiva(self, context, monkeypatch):
+        from agents.agents.supervisor_agent import SupervisorAgent
+        from agents.core.base_agent import AgentResult
+
+        def fake_run(self, agent, action, **kw):
+            return AgentResult(True, agent, action, "ok", warnings=[f"ojo con {agent}"])
+
+        monkeypatch.setattr("agents.orchestrator.Orchestrator.run", fake_run)
+        r = SupervisorAgent(context=context).synthesize(
+            perspectives=self._perspectivas(), parallel=False
+        )
+        assert len(r.warnings) == 2
+        assert any("calidad:" in w for w in r.warnings)

@@ -147,13 +147,16 @@ CONTRACTS: dict[str, Contract] = {
     ),
 
     "supervisor": Contract(
-        role="Coordina workers en COMPETICIÓN: lanza N variantes de una tarea y arbitra cuál gana.",
+        role="Coordina workers en paralelo: los pone a COMPETIR y arbitra, o los abre en abanico y SINTETIZA.",
         can=(
             "lanzar propuestas que compiten (p. ej. búsquedas de papers en paralelo) y elegir la mejor",
+            "abrir en abanico varias perspectivas sobre lo mismo y devolverlas integradas "
+            "(acuerdos, desacuerdos y lo que cada una necesita) — el diamante fan-out/fan-in",
         ),
         cannot=(
             "orquestar un encargo secuencial paso a paso → plan (él delega a dueños, no arbitra)",
             "hacer el trabajo de los workers él mismo — solo coordina y evalúa",
+            "interpretar lo que sintetiza — agrupa hechos; razonar sobre ellos es de la capa de arriba",
         ),
         needs=("la tarea a poner en competición y el criterio de evaluación",),
         collaborates=("research",),

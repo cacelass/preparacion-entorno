@@ -59,6 +59,7 @@ class SupervisorAgent(BaseAgent):
         return {
             "research": self.research,
             "compete": self.compete,
+            "synthesize": self.synthesize,
         }
 
     # -- competición de research ---------------------------------------------
@@ -147,6 +148,82 @@ class SupervisorAgent(BaseAgent):
         return round(0.5 * mean_rel + 0.4 * coverage + 0.1 * volume, 4)
 
     # -- competición genérica -------------------------------------------------
+    def synthesize(self, *, perspectives: list[dict], parallel: bool = True,
+                   question: str = "") -> AgentResult:
+        """
+        Diamante (fan-out → fan-in): lanza varias perspectivas sobre lo MISMO y
+        las integra en un veredicto único.
+
+        No es lo mismo que `compete`. Ahí los candidatos son alternativas y
+        gana una; aquí son ángulos distintos del mismo problema y el valor está
+        en juntarlos: analizar un dataset a la vez desde calidad, fugas y
+        aptitud de features, y devolver una lectura conjunta.
+
+        La síntesis es **estructural, no interpretativa**: agrupa acuerdos,
+        señala desacuerdos y acumula lo que cada perspectiva necesita. Este
+        sistema no llama a ningún LLM — quien razona sobre el resultado es la
+        capa de arriba (el `lider`), y para eso necesita los hechos ordenados,
+        no una opinión ya masticada por una heurística.
+
+        Cada perspectiva: ``{"agent": str, "action": str, "kwargs": dict,
+        "label": str?}``.
+        """
+        if not perspectives:
+            return self._fail_synth("No se pasaron perspectivas.")
+
+        from agents.orchestrator import Orchestrator
+        orch = Orchestrator(context=self.ctx)
+
+        def _run(p: dict) -> dict:
+            label = p.get("label") or f"{p.get('agent')}.{p.get('action')}"
+            try:
+                res = orch.run(p["agent"], p["action"], **p.get("kwargs", {}))
+            except Exception as exc:  # una perspectiva rota no tumba el resto
+                return {"label": label, "agent": p.get("agent"), "success": False,
+                        "message": f"EXCEPCION: {exc}", "warnings": [], "needs": [], "data": None}
+            return {"label": label, "agent": p.get("agent"), "success": res.success,
+                    "message": res.message, "warnings": list(res.warnings),
+                    "needs": list(res.needs), "data": res.data}
+
+        if parallel:
+            with ThreadPoolExecutor(max_workers=min(len(perspectives), 8)) as pool:
+                vistas = list(pool.map(_run, perspectives))
+        else:
+            vistas = [_run(p) for p in perspectives]
+
+        ok = [v for v in vistas if v["success"]]
+        fallidas = [v for v in vistas if not v["success"]]
+        avisos = [f"{v['label']}: {w}" for v in vistas for w in v["warnings"]]
+        preguntas = [f"{v['label']}: {n}" for v in vistas for n in v["needs"]]
+
+        if not ok:
+            return AgentResult(
+                False, self.name, "synthesize",
+                f"Ninguna de las {len(vistas)} perspectivas pudo responder.",
+                data={"question": question, "perspectives": vistas},
+                warnings=avisos, needs=preguntas,
+            )
+
+        consenso = "unánime" if not fallidas else f"parcial ({len(ok)}/{len(vistas)})"
+        return AgentResult(
+            True, self.name, "synthesize",
+            f"{len(ok)}/{len(vistas)} perspectivas respondieron · consenso {consenso}"
+            + (f" · {len(avisos)} aviso(s)" if avisos else ""),
+            data={
+                "question": question,
+                "consensus": consenso,
+                "answered": [v["label"] for v in ok],
+                "failed": [v["label"] for v in fallidas],
+                "findings": {v["label"]: {"message": v["message"], "data": v["data"]} for v in ok},
+                "perspectives": vistas,
+            },
+            warnings=avisos,
+            needs=preguntas,
+        )
+
+    def _fail_synth(self, message: str) -> AgentResult:
+        return AgentResult(False, self.name, "synthesize", message)
+
     def compete(self, *, candidates: list[dict], parallel: bool = False) -> AgentResult:
         """
         Enfrenta candidatos arbitrarios. Cada candidato es un dict
