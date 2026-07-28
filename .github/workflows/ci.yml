@@ -34,44 +34,33 @@ jobs:
       - name: Render + AST
         run: python .github/scripts/validate_template.py
 
+  matriz:
+    name: Generar matriz smoke
+    runs-on: ubuntu-latest
+    needs: validate-template
+    outputs:
+      combos: ${{ steps.gen.outputs.combos }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar pyyaml
+        run: pip install pyyaml
+      # Falla si algun flag opcional se queda sin ejercitar en ningun combo.
+      - name: Cobertura de flags opcionales
+        run: python .github/scripts/gen_smoke_matrix.py
+      - id: gen
+        run: echo "combos=$(python .github/scripts/gen_smoke_matrix.py --json)" >> "$GITHUB_OUTPUT"
+
   smoke:
     name: smoke (${{ matrix.python-version }}) / ${{ matrix.label }}
     runs-on: ubuntu-latest
-    needs: validate-template
+    needs: [validate-template, matriz]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - label: sup-clf
-            data: "ml_type=supervisado task_type=clasificacion model_type=todos"
-            python-version: "3.10"
-          - label: sup-reg
-            data: "ml_type=supervisado task_type=regresion model_type=todos"
-            python-version: "3.12"
-          - label: nosup
-            data: "ml_type=no_supervisado task_type=clasificacion cluster_model=todos"
-            python-version: "3.12"
-          - label: nn-mlp-clf-adamw
-            data: "ml_type=redes_neuronales task_type=clasificacion nn_model=MLP optimizer_type=AdamW nn_loss_fn=Auto"
-            python-version: "3.12"
-          - label: nn-mlp-reg-sgd-mse
-            data: "ml_type=redes_neuronales task_type=regresion nn_model=MLP optimizer_type=SGD nn_loss_fn=MSELoss"
-            python-version: "3.13"
-          - label: nn-lstm-clf-rmsprop
-            data: "ml_type=redes_neuronales task_type=clasificacion nn_model=LSTM optimizer_type=RMSProp nn_loss_fn=BCEWithLogitsLoss"
-            python-version: "3.11"
-          - label: nn-gru-reg-adagrad-l1
-            data: "ml_type=redes_neuronales task_type=regresion nn_model=GRU optimizer_type=Adagrad nn_loss_fn=L1Loss"
-            python-version: "3.12"
-          - label: nn-transformer-clf
-            data: "ml_type=redes_neuronales task_type=clasificacion nn_model=Transformer optimizer_type=AdamW nn_loss_fn=Auto"
-            python-version: "3.10"
-          - label: hibrido-clf
-            data: "ml_type=hibrido task_type=clasificacion model_type=todos"
-            python-version: "3.11"
-          - label: hibrido-reg
-            data: "ml_type=hibrido task_type=regresion model_type=todos"
-            python-version: "3.13"
+        include: ${{ fromJSON(needs.matriz.outputs.combos) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -85,8 +74,12 @@ jobs:
       - name: Instalar copier y pyyaml
         run: pip install copier pyyaml
 
+      # Por env, no interpolado en la linea: `matrix.data` es JSON con comillas
+      # dobles y rompe el quoting del shell (ademas de evitar inyeccion).
       - name: Escribir data file
-        run: python .github/scripts/write_data_file.py "${{ matrix.data }}"
+        env:
+          COMBO_DATA: ${{ matrix.data }}
+        run: python .github/scripts/write_data_file.py "$COMBO_DATA"
 
       - name: Generar proyecto con copier
         run: |

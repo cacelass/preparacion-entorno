@@ -10,10 +10,18 @@ Uso:
     python write_data_file.py "ml_type=supervisado task_type=clasificacion"
 """
 
+import json
 import sys
 from pathlib import Path
 
 import yaml
+
+
+def _version_de_copier() -> str:
+    """La version sale de copier.yml: escrita a mano se quedaba vieja."""
+    doc = yaml.safe_load((Path(__file__).parent.parent.parent / "copier.yml").read_text())
+    return doc.get("dskit_version", {}).get("default", "0.0.0")
+
 
 # Campos comunes a todas las combinaciones
 BASE = {
@@ -25,7 +33,7 @@ BASE = {
     "project_open_source_license": "MIT",
     "python_version": "3.12",
     "project_version": "0.1.0",
-    "dskit_version": "1.9.0",
+    "dskit_version": _version_de_copier(),
     # Flags opcionales — todos apagados por defecto en CI
     "model_type": "todos",
     "cluster_model": "todos",
@@ -44,6 +52,10 @@ BASE = {
     "use_monitoring": False,
     "use_calibration": False,
     "use_conformal": False,
+    # Ojo: en copier `use_rag` viene en True por defecto. Se declara aqui
+    # explicito para que la matriz pueda apagarlo y para que se vea que se
+    # esta instalando chromadb en cada job.
+    "use_rag": True,
     "graphify_mode": "no",
 }
 
@@ -70,6 +82,7 @@ VALID_KEYS = {
     "use_monitoring",
     "use_calibration",
     "use_conformal",
+    "use_rag",
     "graphify_mode",
     "project_slug",
     "project_name",
@@ -81,6 +94,22 @@ VALID_KEYS = {
     "project_version",
     "dskit_version",
 }
+
+# La matriz de CI se genera y pasa JSON: "graphify + obsidian vault" lleva
+# espacios y el formato "key=val key=val" lo parte por la mitad. Se mantiene
+# el formato antiguo para invocaciones a mano.
+try:
+    _json = json.loads(raw)
+except (json.JSONDecodeError, ValueError):
+    _json = None
+
+if isinstance(_json, dict):
+    for k, v in _json.items():
+        if k not in VALID_KEYS:
+            print(f"AVISO: clave desconocida '{k}' sera ignorada")
+            continue
+        overrides[k] = v
+    raw = ""
 
 for token in raw.split():
     if "=" in token:
