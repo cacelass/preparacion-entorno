@@ -290,6 +290,83 @@ class RagTool:
 
     # -- Indexing ------------------------------------------------------------
 
+    #: De donde sale el indice. Eran cinco bloques copiados con el mismo
+    #: esqueleto (existe? -> glob -> leer -> trocear): anadir una fuente
+    #: significaba copiar el sexto. Ahora es una fila mas en la tabla.
+    #: (subdirectorio, patron, recursivo, sufijos admitidos o None, troceador)
+    FUENTES = (
+        ("{{ project_slug }}", "*.py", True, None, "py"),
+        ("agents/prompts", "*.md", False, None, "md"),
+        ("docs", "*.*", True, (".md", ".rst"), "md"),
+        ("vault", "*.md", True, None, "md"),
+        # Memoria del arnes: el historico de features cerradas y sus decisiones
+        # es lo que un agente nuevo necesita buscar en lenguaje natural sin
+        # releer todo progress/.
+        ("progress", "*.md", False, None, "md"),
+    )
+
+    #: Ficheros sueltos de la raiz que tambien entran al indice.
+    FICHEROS_RAIZ = ("README.md", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md")
+
+    @staticmethod
+    def _recolectar(root: Path) -> list[dict[str, Any]]:
+        """Recorre las fuentes declaradas y devuelve todos los chunks."""
+        trozos: list[dict[str, Any]] = []
+
+        def _leer(fichero: Path) -> str | None:
+            try:
+                return fichero.read_text(encoding="utf-8")
+            except Exception:
+                return None  # un fichero ilegible no tumba el indexado entero
+
+        for sub, patron, recursivo, sufijos, tipo in RagTool.FUENTES:
+            base = root / sub
+            if not base.exists():
+                continue
+            for fichero in sorted(base.rglob(patron) if recursivo else base.glob(patron)):
+                if sufijos and fichero.suffix not in sufijos:
+                    continue
+                texto = _leer(fichero)
+                if texto is None:
+                    continue
+                origen = str(fichero.relative_to(root))
+                trozos.extend(
+                    RagTool.chunk_py(texto, origen) if tipo == "py"
+                    else RagTool.chunk_md(texto, origen)
+                )
+
+        for nombre in RagTool.FICHEROS_RAIZ:
+            texto = _leer(root / nombre) if (root / nombre).exists() else None
+            if texto is not None:
+                trozos.extend(RagTool.chunk_md(texto, nombre))
+
+        trozos.extend(RagTool._chunks_backlog(root))
+        return trozos
+
+    @staticmethod
+    def _chunks_backlog(root: Path) -> list[dict[str, Any]]:
+        """
+        El backlog se aplana a markdown antes de indexarlo: buscar
+        "criterios de aceptacion" contra JSON crudo no devuelve nada util.
+        """
+        backlog = root / "featureslist.json"
+        if not backlog.exists():
+            return []
+        try:
+            doc = json.loads(backlog.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+        bloques = []
+        for feat in doc.get("features", []):
+            criterios = "\n".join("- " + c for c in feat.get("acceptance_criteria", []))
+            bloques.append(
+                "## {} — {} [{}]\n\n{}\n\nCriterios de aceptación:\n{}\n".format(
+                    feat.get("id"), feat.get("title"), feat.get("status"),
+                    feat.get("description", ""), criterios,
+                )
+            )
+        return RagTool.chunk_md("\n".join(bloques), "featureslist.json") if bloques else []
+
     @staticmethod
     def index_project(root: Path) -> dict[str, Any]:
         client = RagTool._client(root)
@@ -297,81 +374,7 @@ class RagTool:
             return {"error": "chromadb no disponible. Instala: uv sync --extra rag"}
         collection = RagTool._collection(client)
 
-        all_chunks: list[dict[str, Any]] = []
-
-        src_dir = root / "{{ project_slug }}"
-        if src_dir.exists():
-            for py_file in src_dir.rglob("*.py"):
-                try:
-                    text = py_file.read_text(encoding="utf-8")
-                    all_chunks.extend(RagTool.chunk_py(text, str(py_file.relative_to(root))))
-                except Exception:
-                    pass
-
-        prompts_dir = root / "agents" / "prompts"
-        if prompts_dir.exists():
-            for md_file in prompts_dir.glob("*.md"):
-                try:
-                    text = md_file.read_text(encoding="utf-8")
-                    all_chunks.extend(RagTool.chunk_md(text, str(md_file.relative_to(root))))
-                except Exception:
-                    pass
-
-        docs_dir = root / "docs"
-        if docs_dir.exists():
-            for doc_file in docs_dir.rglob("*.*"):
-                if doc_file.suffix in (".md", ".rst"):
-                    try:
-                        text = doc_file.read_text(encoding="utf-8")
-                        all_chunks.extend(RagTool.chunk_md(text, str(doc_file.relative_to(root))))
-                    except Exception:
-                        pass
-
-        vault_dir = root / "vault"
-        if vault_dir.exists():
-            for md_file in vault_dir.rglob("*.md"):
-                try:
-                    text = md_file.read_text(encoding="utf-8")
-                    all_chunks.extend(RagTool.chunk_md(text, str(md_file.relative_to(root))))
-                except Exception:
-                    pass
-
-        # Memoria del arnés: el histórico de features cerradas y sus decisiones
-        # es justo lo que un agente nuevo necesita buscar en lenguaje natural
-        # ("¿por qué elegimos K=4?") sin releer todo progress/.
-        progress_dir = root / "progress"
-        if progress_dir.exists():
-            for md_file in sorted(progress_dir.glob("*.md")):
-                try:
-                    text = md_file.read_text(encoding="utf-8")
-                    all_chunks.extend(RagTool.chunk_md(text, str(md_file.relative_to(root))))
-                except Exception:
-                    pass
-
-        backlog = root / "featureslist.json"
-        if backlog.exists():
-            try:
-                doc = json.loads(backlog.read_text(encoding="utf-8"))
-                lines = []
-                for feat in doc.get("features", []):
-                    criteria = "\n".join(f"- {c}" for c in feat.get("acceptance_criteria", []))
-                    lines.append(
-                        f"## {feat.get('id')} — {feat.get('title')} [{feat.get('status')}]\n\n"
-                        f"{feat.get('description', '')}\n\nCriterios de aceptación:\n{criteria}\n"
-                    )
-                if lines:
-                    all_chunks.extend(RagTool.chunk_md("\n".join(lines), "featureslist.json"))
-            except Exception:
-                pass
-
-        for doc_file in ("README.md", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md"):
-            fp = root / doc_file
-            if fp.exists():
-                try:
-                    text = fp.read_text(encoding="utf-8")
-                    all_chunks.extend(RagTool.chunk_md(text, doc_file))
-                except Exception:
-                    pass
+        all_chunks: list[dict[str, Any]] = RagTool._recolectar(root)
 
         all_chunks = [c for c in all_chunks if c is not None]
 

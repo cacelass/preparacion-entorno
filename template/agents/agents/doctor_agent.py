@@ -15,6 +15,33 @@ from agents.core.registry import register_agent
 from agents.tools.process_tool import run_command
 
 
+#: Cada operador de `requires-python`, como comparacion de tuplas. Estaba
+#: escrito como una cadena de `if op == ...: if not ...: return False`, que es
+#: el mismo dato repetido siete veces en forma de codigo.
+_COMPARADORES = {
+    ">=": lambda actual, objetivo: actual >= objetivo,
+    ">": lambda actual, objetivo: actual > objetivo,
+    "<=": lambda actual, objetivo: actual <= objetivo,
+    "<": lambda actual, objetivo: actual < objetivo,
+    "==": lambda actual, objetivo: actual == objetivo,
+    "!=": lambda actual, objetivo: actual != objetivo,
+    # ~=X.Y significa ">=X.Y y misma serie X"
+    "~=": lambda actual, objetivo: actual >= objetivo and actual[:-1] == objetivo[:-1],
+}
+
+#: Los mas largos primero: si no, "<" casaria antes que "<=".
+_OPERADORES = sorted(_COMPARADORES, key=len, reverse=True)
+
+
+def _parsea_clausula(clausula: str) -> tuple[str, tuple[int, ...]] | None:
+    """`">=3.12"` -> `(">=", (3, 12))`. None si no se entiende."""
+    op = next((o for o in _OPERADORES if clausula.startswith(o)), None)
+    if op is None:
+        return None
+    partes = [p for p in clausula[len(op):].strip().split(".") if p.isdigit()]
+    return (op, tuple(int(p) for p in partes)) if partes else None
+
+
 def _satisfies_requires_python(current: tuple[int, ...], requires: str) -> bool:
     """
     ¿Cumple `current` el `requires-python` del pyproject?
@@ -24,39 +51,18 @@ def _satisfies_requires_python(current: tuple[int, ...], requires: str) -> bool:
     no aparece en ">=3.12") y un Python 3.1 daba OK (sí aparece). El
     diagnóstico decía justo lo contrario de la realidad.
 
-    Se comparan tuplas de enteros y se soportan las cláusulas que aparecen en
-    la práctica, separadas por comas. Una cláusula que no se entienda se da
-    por buena: es un diagnóstico, no un resolutor de dependencias — mejor no
-    avisar que avisar en falso.
+    Una cláusula que no se entienda se da por buena: es un diagnóstico, no un
+    resolutor de dependencias — mejor no avisar que avisar en falso.
     """
-    ops = (">=", "<=", "==", "!=", "~=", ">", "<")
-    for raw in requires.split(","):
-        clause = raw.strip()
-        if not clause:
+    for bruta in requires.split(","):
+        parseada = _parsea_clausula(bruta.strip())
+        if parseada is None:
             continue
-        op = next((o for o in ops if clause.startswith(o)), None)
-        if op is None:
-            continue
-        try:
-            target = tuple(int(part) for part in clause[len(op):].strip().split(".") if part.isdigit())
-        except ValueError:
-            continue
-        if not target:
-            continue
-        head = current[: len(target)]
-        if op == ">=" and not head >= target:
-            return False
-        if op == ">" and not head > target:
-            return False
-        if op == "<=" and not head <= target:
-            return False
-        if op == "<" and not head < target:
-            return False
-        if op == "==" and head != target:
-            return False
-        if op == "!=" and head == target:
-            return False
-        if op == "~=" and (head < target or current[: len(target) - 1] != target[:-1]):
+        op, objetivo = parseada
+        # `~=` compara la version entera; el resto, solo hasta donde concreta
+        # la clausula (">=3.12" no debe mirar el micro de 3.12.1).
+        actual = current if op == "~=" else current[: len(objetivo)]
+        if not _COMPARADORES[op](actual, objetivo):
             return False
     return True
 

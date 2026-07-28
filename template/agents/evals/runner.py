@@ -158,33 +158,29 @@ HARNESS_STATUS = ("pending", "in_progress", "done", "blocked")
 HARNESS_REQUIRED = ("id", "title", "description", "acceptance_criteria", "status")
 
 
-def _harness() -> list[dict]:
-    """
-    Harness test: verifica que las piezas del arnés existen y son coherentes.
-    Es la contraparte en Python de lo que comprueba ./init.sh (ver AGENTS.md).
-    """
-    from pathlib import Path
-
-    root: Path = get_context().root
-    results: list[dict] = []
-
-    def check(name: str, ok: bool, detail: str) -> None:
-        results.append({"agent": name, "success": ok, "message": detail})
+def _check_ficheros(root, check) -> None:
+    """La puerta y los ficheros que el arnés da por sentados."""
+    import os
 
     gate = root / "init.sh"
-    check("init.sh", gate.is_file(), "presente" if gate.is_file() else "FALTA la puerta del arnés")
-    if gate.is_file():
-        import os
-        executable = os.access(gate, os.X_OK)
-        check("init.sh:+x", executable, "ejecutable" if executable else "sin bit de ejecución (chmod +x init.sh)")
+    if not gate.is_file():
+        check("init.sh", False, "FALTA la puerta del arnés")
+    else:
+        check("init.sh", True, "presente")
+        ejecutable = os.access(gate, os.X_OK)
+        check("init.sh:+x", ejecutable,
+              "ejecutable" if ejecutable else "sin bit de ejecución (chmod +x init.sh)")
 
     for rel in ("AGENTS.md", "progress/current.md", "progress/history.md", "progress/README.md"):
-        path = root / rel
-        check(rel, path.is_file(), "presente" if path.is_file() else "FALTA")
+        check(rel, (root / rel).is_file(), "presente" if (root / rel).is_file() else "FALTA")
 
-    for name in HARNESS_AGENTS:
-        path = root / ".opencode" / "agents" / f"{name}.md"
-        check(f"agente:{name}", path.is_file(), "definido" if path.is_file() else "FALTA su definición")
+
+def _check_agentes(root, check) -> None:
+    """Los cuatro agentes que razonan y los skills que los documentan."""
+    for nombre in HARNESS_AGENTS:
+        ruta = root / ".opencode" / "agents" / f"{nombre}.md"
+        check(f"agente:{nombre}", ruta.is_file(),
+              "definido" if ruta.is_file() else "FALTA su definición")
 
     for skill in ("harness_workflow", "agents_reference"):
         ruta = root / "agents" / "prompts" / f"{skill}.md"
@@ -193,62 +189,85 @@ def _harness() -> list[dict]:
 
     agents_md = root / "AGENTS.md"
     if agents_md.is_file():
-        text = agents_md.read_text(encoding="utf-8", errors="replace")
-        has_protocol = "Protocolo del arnés" in text and "init.sh" in text
-        check("AGENTS.md:protocolo", has_protocol,
-              "protocolo documentado" if has_protocol else "no documenta el protocolo del arnés")
+        texto = agents_md.read_text(encoding="utf-8", errors="replace")
+        ok = "Protocolo del arnés" in texto and "init.sh" in texto
+        check("AGENTS.md:protocolo", ok,
+              "protocolo documentado" if ok else "no documenta el protocolo del arnés")
 
-    backlog = root / "featureslist.json"
-    if not backlog.is_file():
-        check("featureslist.json", False, "FALTA el backlog")
-        return results
 
-    try:
-        doc = json.loads(backlog.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        check("featureslist.json", False, f"JSON inválido: {exc}")
-        return results
-
-    features = doc.get("features") if isinstance(doc, dict) else None
-    if not isinstance(features, list) or not features:
-        check("featureslist.json", False, "falta la clave 'features' con una lista no vacía")
-        return results
-
-    problems: list[str] = []
+def _problemas_backlog(features: list) -> list[str]:
+    """Mismo contrato de esquema que valida ./init.sh."""
+    problemas: list[str] = []
     ids: set[str] = set()
     for i, feat in enumerate(features):
         if not isinstance(feat, dict):
-            problems.append(f"feature #{i} no es un objeto")
+            problemas.append(f"feature #{i} no es un objeto")
             continue
-        missing = [k for k in HARNESS_REQUIRED if k not in feat]
-        if missing:
-            problems.append(f"feature #{i} sin campos: {', '.join(missing)}")
+        faltan = [k for k in HARNESS_REQUIRED if k not in feat]
+        if faltan:
+            problemas.append(f"feature #{i} sin campos: {', '.join(faltan)}")
             continue
         if feat["id"] in ids:
-            problems.append(f"id duplicado: {feat['id']}")
+            problemas.append(f"id duplicado: {feat['id']}")
         ids.add(feat["id"])
         if feat["status"] not in HARNESS_STATUS:
-            problems.append(f"{feat['id']}: status '{feat['status']}' no válido")
+            problemas.append(f"{feat['id']}: status '{feat['status']}' no válido")
         if not isinstance(feat["acceptance_criteria"], list) or not feat["acceptance_criteria"]:
-            problems.append(f"{feat['id']}: acceptance_criteria vacío o no es lista")
+            problemas.append(f"{feat['id']}: acceptance_criteria vacío o no es lista")
 
     for feat in features:
         if isinstance(feat, dict):
             for dep in feat.get("depends_on", []):
                 if dep not in ids:
-                    problems.append(f"{feat.get('id')}: depends_on '{dep}' no existe")
+                    problemas.append(f"{feat.get('id')}: depends_on '{dep}' no existe")
 
-    running = [f["id"] for f in features if isinstance(f, dict) and f.get("status") == "in_progress"]
-    if len(running) > 1:
-        problems.append(f"{len(running)} features in_progress a la vez: {', '.join(running)}")
+    abiertas = [f["id"] for f in features if isinstance(f, dict) and f.get("status") == "in_progress"]
+    if len(abiertas) > 1:
+        problemas.append(f"{len(abiertas)} features in_progress a la vez: {', '.join(abiertas)}")
+    return problemas
 
-    if problems:
-        for problem in problems:
-            check("featureslist.json", False, problem)
+
+def _check_backlog(root, check) -> None:
+    """featureslist.json: existe, es JSON y cumple el esquema."""
+    backlog = root / "featureslist.json"
+    if not backlog.is_file():
+        check("featureslist.json", False, "FALTA el backlog")
+        return
+    try:
+        doc = json.loads(backlog.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        check("featureslist.json", False, f"JSON inválido: {exc}")
+        return
+
+    features = doc.get("features") if isinstance(doc, dict) else None
+    if not isinstance(features, list) or not features:
+        check("featureslist.json", False, "falta la clave 'features' con una lista no vacía")
+        return
+
+    problemas = _problemas_backlog(features)
+    if problemas:
+        for problema in problemas:
+            check("featureslist.json", False, problema)
     else:
         check("featureslist.json", True, f"{len(features)} features, esquema válido")
 
-    return results
+
+def _harness() -> list[dict]:
+    """
+    Harness test: verifica que las piezas del arnés existen y son coherentes.
+    Es la contraparte en Python de lo que comprueba ./init.sh (ver AGENTS.md).
+    """
+    root = get_context().root
+    resultados: list[dict] = []
+
+    def check(nombre: str, ok: bool, detalle: str) -> None:
+        resultados.append({"agent": nombre, "success": ok, "message": detalle})
+
+    _check_ficheros(root, check)
+    _check_agentes(root, check)
+    _check_backlog(root, check)
+    return resultados
+
 
 
 def _summarize(results: list[dict], label: str) -> dict:
