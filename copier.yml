@@ -253,7 +253,7 @@ python_version:
 
 dskit_version:
   type: str
-  default: "1.13.3"
+  default: "1.13.4"
   help: "Versión de dskit que generó el proyecto (no cambiar)"
 
 project_version:

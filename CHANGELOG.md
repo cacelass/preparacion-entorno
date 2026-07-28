@@ -5,6 +5,54 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.13.4] — 2026-07-29
+
+### Consolidación de agentes: 30 → 28
+
+Medido antes de tocar nada: **6 de los 30 agentes no se referenciaban desde
+ningún workflow, gateway, gstack ni CLI** — solo desde el catálogo. Y había
+clústeres de 6 agentes cubriendo el mismo dominio. Se fusionan los dos casos
+donde la duplicación era literal, no parecida.
+
+- **`schedule` → `cicd`.** No fue una fusión sino una eliminación:
+  `cicd.validate_cron` ya devolvía todo lo que hacían sus tres acciones
+  (validar, traducir a lenguaje natural y calcular próximas ejecuciones), y
+  `cicd` ya importaba `ScheduleTool` y ya aliaseaba `cron`/`schedule`. Sus 5
+  tests se portan a `test_cicd_agent.py`, que no tenía **ni uno** de cron. Uno
+  de ellos hacía `len(result.data) == 3` y pasaba por casualidad: `data` es un
+  dict de 3 claves, no 3 ejecuciones.
+- **`docsearch` → `doc`**, con `prune` a `knowledge`. `doc.graph_query` y
+  `docsearch.search` consultaban el mismo grafo; se conserva la
+  implementación de `docsearch`, que **no cachea los fallos** — así un error
+  transitorio de graphify deja de servirse desde caché para siempre.
+- **`graphify-out/` tenía dos dueños**: `knowledge` lo construía y `docsearch`
+  lo podaba. El test de contratos no lo detectaba porque cada uno lo describía
+  con una cadena distinta, así que la regla «un recurso, un dueño» se estaba
+  esquivando con la redacción. Ahora es de `knowledge`.
+
+### Complejidad: 7 puntos calientes → 2, cero bloques E
+
+- `evals/runner.py::_harness` era el bloque más complejo del sistema (E 37):
+  93 líneas encadenando comprobaciones. Partido en cuatro funciones.
+- `rag_tool.py::index_project` (E 35) tenía cinco bloques copiados con el mismo
+  esqueleto; añadir una fuente significaba copiar el sexto. Ahora es una tabla
+  `FUENTES` y un solo bucle.
+- `doctor_agent.py::_satisfies_requires_python` (D 25) era una cadena de siete
+  `if op == ...`: el mismo dato repetido en forma de código. Tabla de
+  operadores.
+- `doc.search` (D 28) y `doc.status` (D 21): una función por fuente.
+
+Media global 3.819 → 3.746. Quedan `cli.main` (30) y
+`review._deep_scan_file` (30), ambos preexistentes.
+
+### Bug encontrado al refactorizar
+
+`doc.search` escribía `"source": "graphify"` en los resultados del grafo, pero
+el formateo comprueba `"source_type"`. **Los resultados de graphify se contaban
+en el total pero no se imprimían nunca.**
+
+---
+
 ## [1.13.3] — 2026-07-28
 
 ### La matriz de CI deja de elegirse a corazonadas

@@ -1,6 +1,6 @@
 [project]
 name = "dskit"
-version = "1.13.3"
+version = "1.13.4"
 description = "Template profesional para Data Science y AI Engineering"
 authors = [
   { name = "cacelass" }
