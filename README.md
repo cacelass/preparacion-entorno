@@ -1,6 +1,6 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-1.12.4-blue)
+![version](https://img.shields.io/badge/dskit-1.13.2-blue)
 ![CI](https://github.com/cacelass/dskit/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)
@@ -10,12 +10,17 @@
 
 Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML de forma organizada, reproducible y lista para producción. Construida sobre `uv`, con una arquitectura modular que cubre el flujo completo desde la ingesta de datos hasta el modelo evaluado, exportado y servido como API o interfaz de chat.
 
+Y con un **arnés de IA** dentro del propio repositorio: un entorno que gobierna cómo trabajan los agentes sobre el proyecto, con puerta de entrada, backlog verificable y una definición de «hecho» que se aplica en código, no pidiéndosela al modelo.
+
 ---
 
 ## Índice
 
 - [DSKIT](#dskit)
   - [Índice](#índice)
+  - [Arnés de IA](#arnés-de-ia)
+    - [Los agentes](#los-agentes)
+    - [Funciona con cualquier asistente](#funciona-con-cualquier-asistente)
   - [Características](#características)
     - [Tipos de ML y arquitecturas](#tipos-de-ml-y-arquitecturas)
     - [Módulos opcionales](#módulos-opcionales)
@@ -37,6 +42,55 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 
 ---
 
+## Arnés de IA
+
+Un modelo de IA genera código mucho más rápido de lo que un humano lo revisa. El arnés (*harness*) es el entorno que pone las riendas: vive dentro del repositorio generado, así que viaja con el proyecto y lo comparte todo el equipo.
+
+```
+./init.sh → progress/ → featureslist.json → implementar → revisar → done
+    │
+    └── si falla: el agente PARA. No se trabaja sobre un proyecto roto.
+```
+
+| Pieza | Qué hace |
+|---|---|
+| `AGENTS.md` | Punto de entrada. Lo primero que lee cualquier agente |
+| `init.sh` | La puerta: entorno, ficheros del arnés, backlog y suite de tests |
+| `featureslist.json` | Backlog con criterios de aceptación **verificables** |
+| `progress/` | Memoria fuera de la ventana de contexto: tarea actual e histórico |
+| `.opencode/agents/` | Los cuatro agentes del arnés |
+
+**La regla que no se salta:** ninguna feature se marca `done` sin que `./init.sh` pase en verde y sin evidencia real del comando que lo demuestra. No es una instrucción en un prompt — la aplica `harness finish` en Python, así que no se puede rodear pidiéndoselo amablemente al modelo.
+
+```bash
+make init            # ¿se puede trabajar?
+make backlog         # estado de las features
+make harness-check   # solo estructura, sin tests
+```
+
+### Los agentes
+
+Dos capas que no hacen lo mismo, y esa separación es el diseño:
+
+- **Razonan** — `lider` (dirige el ciclo), `explorer` (investiga en solo lectura), `implementer` (escribe código y tests), `reviewer` (aprueba o rechaza). Markdown en `.opencode/agents/`.
+- **Ejecutan** — 30 agentes Python en `agents/agents/` (`git`, `test`, `review`, `docker`, `data`, `ml`, `plan`, `doctor`, `harness`…). Acciones deterministas, sin ambigüedad.
+
+El arnés **no sustituye** a los agentes Python: delega en ellos todo lo repetible. Cada uno tiene un contrato en `agents/contracts.py` que declara qué puede, qué no y qué recursos posee en exclusiva — un recurso, un dueño, validado por test.
+
+```bash
+uv run python -m agents --json ask "revisa el Dockerfile"   # ruteo automático
+uv run python -m agents --json run harness next             # ¿qué toca?
+uv run python -m agents.evals.runner                        # harness + smoke + routing + contracts
+```
+
+Los prompts de los agentes se **derivan del código**: cada uno conserva su criterio escrito a mano y lleva un bloque generado con sus acciones y sus límites, sacados de `actions()` y `contracts.py`. `make prompts-check` (y CI) falla si se desincronizan, para que no haya dos fuentes de verdad.
+
+### Funciona con cualquier asistente
+
+`AGENTS.md` es la fuente única de reglas; `CLAUDE.md` solo apunta a él sin duplicar nada. Los cuatro agentes del arnés se escriben una vez en `.opencode/agents/` y `make assistants-sync` los espeja a `.claude/agents/` con el frontmatter que espera Claude Code. El proyecto trae además un hook `SessionEnd` que ejecuta la puerta al cerrar la sesión, para no dejar el repositorio roto sin que nadie se entere.
+
+---
+
 ## Características
 
 ### Tipos de ML y arquitecturas
@@ -55,7 +109,10 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 | `use_monitoring` | Drift KS/chi² + performance vs baseline (Evidently) | `make monitor` |
 | `use_mlflow` | Tracking de experimentos, artifacts y Model Registry | `make mlflow` |
 | `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
-| `use_docker` | Docker + interfaz de chat Gradio | `make chat` |
+| `use_docker` | Docker + interfaz de chat Gradio | `make docker-run` |
+| `use_rag` | RAG semántico local (ChromaDB + ONNX): indexa código, prompts, docs y la memoria del arnés. Sin API key, offline | `make index-rag` |
+| `use_conformal` | Conformal Prediction — sets/intervalos con garantía de cobertura, *distribution-free* | automático |
+| `use_calibration` | Temperature Scaling — calibra la confianza del modelo *(redes_neuronales)* | automático |
 | `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | automático |
 | papers + guía modelos | vault/07_REFERENCIAS/ (notas por modelo) + vault/01_PROYECTO/guiia_modelos.md | automático |
 | `use_shap` | SHAP values — importancia de features | automático |
@@ -67,10 +124,12 @@ Plantilla [copier](https://copier.readthedocs.io) para iniciar proyectos de ML d
 - **TorchMetrics** en bucle de entrenamiento y evaluación NN (Accuracy/F1/Precision/Recall para clasificación, MAE/RMSE/R² para regresión)
 - **Early stopping** y **validation split** configurables en redes neuronales
 - **TensorBoard** integrado en redes neuronales (`make tb`)
-- **Sistema de agentes especializados** en `agents/` para changelog, releases, CI/CD, tests, dependencias, API y documentación
+- **30 agentes especializados** en `agents/` para changelog, releases, CI/CD, tests, dependencias, API, datos, modelos y documentación — con contratos que impiden que dos agentes escriban el mismo recurso
+- **`make check`** — lint + typecheck + test + arnés, la batería completa
 - **`make smoke`** — tests de humo que verifican que el pipeline arranca sin errores
 - **`make profile`** — profiling con cProfile + snakeviz
 - **`make lock`** — regenera `uv.lock` tras cambios en dependencias
+- **CI que ejecuta la puerta del arnés** y comprueba que los prompts no se han desincronizado del código
 - `uv sync` automático tras generar el proyecto
 
 ---
@@ -135,6 +194,10 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `use_duckdb` | true/false | siempre | DuckDB SQL sobre ficheros |
 | `use_api` | true/false | siempre | API REST FastAPI |
 | `use_docker` | true/false | siempre | Docker + chat Gradio |
+| `use_rag` | true/false | siempre | RAG semántico local (ChromaDB + ONNX) — por defecto `true` |
+| `use_conformal` | true/false | supervisado, hibrido, redes_neuronales | Conformal Prediction |
+| `use_calibration` | true/false | redes_neuronales | Temperature Scaling |
+| `project_open_source_license` | `No license file` · `MIT` · `BSD-3-Clause` · `Apache-2.0` | siempre | Licencia del proyecto generado |
 | `python_version` | `3.10`–`3.13` | siempre | Versión de Python |
 | `project_version` | texto | siempre | Versión inicial del proyecto |
 
@@ -148,11 +211,15 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 
 ```bash
 make help        # ver todos los comandos disponibles
-make run         # pipeline completo: data → features → train → predict
+make init        # la puerta del arnés: ¿se puede trabajar?
+make backlog     # estado de featureslist.json
+make pipeline    # pipeline completo: data → features → train → predict
+make run         # ejecuta main.py
 make data        # solo ingesta de datos
 make features    # solo preprocesado
 make train       # solo entrenamiento
 make predict     # solo evaluación
+make check       # lint + typecheck + test + arnés
 make smoke       # tests de humo rápidos
 make test        # suite completa de tests con cobertura
 make lint        # ruff check
@@ -165,7 +232,8 @@ make monitor     # drift + performance report  (use_monitoring=true)
 make tune        # HPO con Optuna              (use_optuna=true)
 make serve       # API REST localhost:8000     (use_api=true)
 make query       # Shell DuckDB interactivo   (use_duckdb=true)
-make chat        # Interfaz Gradio            (use_docker=true)
+make index-rag   # indexa el proyecto en ChromaDB (use_rag=true)
+make docker-run  # construye la imagen y lanza el chat (use_docker=true)
 ```
 
 ---
@@ -204,11 +272,24 @@ nombre_proyecto/
 │   ├── 05_AGENTES/
 │   ├── 06_OBSERVACIONES/
 │   └── 07_REFERENCIAS/
+├── AGENTS.md                     ← protocolo del arnés: fuente única de reglas
+├── CLAUDE.md                     ← puntero a AGENTS.md para Claude Code
+├── init.sh                       ← la puerta: ¿se puede trabajar?
+├── featureslist.json             ← backlog con criterios de aceptación
+├── progress/                     ← memoria del arnés
+│   ├── current.md                ← feature en curso
+│   ├── history.md                ← append-only de lo cerrado
+│   └── <agente>-<ID>.md          ← informe de cada subagente
+├── .opencode/agents/             ← lider · explorer · implementer · reviewer
+├── .claude/                      ← settings.json (hook SessionEnd) + agents/ espejados
 ├── agents/                       ← agentes especializados, docs y utilidades de release
 │   ├── README.md                 ← guía completa del sistema de agentes
-│   ├── agents/                   ← agentes concretos: git, docs, test, api...
+│   ├── agents/                   ← los 30 agentes: git, test, harness, data, ml...
+│   ├── contracts.py              ← qué puede y qué no cada agente (un recurso, un dueño)
 │   ├── tools/                    ← utilidades reutilizables por agente
-│   ├── prompts/                  ← fichas de comportamiento por agente
+│   ├── prompts/                  ← fichas por agente (bloque autogenerado + criterio)
+│   ├── prompts_sync.py           ← mantiene prompts y subagentes al día
+│   ├── evals/runner.py           ← harness + smoke + routing + contracts
 │   └── workspace/                ← espacio de trabajo por agente
 ├── data/{raw,interim,processed,external}/
 ├── models/                       ← pesos .pt / .joblib + artifacts/
@@ -239,25 +320,44 @@ nombre_proyecto/
 
 | Target | Descripción |
 |---|---|
-| `make run` | Pipeline completo |
+| `make pipeline` | Pipeline completo: data → features → train → predict |
+| `make run` | Ejecuta `main.py` |
 | `make data` | Ingesta de datos |
 | `make features` | Preprocesado |
 | `make train` | Entrenamiento |
 | `make predict` | Evaluación + figuras + CSV |
+| `make check` | lint + typecheck + test + arnés |
 | `make test` | pytest con cobertura (`--cov=<slug>`) |
 | `make smoke` | Solo `@pytest.mark.smoke` |
 | `make lint` | `ruff check` |
 | `make format` | `ruff format` |
+| `make typecheck` | `mypy --strict` |
+| `make security` | bandit + pip-audit |
+| `make audit` | radon cc + auditoría del equipo de agentes |
 | `make profile` | cProfile → `reports/profile.prof` |
 | `make lock` | `uv lock` — regenera lockfile |
 | `make docs` | Sphinx autodoc |
+| **Arnés** | |
+| `make init` | Ejecuta `./init.sh` — la puerta |
+| `make harness-check` | Solo estructura del arnés, sin tests |
+| `make backlog` | Estado de `featureslist.json` |
+| **Agentes** | |
+| `make agents-list` | Lista los 30 agentes |
+| `make agents-doctor` | Diagnóstico integral |
+| `make agents-eval` | harness + smoke + routing + contracts |
+| `make prompts-sync` | Regenera prompts desde el código y los contratos |
+| `make prompts-check` | Falla si un prompt se desincronizó |
+| `make assistants-sync` | Espeja los subagentes a `.claude/agents/` |
+| `make skills` | Instala los prompts como skills en `.opencode/skills/` |
+| **Opcionales** | |
 | `make tb` | TensorBoard :6006 *(redes_neuronales)* |
 | `make mlflow` | MLflow UI :5000 *(use_mlflow)* |
 | `make monitor` | Drift + performance report *(use_monitoring)* |
 | `make tune` | HPO Optuna *(use_optuna)* |
 | `make serve` | API REST :8000 *(use_api)* |
 | `make query` | Shell DuckDB *(use_duckdb)* |
-| `make chat` | Gradio :7860 *(use_docker)* |
+| `make index-rag` | Indexa el proyecto en ChromaDB *(use_rag)* |
+| `make docker-run` | Construye la imagen y lanza el chat *(use_docker)* |
 | `make clean-all` | Limpia cachés, modelos y figuras |
 | `make info` | Muestra versiones del entorno |
 

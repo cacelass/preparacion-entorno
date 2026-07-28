@@ -12,8 +12,8 @@
 
 > {{ project_description }}
 
-**Tipo de ML:** `{{ ml_type }}`{% if ml_type == "redes_neuronales" %} — arquitectura: `{{ nn_model }}`{% endif %}  
-**Autor:** {{ project_author_name }}  
+**Tipo de ML:** `{{ ml_type }}`{% if ml_type == "redes_neuronales" %} — arquitectura: `{{ nn_model }}`{% endif %}
+**Autor:** {{ project_author_name }}
 **Versión:** {{ project_version }}{% if use_xgboost %} · XGBoost ✓{% endif %}{% if use_lightgbm %} · LightGBM ✓{% endif %}{% if use_catboost or model_type == 'CatBoost' %} · CatBoost ✓{% endif %}
 
 ---
@@ -22,6 +22,7 @@
 
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Inicio rápido](#inicio-rápido)
+- [Arnés de IA](#arnés-de-ia)
 - [Sistema de agentes](#sistema-de-agentes){% if use_docker %}
 - [Docker — Interfaz de chat](#docker--interfaz-de-chat){% endif %}{% if graphify_mode == "graphify + obsidian vault" %}
 - [Obsidian Vault](#obsidian-vault){% endif %}
@@ -50,10 +51,57 @@
 │   ├── visualization/  visualize.py
 │   └── utils/          paths.py
 ├── tests/
+├── progress/           ← memoria del arnés (tarea actual + histórico)
+├── AGENTS.md           ← protocolo del arnés: punto de entrada de la IA
+├── init.sh             ← la puerta: ¿se puede trabajar?
+├── featureslist.json   ← backlog con criterios de aceptación
 ├── main.py             ← pipeline completo
 ├── Makefile
 └── pyproject.toml
 ```
+
+---
+
+## Arnés de IA
+
+El proyecto trae un **arnés** (*harness*): un entorno dentro del propio
+repositorio que gobierna cómo trabaja un agente de IA sobre él. No es un
+chatbot — es un ciclo con puerta de entrada, backlog y verificación.
+
+```
+./init.sh → progress/ → featureslist.json → implementar → revisar → done
+    │
+    └── si falla: el agente PARA. No se trabaja sobre un proyecto roto.
+```
+
+Funciona con **cualquier asistente**: `AGENTS.md` es la fuente única de reglas y
+`CLAUDE.md` solo apunta a él, sin duplicar nada. Los cuatro subagentes se
+escriben una vez en `.opencode/agents/` y `make assistants-sync` los espeja a
+`.claude/agents/` con el formato que espera Claude Code.
+
+| Pieza | Qué hace |
+|-------|----------|
+| `AGENTS.md` | Punto de entrada. Lo primero que lee cualquier agente |
+| `init.sh` | Verifica entorno, ficheros del arnés y que los tests pasan |
+| `featureslist.json` | Qué hay que hacer, con criterios de aceptación explícitos |
+| `progress/` | Memoria fuera de la ventana de contexto: tarea actual e histórico |
+| `.opencode/agents/` | `lider`, `explorer`, `implementer`, `reviewer` |
+
+```bash
+make init            # ¿se puede trabajar?
+make harness-check   # solo estructura, sin tests
+make backlog         # estado de las features
+```
+
+Y para arrancar el ciclo en tu asistente:
+
+> Lee `AGENTS.md` y sigue el protocolo: ejecuta `./init.sh`, lee `progress/` y
+> elige la primera feature pendiente.
+
+**La regla que no se salta:** ninguna feature se marca `done` sin que
+`./init.sh` pase en verde. El agente demuestra su trabajo, no lo declara.
+
+El protocolo completo está en [`AGENTS.md`](AGENTS.md).
 
 
 {% if use_docker %}

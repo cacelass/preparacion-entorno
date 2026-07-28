@@ -198,7 +198,7 @@ uv run python -m agents tools
   tiene. Solo hace falta la primera vez, en un proyecto sin este sistema —
   pregunta por ella si la necesitas.
 
-## Los 26 agentes
+## Los 30 agentes
 
 Los ROLES (qué puede, qué no puede, qué necesita, qué posee) están en
 `agents/contracts.py` — esta tabla resume la responsabilidad y las
@@ -240,6 +240,16 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `refactor` | Refactoriza código automáticamente: corrige mutables como argumento por defecto, `except:` → `except Exception:`, añade `-> None` a funciones públicas sin tipo de retorno, y detecta `weights_only=False` con sugerencia de corrección. Usa `dry_run=True` por defecto para revisión previa | `code_analysis_tool` |
 | `doctor` | Diagnóstico integral del proyecto: python, git, estructura, tests, datos, dependencias, uso de disco. Ofrece `checkup` (todas las verificaciones), `disk_usage`, `summary`. | `process_tool` |
 | `schedule` | Valida, describe en lenguaje natural y calcula próximas ejecuciones de expresiones cron. Alias: `@daily`, `@hourly`, `@weekly`, `@monthly`, `@yearly`. | `schedule_tool` |
+| `plan` | **Jefe de proyecto**: convierte un encargo en lenguaje natural en una orden de trabajo, devuelve TODAS las preguntas que le falten antes de ejecutar nada, y delega cada paso al agente dueño | `sqlite_tool` |
+| `audit` | **Auditor del equipo**: mide uso, tasa de éxito y duración por agente/acción sobre el log de ejecuciones, y propone mejoras con datos en vez de impresiones | `sqlite_tool` |
+| `supervisor` | Lanza varios workers en competición sobre la misma tarea y arbitra cuál es la mejor propuesta | `parallel_tool` |
+| `knowledge` | Construye y mantiene el grafo de conocimiento y la bóveda Obsidian. Único dueño de `vault/` | `graphify_tool` |
+| `docsearch` | Navega el grafo de conocimiento: busca nodos, recorre vecinos y poda lo irrelevante | `graphify_tool` |
+| `research` | Busca papers en arXiv/OpenAlex relacionados con el proyecto | `research_tool` |
+| `memory` | **Memoria proactiva**: observa las trayectorias de los agentes y mantiene un banco estructurado (facts/state/traces) para combatir el decaimiento de estado en tareas largas | `memory_tool` |
+| `doc` | **Documentación unificada**: responde dónde está algo consultando a la vez el grafo, el índice semántico y el vault | `graphify_tool`, `rag_tool` |
+| `rag` | RAG semántico local con ChromaDB + embeddings ONNX. Indexa código, prompts, docs, vault y la memoria del arnés; también URLs externas. Solo con `use_rag=true` | `rag_tool` |
+| `harness` | **Dueño del arnés**: mantiene `featureslist.json` y `progress/`, ejecuta la puerta `init.sh` y **rehúsa cerrar** una feature si no pasa o si no hay evidencia real | `process_tool` |
 
 Cada agente documenta en su propio docstring qué responsabilidades de la
 lista original están implementadas y cuáles quedan como extensión (p. ej.

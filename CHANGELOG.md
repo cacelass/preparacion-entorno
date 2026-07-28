@@ -1,7 +1,190 @@
 # Changelog
 
-Todos los cambios relevantes de esta plantilla se documentan aquí.  
+Todos los cambios relevantes de esta plantilla se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
+
+---
+
+## [1.13.2] — 2026-07-28
+
+### Arnés (harness engineering)
+
+Los proyectos generados nacen con un arnés: un entorno dentro del propio
+repositorio que gobierna cómo trabaja un agente de IA sobre él.
+
+- **`template/init.sh`** — la puerta. Verifica entorno (python/uv/venv), ficheros
+  del arnés, esquema de `featureslist.json`, estructura del proyecto y ejecuta
+  la suite de tests. Exit `!= 0` significa *no empieces a trabajar*. Modos
+  `--quick` (sin tests) y `--json` (consumo por agentes).
+- **`template/featureslist.json`** — backlog estructurado con `id`, `title`,
+  `description`, `acceptance_criteria`, `status` y `depends_on`. Se siembra con
+  features reales del proyecto y varía según `ml_type`, `use_api`, `use_docker`,
+  `use_monitoring` y `use_optuna`.
+- **`template/progress/`** — memoria fuera de la ventana de contexto:
+  `current.md` (feature en curso), `history.md` (append-only de lo cerrado) y
+  `<agente>-<FEATURE-ID>.md` (resultado de cada subagente). Evita el "teléfono
+  descompuesto" entre agentes.
+- **Cuatro agentes markdown** en `template/.opencode/agents/`: `lider`
+  (orquesta, no escribe código de producto), `explorer` (investiga en solo
+  lectura), `implementer` (una feature con sus tests), `reviewer` (aprueba o
+  rechaza ejecutando `init.sh`, y puede endurecer sus propios criterios).
+  Registrados en `template/opencode.json`.
+- **Protocolo en `template/AGENTS.md`** — punto de entrada de cualquier agente.
+  La regla que no se salta: ninguna feature se marca `done` sin `./init.sh` en
+  verde, y cada criterio se cierra con la salida real del comando que lo prueba.
+
+### Agente `harness` — la regla del arnés pasa a ser código
+
+El arnés no es una capa aparte: su parte mecánica es un agente Python más.
+
+- Nuevo agente **`harness`** (`agents/agents/harness_agent.py`), dueño único de
+  `featureslist.json` y `progress/`. Acciones: `status`, `next`, `start`,
+  `finish`, `block`, `record`, `add`, `gate`.
+- **`finish` rehúsa cerrar una feature** si `./init.sh` no pasa en verde o si no
+  se aporta evidencia (devuelve `needs`). Deja de ser una instrucción que el
+  modelo puede ignorar: verificado con evidencia falsa y un test roto, el
+  backlog no se tocó.
+- Ningún agente edita el backlog ni el progreso a mano; los cuatro agentes
+  markdown registran su informe con `harness record`.
+- Contrato en `contracts.py`, prompt en `agents/prompts/harness_agent.md`,
+  29 tests en `agents/tests/test_harness_agent.py`, benchmarks de routing.
+
+### Jerarquía de agentes
+
+- **`lider` pasa a ser el agente `primary`** de opencode: es el punto de entrada
+  del proyecto. El `orquestador` pasa a `subagent` — sigue siendo el gateway a
+  los agentes Python, pero ahora es el líder quien le delega.
+- `explorer`, `implementer` y `reviewer` declarados como `subagent`.
+
+### Contrato que faltaba y colisiones de routing (bugs preexistentes)
+
+- **`doc` estaba registrado sin contrato** en `contracts.py`, con
+  `test_contracts.py` en rojo desde entonces. Añadido.
+- **`doc` declaraba palabras genéricas** (`buscar`, `rag`, `vault`, `grafo`,
+  `documentacion`, `semantico`…) que le robaban el ruteo a `rag`, `knowledge`,
+  `docsearch` y `documentation`, con `test_capability_collisions.py` en rojo.
+  Repartidas por dueño: `doc` se queda con las que expresan «búscalo donde
+  sea» (`todas las fuentes`, `dónde está documentado`, `qué hace`…), y cada
+  fuente concreta recupera las suyas.
+
+### Ruteo: 21/32 → 34/34
+
+Dos defectos de fondo en `BaseAgent.can_handle`, que afectaban a todo el sistema:
+
+- **Comparaba con acentos.** «documentación» no casaba con la palabra clave
+  `documentacion`: misma palabra para el usuario, cero puntos para el ruteo. En
+  un proyecto en español eso descartaba media consulta típica. Ahora normaliza
+  (sin tocar la `ñ`, que no es un acento sino otra letra).
+- **Contaba aciertos, no especificidad.** Dos palabras genéricas ganaban a una
+  frase larga: en «busca en el grafo de conocimiento», `knowledge` sumaba 2
+  (grafo + conocimiento) y `docsearch` solo 1 (busca en el grafo). Ahora cada
+  acierto puntúa por las palabras que cubre.
+- Vocabulario añadido a `refactor`, `audit`, `supervisor`, `graph`, `plan`,
+  `rag`, `mlflow` y `docsearch` para las formas verbales que fallaban
+  (`refactoriza`, `audita`, `planea`, `indexa`…).
+- Nuevo `agents/tests/test_routing_scoring.py` que protege ambas propiedades.
+
+### Otras integraciones
+
+- `harness_workflow` como workflow skill, registrado en `orquestador.md` y en la
+  tabla de workflows de `AGENTS.md`.
+- **RAG indexa la memoria del arnés**: `progress/` y `featureslist.json` entran
+  en el índice semántico con `file_type: harness`, así que el histórico se
+  consulta en lenguaje natural en vez de releyéndolo.
+- El agente `doctor` incluye una verificación `harness` en su `checkup`.
+- `make check` incluye ahora `harness-check`; el workflow de CI del proyecto
+  generado ejecuta la puerta (`./init.sh --quick`) como paso bloqueante.
+- `contracts.py` delimita las tres memorias que no se pisan: `progress/`
+  (`harness`), `agents/workspace/memory/` (`memory`) y `vault/` (`knowledge`).
+
+### El arnés deja de depender de opencode
+
+Hasta ahora el arnés solo funcionaba si usabas opencode: un proyecto generado
+no traía nada para Claude Code —que lee `CLAUDE.md`, no `AGENTS.md`— ni sus
+subagentes. Con el asistente más extendido quedándose fuera, medio template no
+servía.
+
+- **`template/CLAUDE.md`** — puntero a `AGENTS.md` vía `@AGENTS.md`, más las
+  tres reglas que no se saltan. Deliberadamente no duplica nada: dos copias de
+  las reglas divergen, y ese es justo el problema que arregla el resto de este
+  release.
+- **`.claude/agents/*.md` generados**, no escritos a mano. La fuente sigue
+  siendo `.opencode/agents/`; `sync_assistants()` los espeja añadiendo el
+  frontmatter YAML de Claude Code. Al `explorer` se le declara `tools:` de solo
+  lectura — dárselo por escrito al asistente es más fiable que pedírselo en el
+  prompt. Gitignorados, y `copier.yml` los genera al crear el proyecto.
+- **`.claude/settings.json`** con un hook `SessionEnd` que ejecuta
+  `./init.sh --quick`: cerrar la sesión ya no puede dejar el proyecto roto sin
+  que nadie se entere. Es la pieza de *hooks* que faltaba del patrón. Incluye
+  una allowlist de permisos para los comandos del arnés.
+- `make assistants-sync`; `make prompts-check` y CI detectan también el espejo
+  desincronizado. 5 tests más en `test_prompts_sync.py`.
+
+### Prompts autosuficientes y a prueba de deriva
+
+Solo 9 de 30 prompts listaban comandos ejecutables: cargar `skill ml_agent`
+daba el criterio del agente pero no sus acciones, así que el asistente gastaba
+un `describe <agente>` extra antes de poder hacer nada. Y las reglas de
+`contracts.py` estaban además reescritas a mano en la prosa de cada prompt —
+dos fuentes de verdad que ya habían divergido.
+
+- **`agents/prompts_sync.py`** — cada prompt conserva su prosa escrita a mano
+  (el criterio, que es lo valioso) y gana un bloque `AUTOGEN` con su tabla de
+  acciones —marcando qué argumentos son obligatorios— y sus límites derivados
+  del contrato (`role`, `cannot`, `needs`, `owns`, `collaborates`).
+- `make prompts-sync` regenera; `make prompts-check` solo comprueba y sale con
+  código 1 si algo se desincronizó. CI lo ejecuta como paso bloqueante, así que
+  añadir una acción sin regenerar se caza en el PR.
+- `copier.yml` lo ejecuta al generar el proyecto: nace con los prompts al día.
+- Idempotente y no destructivo: verificado sobre un proyecto real (30 prompts
+  regenerados, segunda pasada sin cambios, prosa intacta). 10 tests en
+  `agents/tests/test_prompts_sync.py`, incluido el ciclo de deriva completo.
+
+### El agente `refactor` ya no puede salirse del proyecto (bug grave)
+
+`RefactorAgent._py_files()` aceptaba cualquier `within` y hacía `rglob("*.py")`
+sin excluir nada salvo `__pycache__`. Con `--within .` entraba en `.venv/` y
+reescribía los ficheros de los paquetes instalados.
+
+El daño no se queda en ese proyecto: **uv instala por hardlink desde su caché
+global**, así que reescribir un fichero dentro de `.venv/` corrompe la copia
+cacheada en `~/.cache/uv/archive-v0/`, y a partir de ahí *todos* los proyectos
+que instalen esa versión reciben el paquete roto. Encontrado en esta máquina:
+21 paquetes envenenados (numpy, pandas, matplotlib, statsmodels, joblib,
+plotly, chromadb…), con la firma inconfundible de `fix_mutable_defaults`
+(`def f(arraysNoneparent_index=[])`). Purgados.
+
+- `FORBIDDEN_DIRS` — `.venv`, `venv`, `site-packages`, `node_modules`, `build`,
+  `dist`, `.git`, `.tox`, cachés… se ignoran venga como venga `within`.
+- La ruta se resuelve y se comprueba con `is_relative_to(root)`: ni `--within ..`
+  ni un symlink que apunte fuera pueden sacar al agente del proyecto.
+- `agents/tests/test_refactor_scope.py` — 11 tests, incluido uno que ejecuta el
+  fix de verdad y verifica que el fichero plantado en `.venv/` sigue intacto.
+
+### Bugfix del template
+
+- `tests/test_paths.py` llamaba a `paths.make_dirs()`, que no existe (es
+  `ensure_dirs()`), y aun renombrando fallaba porque la guarda `_dirs_created`
+  la deja en no-op tras el import. **Todo proyecto generado nacía con un test
+  en rojo** — y por tanto con la puerta del arnés bloqueada. El CI no lo veía
+  porque solo valida sintaxis del render, no ejecuta la suite generada.
+
+### Verificación
+
+- Nueva suite `harness` en `agents/evals/runner.py` (`--harness`): comprueba que
+  `init.sh` existe y es ejecutable, que están los ficheros y agentes del arnés,
+  que `AGENTS.md` documenta el protocolo y que `featureslist.json` cumple el
+  mismo esquema que valida `init.sh`.
+- `make init`, `make harness-check` y `make backlog` en el Makefile del template;
+  `make opencode-check` verifica también las definiciones del arnés.
+- `validate_template.py` valida ahora los `.json` renderizados en las 20
+  combinaciones (las condicionales Jinja2 en JSON rompen fácil por comas
+  colgantes) y aplica el esquema del backlog. `.vscode/` queda exento por ser
+  JSONC.
+- `copier.yml` añade la tarea `chmod +x init.sh`.
+- Tests nuevos del arnés y del ruteo en `agents/tests/`
+  (`test_harness_agent.py`, `test_routing_scoring.py`) y cobertura de la
+  indexación de `progress/` en `test_rag_agent.py`.
 
 ---
 
