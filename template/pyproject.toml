@@ -143,10 +143,13 @@ monitoring = [
 {% endif %}
 
 {% if graphify_mode != 'no' %}
-# Graphify: grafo de conocimiento del proyecto (github.com/anomalyco/graphify)
-# Requiere GEMINI_API_KEY en .env para extracción semántica vía Gemini
+# Graphify: grafo de conocimiento del proyecto.
+# El paquete en PyPI se llama `graphifyy` (con doble y); el modulo que se
+# importa es `graphify`. No son lo mismo, y poner el del import hacia que
+# `uv sync` no resolviera: no existe ningun paquete llamado `graphify`.
+# Requiere GEMINI_API_KEY en .env para extracción semántica vía Gemini.
 graphify = [
-    "graphify[gemini]",
+    "graphifyy[gemini]",
 ]
 {% endif %}
 

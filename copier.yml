@@ -292,7 +292,7 @@ _tasks:
     && uv run python -c 'import torch; print("torch", torch.__version__)'
     {% endif %}
     {% if graphify_mode != 'no' %}
-    && uv run python -c 'import graphify; print("graphify", graphify.__version__)'
+    && uv run python -c 'import importlib.metadata as m; import graphify; print("graphify", m.version("graphifyy"))'
     {% endif %}
     {% if use_optuna %}
     && uv run python -c 'import optuna; print("optuna", optuna.__version__)'
