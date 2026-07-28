@@ -29,7 +29,7 @@ def test_el_bloque_lista_todas_las_acciones(context):
 def test_el_bloque_marca_los_argumentos_obligatorios(context):
     """`commit_with_changelog` necesita `message`: debe verse que es obligatorio."""
     bloque = render_block("git", _agent(context, "git"))
-    linea = next(l for l in bloque.splitlines() if "commit_with_changelog" in l)
+    linea = next(fila for fila in bloque.splitlines() if "commit_with_changelog" in fila)
     assert "--message" in linea and "obligatorio" in linea
 
 

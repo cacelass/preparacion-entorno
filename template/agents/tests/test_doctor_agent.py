@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from agents.agents.doctor_agent import DoctorAgent
+from agents.agents.doctor_agent import DoctorAgent, _satisfies_requires_python
 from agents.config import ProjectConfig
 from agents.context import SharedContext
 
@@ -129,10 +129,6 @@ def test_human_size_gb():
 
 
 # -- requires-python: comparar versiones, no subcadenas -------------------------
-
-import pytest
-
-from agents.agents.doctor_agent import _satisfies_requires_python
 
 
 @pytest.mark.parametrize(
