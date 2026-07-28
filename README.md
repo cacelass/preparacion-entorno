@@ -1,6 +1,6 @@
 # DSKIT
 
-![version](https://img.shields.io/badge/dskit-1.13.2-blue)
+![version](https://img.shields.io/badge/dskit-1.13.3-blue)
 ![CI](https://github.com/cacelass/dskit/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 ![uv](https://img.shields.io/badge/gestor-uv-green)

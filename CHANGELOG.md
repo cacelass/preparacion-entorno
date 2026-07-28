@@ -5,6 +5,62 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [1.13.3] — 2026-07-28
+
+### La matriz de CI deja de elegirse a corazonadas
+
+23 variables ramifican el template: 4·10^10 combinaciones teóricas, de las que
+CI probaba 20 escogidas a mano. Y de los 14 flags opcionales, los 10 combos de
+`smoke` solo ejercitaban **uno** — `use_rag`, y por venir activado por defecto,
+no por decisión. `use_api`, `use_optuna`, `use_monitoring`, `use_docker`,
+`use_mlflow`, `use_duckdb`, los boosters, SHAP, conformal, calibration y
+graphify **no se instalaban ni se ejecutaban jamás**.
+
+- **`.github/scripts/pairwise.py`** — cobertura all-pairs determinista: casi
+  todos los fallos de interacción saltan con dos variables, no con siete, así
+  que cubrir todos los pares posibles cuesta decenas de casos en vez de miles
+  de millones. Sin `random`: misma `copier.yml`, misma matriz. Trae
+  `--self-test`, porque una herramienta de test rota en silencio baja la
+  cobertura sin poner nada en rojo.
+- Las variables se **leen** de `copier.yml` en vez de copiarse. Ese era el
+  agujero de fondo: `use_rag` llevaba versiones sin aparecer en ninguna
+  combinación.
+- **`.github/scripts/gen_smoke_matrix.py`** — reparte los flags opcionales
+  entre los combos que ya existían: 0/14 → 14/14 **sin un job más**. Pondera
+  el coste de instalación (redes neuronales ya arrastra torch).
+- Render + AST: 20 → 194 combos, 6.940 → 67.512 checks, **2073/2073 pares
+  (100%)**, en 2m29s.
+
+### Cuatro bugs que la matriz encontró en su primera ejecución
+
+Todos en configuraciones que llevaban desde siempre sin probarse.
+
+- **`graphify` era 100% ininstalable.** El paquete en PyPI se llama
+  `graphifyy` (doble y); `graphify` es el nombre del módulo que se importa.
+  `uv sync` fallaba con "there are no versions of graphify[gemini]" en
+  cualquier proyecto con `graphify_mode != "no"`. Segundo fallo en el mismo
+  camino: la tarea post-generación comprobaba `graphify.__version__`, que el
+  módulo no expone.
+- **El Temperature Scaling nunca ha funcionado.** `torch.nn.functional as F`
+  no se importaba y el bloque de calibración lo usa; al estar dentro de un
+  `try/except`, fallaba en silencio imprimiendo "Calibración no disponible".
+- **La API hacía dos inferencias por petición.** `pred` se asignaba sin usar y
+  la respuesta volvía a llamar a `model.predict(X)`. Además `int()` truncaba
+  el valor en regresión.
+- `import io, base64, matplotlib` en una línea en el chat (E401).
+
+### Correcciones de infraestructura
+
+- `write_data_file.py` acepta JSON: el formato `"key=val key=val"` partía
+  `graphify_mode=graphify + obsidian vault` por los espacios, así que esa
+  opción era intestable. `use_rag` no estaba en `VALID_KEYS` y no había forma
+  de controlarlo desde CI. `dskit_version` estaba clavado en 1.9.0; ahora sale
+  de `copier.yml`.
+- El JSON de la matriz se pasa por variable de entorno, no interpolado en la
+  línea del shell.
+
+---
+
 ## [1.13.2] — 2026-07-28
 
 ### Arnés (harness engineering)
