@@ -1,5 +1,8 @@
 # --- Entorno ---
-.claude/
+# Ajustes personales de Claude Code (permisos de esta máquina).
+# El resto de .claude/ SÍ se versiona: settings.json y los agentes son
+# del proyecto, no de quien lo abre.
+.claude/settings.local.json
 .venv/
 .env
 .env.local

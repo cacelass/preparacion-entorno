@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ project_name }} — Chat</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column; }
+  #header { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  #header h1 { font-size: 16px; font-weight: 600; }
+  #header .status { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
+  #header .status.offline { background: #f85149; }
+  #chat { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 8px; line-height: 1.5; font-size: 14px; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: #1f6feb; color: #fff; }
+  .msg.bot { align-self: flex-start; background: #21262d; border: 1px solid #30363d; }
+  .msg.bot table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  .msg.bot th, .msg.bot td { border: 1px solid #30363d; padding: 4px 8px; text-align: left; font-size: 13px; }
+  .msg.bot th { background: #161b22; }
+  .msg.bot code { background: #161b22; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+  .msg.bot img { max-width: 100%; border-radius: 6px; margin: 8px 0; }
+  .msg .prediction-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin: 8px 0; }
+  .msg .prediction-card .label { color: #8b949e; font-size: 12px; }
+  .msg .prediction-card .value { font-size: 18px; font-weight: 600; }
+  .msg .prediction-card .prob-bar { height: 6px; background: #30363d; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .msg .prediction-card .prob-bar .fill { height: 100%; background: #1f6feb; border-radius: 3px; transition: width 0.3s; }
+  #input-area { display: flex; gap: 8px; padding: 12px 20px; background: #161b22; border-top: 1px solid #30363d; flex-shrink: 0; }
+  #input { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; padding: 10px 14px; font-size: 14px; outline: none; }
+  #input:focus { border-color: #1f6feb; }
+  #send { background: #1f6feb; color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-size: 14px; cursor: pointer; }
+  #send:hover { background: #388bfd; }
+  #send:disabled { opacity: 0.5; cursor: not-allowed; }
+  .feature-form { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin: 8px 0; }
+  .feature-form .field { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .feature-form .field input { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; padding: 4px 8px; width: 120px; font-size: 13px; }
+  .feature-form .field input:focus { border-color: #1f6feb; outline: none; }
+  .feature-form button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; margin-top: 8px; cursor: pointer; font-size: 13px; }
+  .feature-form button:hover { background: #2ea043; }
+</style>
+</head>
+<body>
+<div id="header">
+  <span class="status" id="status-dot"></span>
+  <h1>{{ project_name }} — Chat</h1>
+</div>
+<div id="chat"></div>
+<div id="input-area">
+  <input id="input" type="text" placeholder="Escribe 'help' para comandos..." autofocus>
+  <button id="send" onclick="sendMsg()">Enviar</button>
+</div>
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const statusDot = document.getElementById('status-dot');
+let ws = null;
+let featureState = null;
+
+function addMsg(text, type) {
+  const div = document.createElement('div');
+  div.className = `msg ${type}`;
+  if (type === 'bot') {
+    const html = text
+      .replace(/### (.+)/g, '<h3>$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/^- (.+)/gm, '<li>$1</li>')
+      .replace(/\|(.+)\|/g, (m) => { const cells = m.slice(1,-1).split('|').map(c => `<td>${c.trim()}</td>`).join(''); return `<tr>${cells}</tr>`; })
+      .replace(/(<tr>.*<\/tr>)\n(<tr>.*<\/tr>)/g, '<table>$1$2</table>')
+      .replace(/\n/g, '<br>');
+    div.innerHTML = html;
+  } else {
+    div.textContent = text;
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function showPredictionCard(data) {
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  const prob = data.probability || 0;
+  let html = `<div class="prediction-card">`;
+  html += `<div class="label">Predicción</div><div class="value">${data.prediction ?? data.cluster ?? '?'}</div>`;
+  if (data.label) html += `<div class="label">Clase</div><div class="value">${data.label}</div>`;
+  if (data.probability != null) {
+    html += `<div class="label">Confianza: ${(prob * 100).toFixed(1)}%</div>`;
+    html += `<div class="prob-bar"><div class="fill" style="width:${prob * 100}%"></div></div>`;
+  }
+  if (data.model) html += `<div class="label" style="margin-top:8px">Modelo: ${data.model}</div>`;
+  html += `</div>`;
+  html += `<button onclick="explainPredict()" style="background:#1f6feb;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:12px;">Explicar predicción</button>`;
+  div.innerHTML = html;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function explainPredict() {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Explicando...';
+  fetch('/api/explain', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) return addMsg(`Error: ${d.error}`, 'bot');
+      const img = document.createElement('img');
+      img.src = 'data:image/png;base64,' + d.plot;
+      const div = document.createElement('div'); div.className = 'msg bot';
+      div.appendChild(img);
+      chat.appendChild(div);
+      btn.textContent = 'Explicar predicción';
+      btn.disabled = false;
+    }).catch(() => { btn.disabled = false; btn.textContent = 'Explicar predicción'; });
+}
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onopen = () => { statusDot.className = 'status'; };
+  ws.onclose = () => { statusDot.className = 'status offline'; setTimeout(connect, 3000); };
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'bot') addMsg(data.text, 'bot');
+  };
+}
+
+function sendMsg() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) { addMsg('Desconectado. Reconectando...', 'bot'); return; }
+  const text = input.value.trim();
+  if (!text) return;
+  addMsg(text, 'user');
+  input.value = '';
+  ws.send(JSON.stringify({ text }));
+}
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMsg(); });
+
+// Predict form support (client-side feature collection)
+function startPredictForm(features) {
+  featureState = { features: {}, list: features, idx: 0 };
+  const div = document.createElement('div'); div.className = 'msg bot';
+  let html = '<div class="feature-form"><strong>Ingresa los valores:</strong>';
+  features.forEach((f, i) => {
+    html += `<div class="field"><label>${f}</label><input type="text" id="feat-${i}" placeholder="0.0"></div>`;
+  });
+  html += `<button onclick="submitPredictForm()">Predecir</button></div>`;
+  div.innerHTML = html;
+  chat.appendChild(div);
+}
+
+function submitPredictForm() {
+  if (!featureState) return;
+  const data = {};
+  featureState.list.forEach((f, i) => {
+    const val = document.getElementById(`feat-${i}`).value.trim();
+    data[f] = val ? (isNaN(val) ? val : parseFloat(val)) : 0.0;
+  });
+  fetch('/api/status').then(r => r.json()).then(status => {
+    fetch('/api/predict', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: data })
+    }).then(r => r.json()).then(res => {
+      if (res.error) addMsg(`Error: ${res.error}`, 'bot');
+      else showPredictionCard(res);
+    });
+  });
+}
+
+connect();
+</script>
+</body>
+</html>

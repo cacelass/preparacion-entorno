@@ -36,7 +36,7 @@ def test_runs_dir_exists():
 
 def test_project_dir_contains_pyproject(tmp_path, monkeypatch):
     """
-    make_dirs() debe crear todos los subdirectorios necesarios.
+    ensure_dirs() debe crear todos los subdirectorios necesarios.
     Se prueba con un PROJECT_DIR temporal para no contaminar el proyecto real.
     """
     fake_root = tmp_path / "fake_project"
@@ -63,7 +63,10 @@ def test_project_dir_contains_pyproject(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "RUNS_DIR", fake_root / "runs")
 {% endif %}
 
-    paths.make_dirs()
+    # ensure_dirs() se autoejecuta al importar el módulo y se guarda contra
+    # repeticiones; hay que rearmarlo para que actúe sobre las rutas falsas.
+    monkeypatch.setattr(paths, "_dirs_created", False)
+    paths.ensure_dirs()
 
     assert new_raw.exists()
     assert new_interim.exists()

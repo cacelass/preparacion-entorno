@@ -74,6 +74,9 @@ reports/figures/*.svg
 reports/**/*.csv
 *.html
 !docs/**/*.html
+# La interfaz del chat es código fuente del template, no un informe generado:
+# sin esta excepción `*.html` se la traga y el proyecto nace sin UI.
+!chat/static/*.html
 
 # --- Modelos entrenados ---
 models/**/*.joblib

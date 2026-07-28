@@ -13,6 +13,11 @@ repos:
     hooks:
       - id: isort
         args: [--profile, black, --filter-files]
+        # template/ es Jinja, no Python: isort reescribio
+        # `from {{ project_slug }}...` a `from {{project_slug}}...` y con
+        # imports dentro de un {% if %} corromperia el template. El resto de
+        # hooks que reescriben codigo ya lo excluian; este se habia quedado.
+        exclude: template/
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.3
