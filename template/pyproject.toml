@@ -154,10 +154,21 @@ graphify = [
 {% endif %}
 
 {% if use_rag %}
-# RAG: búsqueda semántica local con ChromaDB + embeddings ONNX
-# Modelo all-MiniLM-L6-v2 vía ONNX (descarga única ~23MB, sin GPU ni API key)
+# RAG: búsqueda híbrida local (vector + BM25) con ChromaDB
+# Modelo all-MiniLM-L6-v2 vía ONNX (descarga única ~80MB, sin GPU ni API key).
+# El suelo es 0.5.0: por debajo la API de colecciones es otra y el índice no
+# llega a crearse. El techo evita que un major de chroma rompa el arnés solo.
 rag = [
-    "chromadb>=0.4.0",
+    "chromadb>=0.5.0,<2.0",
+]
+
+# Embeddings multilingües de verdad: all-MiniLM-L6-v2 está entrenado en inglés
+# y este proyecto se documenta en español. Cuesta arrastrar torch, así que es
+# opt-in: instala este extra y exporta DSKIT_RAG_EMBEDDER=multilingual.
+# Al cambiar de embedder hay que reconstruir: `rag index --rebuild`.
+rag_multilingual = [
+    "chromadb>=0.5.0,<2.0",
+    "sentence-transformers>=2.2",
 ]
 {% endif %}
 

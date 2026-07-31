@@ -10,6 +10,7 @@
         agents-list agents-run agents-doctor agents-memory agents-eval \
         init harness-check backlog prompts-sync prompts-check assistants-sync \
         skills opencode-init opencode-check \
+        index-rag index-rag-rebuild \
         recommended-tools recommended-all \
         clean clean-models clean-figures clean-all \
         run info help
@@ -350,8 +351,15 @@ prompts-check:
 	@uv run python -m agents.prompts_sync
 
 index-rag:
-	@echo "▶  Indexando documentación del proyecto en ChromaDB..."
+	@echo "▶  Indexando código y documentación del proyecto en ChromaDB..."
+	@echo "   (incremental: solo se reindexa lo que cambió)"
 	uv run python -m agents run rag index
+
+# Necesario al cambiar DSKIT_RAG_EMBEDDER: los vectores del embedder anterior
+# no son comparables con los del nuevo, y mezclarlos no da error — da basura.
+index-rag-rebuild:
+	@echo "▶  Reconstruyendo el índice RAG desde cero..."
+	uv run python -m agents run rag index --rebuild
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Skills — configuración del asistente de IA

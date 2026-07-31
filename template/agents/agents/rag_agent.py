@@ -1,8 +1,8 @@
 """
-agents.agents.rag_agent — RAG semántico con ChromaDB + embeddings ONNX.
+agents.agents.rag_agent — RAG local con ChromaDB: búsqueda híbrida.
 
-Indexa la documentación del proyecto (código, prompts, docs, vault) y permite
-búsqueda semántica. También puede indexar URLs externas.
+Indexa la documentación del proyecto (código, prompts, docs, vault) y busca
+fundiendo similitud vectorial con BM25 léxico. También indexa URLs externas.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from agents.tools.rest_tool import RestTool
 class RagAgent(BaseAgent):
     name = "rag"
     description = (
-        "RAG semántico local: indexa código, prompts, docs y vault del proyecto "
-        "con ChromaDB + embeddings ONNX. Busca en lenguaje natural y también "
-        "puede indexar URLs externas."
+        "RAG local: indexa código, prompts, docs y vault del proyecto con "
+        "ChromaDB. Busca en lenguaje natural fundiendo vector y BM25 léxico, y "
+        "también puede indexar URLs externas."
     )
     capabilities = [
         "rag", "semantico", "semantic", "indexar", "index",
@@ -45,19 +45,22 @@ class RagAgent(BaseAgent):
             "status": self.status,
         }
 
-    def index(self) -> AgentResult:
+    def index(self, *, rebuild: bool = False) -> AgentResult:
         if not RagTool.available():
             return AgentResult(
                 False, self.name, "index",
                 "chromadb no está instalado. Ejecuta: uv sync --extra rag",
             )
-        result = RagTool.index_project(self.ctx.root)
+        result = RagTool.index_project(self.ctx.root, rebuild=rebuild)
         if "error" in result:
             return AgentResult(False, self.name, "index", result["error"])
         return AgentResult(
             True, self.name, "index",
-            f"Índice actualizado: {result['total_chunks']} fragmentos "
-            f"(+{result['new_chunks']} nuevos) de {result['sources']} fuente(s).",
+            f"Índice actualizado: {result['total_chunks']} fragmentos de "
+            f"{result['sources']} fuente(s) [{result['embedder']}]. "
+            f"+{result['new_chunks']} nuevos, {result['updated_files']} fichero(s) "
+            f"reindexado(s), {result['unchanged_files']} sin cambios, "
+            f"-{result['deleted_chunks']} huérfanos.",
             data=result,
         )
 
@@ -75,10 +78,11 @@ class RagAgent(BaseAgent):
         for url in urls:
             try:
                 resp = RestTool.get(url, timeout=30)
-                content = resp.text
-                from agents.tools.rag_tool import RagTool as RT
-                result = RT.index_url(self.ctx.root, url, content)
-                indexed.append(result)
+                result = RagTool.index_url(self.ctx.root, url, resp.text)
+                if "error" in result:
+                    errors.append({"url": url, "error": result["error"]})
+                else:
+                    indexed.append(result)
             except Exception as exc:
                 errors.append({"url": url, "error": str(exc)[:200]})
 
@@ -91,13 +95,16 @@ class RagAgent(BaseAgent):
             warnings=[f"{e['url']}: {e['error']}" for e in errors] if errors else None,
         )
 
-    def search(self, *, query: str, top_k: int = 10, hybrid: bool = False) -> AgentResult:
+    def search(self, *, query: str, top_k: int = 10, hybrid: bool = True,
+               min_score: float = 0.0) -> AgentResult:
         if not RagTool.available():
             return AgentResult(
                 False, self.name, "search",
                 "chromadb no está instalado. Ejecuta: uv sync --extra rag",
             )
-        results = RagTool.search(self.ctx.root, query, top_k=top_k, hybrid=hybrid)
+        results = RagTool.search(
+            self.ctx.root, query, top_k=top_k, hybrid=hybrid, min_score=min_score
+        )
         if not results:
             return AgentResult(
                 True, self.name, "search",
@@ -109,7 +116,9 @@ class RagAgent(BaseAgent):
 
         lines = []
         for r in results[:5]:
-            lines.append(f"  [{r['score']}] {r['source']}:{r['line']} — {r['text'][:120]}")
+            lines.append(
+                f"  [{r['score']} {r['match']}] {r['source']}:{r['line']} — {r['text'][:120]}"
+            )
         return AgentResult(
             True, self.name, "search",
             f"{len(results)} resultado(s). Top:\n" + "\n".join(lines),
@@ -124,8 +133,11 @@ class RagAgent(BaseAgent):
                 "chromadb no instalado. Ejecuta: uv sync --extra rag",
                 data=info,
             )
+        if info.get("mismatch"):
+            return AgentResult(False, self.name, "status", info["mismatch"], data=info)
         return AgentResult(
             True, self.name, "status",
-            f"Índice RAG: {info['total_chunks']} fragmentos en '{info['collection']}'.",
+            f"Índice RAG: {info['total_chunks']} fragmentos de {info['sources']} "
+            f"fuente(s) en '{info['collection']}' — embedder {info['embedder_desc']}.",
             data=info,
         )
