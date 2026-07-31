@@ -188,10 +188,10 @@ use_conformal:
   default: false
   when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' or ml_type == 'redes_neuronales' }}"
 
-# --- RAG semántico (ChromaDB + embeddings ONNX) ---
+# --- RAG local (ChromaDB + BM25) ---
 use_rag:
   type: bool
-  help: "Añadir RAG semántico local? (chromadb + embeddings ONNX) Busca en código, prompts, docs y URLs externas en lenguaje natural.\n         make index-rag para construir el indice. Sin API key, funciona offline."
+  help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. make index-rag para construir el indice. Sin API key, funciona offline."
   default: true
 
 # --- Explicabilidad ---
