@@ -201,12 +201,23 @@ def test_evaluate_models_silhouette_range(patch_paths):
 
 
 def test_evaluate_models_saves_pca_plots(patch_paths):
-    """Debe guardar proyecciones PCA 2D por modelo."""
+    """
+    Debe guardar una proyeccion PCA 2D por cada modelo *evaluado*.
+
+    No por cada modelo ajustado: `evaluate_models` salta a proposito los que
+    producen menos de dos clusters (DBSCAN sobre datos sinteticos suele marcar
+    todo como ruido), y ahi no hay metricas ni grafico que dibujar. El test
+    exigia un PNG por modelo ajustado, asi que fallaba por un comportamiento
+    correcto. El contrato real es: un grafico por fila del DataFrame.
+    """
     X = _make_X()
     fitted = train_models(X, n_clusters=3)
-    evaluate_models(fitted, X)
+    df_res = evaluate_models(fitted, X)
     pngs = list(patch_paths["FIGURES_DIR"].glob("clusters_*_pca.png"))
-    assert len(pngs) == len(fitted)
+    assert len(df_res) > 0, "ningun modelo llego a evaluarse"
+    assert len(pngs) == len(df_res)
+    for nombre in df_res["Modelo"]:
+        assert (patch_paths["FIGURES_DIR"] / f"clusters_{nombre}_pca.png").exists()
 
 
 def test_evaluate_models_saves_csv(patch_paths):

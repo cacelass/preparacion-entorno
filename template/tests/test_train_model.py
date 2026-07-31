@@ -186,13 +186,24 @@ def test_train_models_fits_and_saves(patch_paths):
         assert (patch_paths["MODELS_DIR"] / f"{name}.joblib").exists()
 
 
-def test_train_models_labels_attribute(patch_paths):
-    """Los modelos ajustados deben tener el atributo labels_."""
+def test_train_models_asignan_cluster_a_cada_muestra(patch_paths):
+    """
+    Todo modelo ajustado debe poder asignar un cluster a cada muestra.
+
+    El contrato NO es `labels_`: `GaussianMixture` no lo tiene y no lo necesita,
+    porque expone `.predict()`. El codigo de produccion ya lo resuelve asi
+    (`model.labels_ if hasattr(...) else model.predict(X)`), asi que exigir
+    `labels_` a todos era un test mas estricto que la implementacion — y llevaba
+    la suite en rojo desde que se anadio GaussianMixture.
+    """
     X = _make_X()
     fitted = train_models(X, n_clusters=3)
     for name, model in fitted.items():
-        assert hasattr(model, "labels_"), f"{name} debe tener labels_"
-        assert len(model.labels_) == len(X)
+        etiquetas = getattr(model, "labels_", None)
+        if etiquetas is None:
+            assert hasattr(model, "predict"), f"{name} no expone labels_ ni predict"
+            etiquetas = model.predict(X)
+        assert len(etiquetas) == len(X), f"{name} no etiqueta todas las muestras"
 
 
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
