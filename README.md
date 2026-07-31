@@ -27,6 +27,7 @@ Y con un **arnés de IA** dentro del propio repositorio: un entorno que gobierna
     - [Pipeline de calidad integrado](#pipeline-de-calidad-integrado)
   - [Requisitos previos](#requisitos-previos)
   - [Instalación rápida](#instalación-rápida)
+  - [Actualizar un proyecto existente](#actualizar-un-proyecto-existente)
   - [Variables de configuración](#variables-de-configuración)
     - [Validaciones automáticas](#validaciones-automáticas)
   - [Uso](#uso)
@@ -110,7 +111,7 @@ Los prompts de los agentes se **derivan del código**: cada uno conserva su crit
 | `use_mlflow` | Tracking de experimentos, artifacts y Model Registry | `make mlflow` |
 | `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
 | `use_docker` | Docker + interfaz de chat Gradio | `make docker-run` |
-| `use_rag` | RAG semántico local (ChromaDB + ONNX): indexa código, prompts, docs y la memoria del arnés. Sin API key, offline | `make index-rag` |
+| `use_rag` | RAG local (ChromaDB + BM25): indexa el código, los prompts, los docs y la memoria del arnés, y busca fundiendo vector y léxico. Sin API key, offline | `make index-rag` |
 | `use_conformal` | Conformal Prediction — sets/intervalos con garantía de cobertura, *distribution-free* | automático |
 | `use_calibration` | Temperature Scaling — calibra la confianza del modelo *(redes_neuronales)* | automático |
 | `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | automático |
@@ -165,6 +166,52 @@ uv sync --extra dev --extra <ml_type>
 
 ---
 
+## Actualizar un proyecto existente
+
+Un proyecto generado no es una copia muerta: guarda las respuestas en
+`.copier-answers.yml` y puede traerse las mejoras de versiones posteriores de
+la plantilla sin volver a empezar.
+
+```bash
+cd tu_proyecto
+git add -A && git commit -m "chore: antes de actualizar dskit"   # imprescindible
+copier update --trust
+```
+
+`copier update` calcula qué cambió en la plantilla entre tu versión y la última,
+y aplica **solo esa diferencia** sobre tu proyecto, respetando tus
+modificaciones. Donde tus cambios choquen con los de la plantilla te dejará
+marcadores de conflicto (`<<<<<<<`), igual que un merge de git; búscalos antes
+de dar la actualización por buena:
+
+```bash
+grep -rn '<<<<<<<' --exclude-dir=.git .
+```
+
+Por eso el commit previo no es opcional: es lo único que te deja ver el
+resultado con `git diff` y descartarlo con `git checkout .` si no te convence.
+
+**Cambiar de opciones.** `copier update` reutiliza tus respuestas anteriores.
+Para revisarlas —o activar un módulo que dejaste fuera— usa
+`copier update --trust --defaults=false`, o edita `.copier-answers.yml` antes de
+actualizar. Nota que activar un extra añade sus ficheros, pero desactivarlo no
+siempre borra los que ya existen: revisa el diff.
+
+**Después de actualizar**, pasa la puerta del arnés antes de seguir trabajando:
+
+```bash
+uv sync --extra dev --extra <ml_type>
+./init.sh
+```
+
+**Saltos de varias versiones.** No hay migraciones automáticas todavía, así que
+si vienes de una versión bastante anterior, lee el [CHANGELOG](CHANGELOG.md)
+entre tu versión y la actual: los cambios que requieren acción manual se anotan
+ahí. Actualizar versión a versión da conflictos más pequeños y legibles que un
+salto largo de golpe.
+
+---
+
 ## Variables de configuración
 
 Copier muestra solo las preguntas relevantes según las respuestas anteriores.
@@ -194,7 +241,7 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `use_duckdb` | true/false | siempre | DuckDB SQL sobre ficheros |
 | `use_api` | true/false | siempre | API REST FastAPI |
 | `use_docker` | true/false | siempre | Docker + chat Gradio |
-| `use_rag` | true/false | siempre | RAG semántico local (ChromaDB + ONNX) — por defecto `true` |
+| `use_rag` | true/false | siempre | RAG local híbrido (ChromaDB + BM25) — por defecto `true` |
 | `use_conformal` | true/false | supervisado, hibrido, redes_neuronales | Conformal Prediction |
 | `use_calibration` | true/false | redes_neuronales | Temperature Scaling |
 | `project_open_source_license` | `No license file` · `MIT` · `BSD-3-Clause` · `Apache-2.0` | siempre | Licencia del proyecto generado |
@@ -356,7 +403,8 @@ nombre_proyecto/
 | `make tune` | HPO Optuna *(use_optuna)* |
 | `make serve` | API REST :8000 *(use_api)* |
 | `make query` | Shell DuckDB *(use_duckdb)* |
-| `make index-rag` | Indexa el proyecto en ChromaDB *(use_rag)* |
+| `make index-rag` | Indexa el proyecto en ChromaDB, incremental *(use_rag)* |
+| `make index-rag-rebuild` | Reconstruye el índice desde cero *(use_rag)* |
 | `make docker-run` | Construye la imagen y lanza el chat *(use_docker)* |
 | `make clean-all` | Limpia cachés, modelos y figuras |
 | `make info` | Muestra versiones del entorno |

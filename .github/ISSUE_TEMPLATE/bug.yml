@@ -1,0 +1,76 @@
+name: Bug
+description: Algo no funciona en la plantilla o en el proyecto que genera
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de nada: la mayoría de los bugs de dskit no están en la plantilla
+        sino en el **proyecto generado**, y dependen de las opciones que
+        elegiste. Por eso el `.copier-answers.yml` de abajo es lo más útil que
+        puedes pegar — sin él casi nunca se puede reproducir.
+
+  - type: dropdown
+    id: donde
+    attributes:
+      label: ¿Dónde ocurre?
+      options:
+        - Al generar el proyecto (copier copy)
+        - En el proyecto generado (código, tests, Makefile)
+        - En el CI del proyecto generado
+        - En el arnés de IA (agents/, init.sh, harness)
+        - Al actualizar (copier update)
+    validations:
+      required: true
+
+  - type: textarea
+    id: answers
+    attributes:
+      label: Tu .copier-answers.yml
+      description: Está en la raíz del proyecto generado. Quita lo que sea privado.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducir
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. copier copy --trust --defaults --data-file ... . /tmp/proyecto
+        2. cd /tmp/proyecto && make test
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué esperabas y qué pasó
+    validations:
+      required: true
+
+  - type: textarea
+    id: salida
+    attributes:
+      label: Salida real del comando
+      description: Pégala entera, no la resumas. El traceback completo es lo que sirve.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de dskit
+      placeholder: "1.13.4 (o el commit)"
+    validations:
+      required: true
+
+  - type: input
+    id: entorno
+    attributes:
+      label: Python, uv y sistema operativo
+      placeholder: "Python 3.12.7, uv 0.5.11, Ubuntu 24.04"
+    validations:
+      required: true

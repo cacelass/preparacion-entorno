@@ -1,0 +1,38 @@
+name: Propuesta
+description: Sugerir una opción, un agente o un cambio en la plantilla
+labels: ["mejora"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: El problema, no la solución. Qué te toca hacer a mano hoy.
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Qué propones
+    validations:
+      required: true
+
+  - type: dropdown
+    id: alcance
+    attributes:
+      label: ¿A quién afecta?
+      options:
+        - A todos los proyectos generados
+        - Solo con ciertas opciones (sería una opción nueva de copier.yml)
+        - Solo al repositorio de la plantilla (CI, docs, validadores)
+    validations:
+      required: true
+
+  - type: textarea
+    id: coste
+    attributes:
+      label: Qué añade en dependencias o en tiempo de generación
+      description: |
+        dskit tiene como principio «cero dependencias innecesarias». Si tu
+        propuesta arrastra una librería pesada, di cuál y por qué compensa —
+        o si tendría sentido como extra opcional.
