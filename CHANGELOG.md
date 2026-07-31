@@ -5,6 +5,121 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ---
 
+## [No publicado]
+
+### El CI del proyecto generado nunca se había ejecutado — y estaba roto
+
+`validate_template.py` probaba que la plantilla renderiza y `smoke` que el
+proyecto arranca. Nadie probaba que el `.github/workflows/ci.yml` que se le
+entrega al usuario **pase**. Al ejecutarlo por primera vez, fallaban 4 de sus 9
+pasos.
+
+- **`uv sync --frozen` con `uv.lock` en el `.gitignore`.** El lock se creaba al
+  generar, pero no se commiteaba, así que el primer push de cualquier proyecto
+  moría con `error: Unable to find lockfile at 'uv.lock'`. Ahora el lock se
+  versiona: esto no es una librería, es un proyecto de datos, y el lock es lo
+  único que hace reproducible el entorno entre máquinas.
+- **El paso `Install dependencies` era un escalar YAML plano con `\` de
+  continuación.** YAML pliega los saltos en espacios, así que al shell le
+  llegaba `uv sync --extra dev --extra supervisado \ --extra api \ ...` con `\ `
+  como espacio escapado, y uv recibía argumentos basura. Rompía el CI de
+  cualquier proyecto con al menos un extra activo. Ahora es un bloque literal.
+- **`mypy --strict` con 193 errores en 20 ficheros.** El gate de tipos jamás
+  había pasado. Arreglados los 61 errores del código de producto —incluidos
+  varios bugs de firma reales del tipo `def f(x: str = None)`— y configurado
+  mypy en `pyproject.toml` con estricto global y relajado para `tests/`: anotar
+  `-> None` en 155 funciones de test no atrapa ni un bug, y tener el gate en
+  rojo permanente es peor que no tenerlo. El CI ya no pasa `--strict` por línea
+  de comandos, de modo que tu máquina y CI comprueban exactamente lo mismo.
+- **Dos tests en rojo desde hacía versiones** en `no_supervisado`, ambos por
+  tests más estrictos que la implementación: uno exigía `labels_` a todos los
+  modelos de clustering cuando `GaussianMixture` no lo tiene (y el código ya
+  hacía `hasattr(...) else model.predict(X)`), y otro exigía un gráfico PCA por
+  modelo ajustado ignorando que `evaluate_models` salta a propósito los que
+  producen menos de dos clusters. Reescritos contra el contrato real.
+- **`--cov-fail-under=20`.** Medida la cobertura real: 74% en supervisado y 67%
+  en no_supervisado. El umbral no era una puerta, era un adorno — cabía borrar
+  dos tercios de los tests sin que CI se inmutase. Subido a 60.
+
+**Y el job que impide que vuelva a pasar.** `.github/scripts/run_generated_ci.py`
+genera un proyecto, lo commitea, **lo clona** y ejecuta los pasos `run:` de su
+workflow en el clon. El clon es exactamente lo que ve GitHub Actions al hacer
+checkout, así que cualquier fichero que el CI necesite y el `.gitignore` se
+trague se cae ahí y no en el repositorio de un usuario. Los pasos se leen del
+workflow de verdad en lugar de replicarse en el script: una copia se
+desincroniza y acabaríamos probando nuestra idea del CI en vez del CI.
+
+### Salud del repositorio y ruta de actualización
+
+- `CONTRIBUTING.md`, `SECURITY.md`, plantillas de issue y de PR, que no existían.
+- Sección **«Actualizar un proyecto existente»** en el README: `copier update`
+  no se mencionaba ni una vez en 401 líneas, pese a haber 41 versiones
+  publicadas. Cubre el commit previo obligatorio, la resolución de conflictos,
+  el cambio de opciones y la puerta del arnés después de actualizar.
+
+### El RAG estaba roto de fábrica — reparado y medido
+
+Auditoría del RAG ejecutándolo de verdad contra `chromadb` real, no leyéndolo.
+El resumen es que no funcionaba: **`make index-rag` reventaba en cualquier
+proyecto recién generado** y nadie se enteraba porque el CI no instalaba el
+extra que lo habría destapado.
+
+- **La colección no llegaba a crearse.** `_collection` hacía `get_collection` y
+  capturaba `ValueError`, pero chroma moderno lanza `NotFoundError`, que no
+  hereda de él. Como el `create_collection` vivía en el `except`, el índice no
+  se creaba nunca: `NotFoundError: Collection [dskit-rag] does not exist` en el
+  primer `index`, `search` y `status`. Ahora es `get_or_create_collection`.
+- **El CI no instalaba `--extra rag`**, así que los tres tests que tocaban
+  chromadb se saltaban *siempre* y el crash llevaba ahí sin que nadie lo viera.
+  Añadido al workflow; los tests de integración ya no son decorativos.
+- **El 22% del corpus era invisible.** El embedder trunca a 256 tokens (~1.000
+  caracteres) y el troceador solo tenía suelo, nunca techo: se indexaban chunks
+  de hasta 18.467 caracteres de los que solo entraban al vector los primeros
+  mil. Medido sobre esta misma plantilla: 332 chunks por encima del límite,
+  326.649 caracteres guardados pero irrecuperables. Ahora hay techo duro con
+  solape real. Nueva medición: **0 chunks por encima del límite, 0% perdido**.
+- **El índice nunca se limpiaba.** Era add-only: editar un fichero dejaba el
+  chunk viejo dentro para siempre, y borrarlo no lo sacaba del índice. Peor,
+  como el id hasheaba solo los primeros 80 caracteres, una edición más allá de
+  ese punto producía el mismo id y `add` descartaba el cambio en silencio. Con
+  `progress/` y `featureslist.json` indexados —que cambian en cada feature— eso
+  contaminaba la memoria del arnés al ritmo al que se trabaja. Ahora el
+  reindexado es por fichero y por huella de contenido: lo que no cambió no se
+  re-embebe, lo que cambió se reemplaza y lo que se borró se purga.
+- **`hybrid=True` no hacía nada.** Pasaba `includes=` (el kwarg de chroma es
+  `include`), petaba, y el `except` caía al mismo query que `hybrid=False`.
+  Ahora la búsqueda híbrida existe: BM25 Okapi en stdlib fundido con el ranking
+  vectorial vía Reciprocal Rank Fusion. No es adorno — el embedder por defecto
+  está entrenado en inglés y esta plantilla se documenta en español, así que
+  buena parte de la señal útil es literal.
+- **El índice no cubría el código que se despliega.** Solo entraba el paquete
+  principal: `api/`, `chat/`, `monitoring/`, `tuning/` y `agents/` quedaban
+  fuera, así que preguntar por el drift devolvía los prompts que lo describen y
+  nunca `monitoring/monitor.py`. Añadidos a las fuentes.
+- **El 70% de los chunks eran docstrings duplicados.** Se indexaba la función
+  *y* su docstring por separado; como el docstring es prosa corta y limpia,
+  ganaba el coseno a la implementación. Eliminada la duplicación: ahora los
+  tipos de sección son `function`/`class`/`module`/`heading` y el `section_type`
+  ya no etiqueta las funciones como `docstring`.
+
+Y de paso: cada chunk de código lleva su ruta (y su clase) como cabecera, cada
+sección de markdown arrastra las migas de sus ancestros, `_chunk_by_size` ya no
+tira la última tanda ni emite números de línea inventados, el HTML de las URLs
+se convierte a texto antes de indexar, reindexar una URL la reemplaza en vez de
+duplicarla, y `search` acepta `min_score`.
+
+**Embedder multilingüe opcional** (`--extra rag_multilingual` +
+`DSKIT_RAG_EMBEDDER=multilingual`): `all-MiniLM-L6-v2` está entrenado en inglés.
+Como ambos modelos dan vectores de 384 dimensiones, mezclar índices no daría
+error de chroma sino resultados sin sentido — el embedder queda grabado en los
+metadatos de la colección y el agente rechaza buscar si detecta el desajuste.
+
+Los tests del RAG pasan de 15 a 50 y cubren lo que antes no se probaba nunca:
+creación de la colección, reindexado incremental, purga de huérfanos, techo del
+embedder, fusión híbrida y desajuste de embedder.
+
+---
+
 ## [1.13.4] — 2026-07-29
 
 ### Consolidación de agentes: 30 → 28
