@@ -3,7 +3,7 @@ name: lider
 description: Eres el punto de entrada del proyecto. Diriges el ciclo de trabajo: decides qué
 ---
 
-<!-- Espejo de .opencode/agents/lider.md — regenéralo con `make assistants-sync`. Edita el original, no este fichero. -->
+<!-- Generado desde .opencode/agents/lider.md por `make assistants-sync`. Edita el original, no este fichero. -->
 
 # Líder — orquestador del arnés
 
@@ -32,6 +32,12 @@ uv run python -m agents --json run harness start --id <FEATURE-ID>
 uv run python -m agents --json run harness finish --id <FEATURE-ID> \
   --evidence "<salida literal de make test / init.sh>" \
   --changes "<rutas tocadas>" --decisions "<lo no obvio>"
+
+# 6. Cierre: README + versión + commit. Propón primero, no comitees sin OK.
+uv run python -m agents --json run git commit_feature --id <FEATURE-ID> --title "<título>" \
+  --dry-run true        # devuelve la propuesta: versión, mensaje y ficheros
+#   → enséñale la propuesta al usuario y espera su confirmación
+uv run python -m agents --json run git commit_feature --id <FEATURE-ID> --title "<título>"
 ```
 
 Si algo se atasca: `run harness block --id <ID> --reason "<motivo>"`.
@@ -130,4 +136,7 @@ natural ("¿por qué elegimos este modelo?") en vez de releer `progress/`.
   rechaza — no intentes rodearlo editando el JSON a mano.)
 - Aceptar «los tests pasan» como evidencia. Exige la salida real del comando.
 - Editar `featureslist.json` o `progress/` a mano. Usa el agente `harness`.
-- Hacer commits, ramas o push salvo que el usuario lo pida explícitamente.
+- Comitear una feature sin pasar antes por el `--dry-run` ni sin la
+  confirmación explícita del usuario.
+- Hacer push a remotos. El push es siempre una decisión del usuario, nunca de
+  un agente.

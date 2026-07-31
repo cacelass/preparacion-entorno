@@ -14,6 +14,7 @@ Conoce el formato exacto que ya usa este template:
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from agents.agents.git_agent import GitAgent
 from agents.core.base_agent import AgentResult, BaseAgent
@@ -72,12 +73,33 @@ class DocumentationAgent(BaseAgent):
             data={"all_targets": sorted(targets), "undocumented": undocumented}, warnings=warnings,
         )
 
-    def update_changelog(self, *, since_tag: str | None = None, dry_run: bool = True) -> AgentResult:
+    def update_changelog(self, *, since_tag: str | None = None, dry_run: bool = True,
+                         feature_id: str = "", feature_title: str = "") -> AgentResult:
         """
         Genera una entrada de changelog (vía GitAgent) e, si `dry_run=False`,
         la inserta en `CHANGELOG.md` justo después de la cabecera del
         archivo (antes de la primera entrada de versión existente).
+
+        Si se pasan `feature_id` y `feature_title`, la entrada se construye a
+        partir de la feature del arnés (`### Añadido · <title> (<id>)`) en vez
+        de derivarse del git log. Es el modo que usa `GitAgent.commit_feature`
+        al cerrar una feature: entre features no hay tags, y derivar del log
+        duplicaría entradas de un cierre al siguiente.
         """
+        if feature_id and feature_title:
+            entry = (
+                f"## [Unreleased] — {date.today().isoformat()}\n\n"
+                f"### Añadido\n\n"
+                f"- {feature_title} ({feature_id})\n"
+            )
+            if dry_run:
+                return AgentResult(
+                    True, self.name, "update_changelog",
+                    "Entrada de feature generada en modo dry_run (no se escribió en disco).",
+                    data=entry,
+                )
+            return self._insert_changelog(entry)
+
         git_agent = GitAgent(context=self.ctx)
         changelog_result = git_agent.run("generate_changelog", since_tag=since_tag)
         if not changelog_result.success or not changelog_result.data:
@@ -95,6 +117,10 @@ class DocumentationAgent(BaseAgent):
                 data=entry,
             )
 
+        return self._insert_changelog(entry)
+
+    def _insert_changelog(self, entry: str) -> AgentResult:
+        """Inserta `entry` en CHANGELOG.md tras la cabecera del archivo."""
         if not self.ctx.changelog_file.exists():
             new_content = f"# Changelog\n\n{entry}\n"
         else:

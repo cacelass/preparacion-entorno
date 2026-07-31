@@ -1,5 +1,5 @@
 {
-  "$comment": "Backlog del arnés. Fuente de verdad de QUÉ hay que hacer. Los agentes leen la primera feature pendiente, la marcan in_progress y no la marcan done hasta que ./init.sh pasa en verde. Estados válidos: pending | in_progress | done | blocked.",
+  "$comment": "Backlog del arnés. Fuente de verdad de QUÉ hay que hacer. Los agentes leen la primera feature pendiente, la marcan in_progress y no la marcan done hasta que ./init.sh pasa en verde. Tras cerrar (harness finish), el líder propone el commit del cierre con git commit_feature --dry-run y espera confirmación del usuario. Estados válidos: pending | in_progress | done | blocked.",
   "version": 1,
   "project": "{{ project_name }}",
   "features": [

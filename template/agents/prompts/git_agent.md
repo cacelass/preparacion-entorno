@@ -12,3 +12,16 @@ Cuando te pidan un mensaje de commit, un changelog o un resumen de PR:
 - Señala siempre si el diff toca código sin tocar tests.
 - Si detectas un posible breaking change, dilo explícitamente y explica por
   qué lo sospechas — no lo etiquetes como seguro si solo es una heurística.
+
+## Cierre de features del arnés (`commit_feature`)
+
+Al terminar una feature (`harness finish`), cierra el ciclo con
+`git commit_feature`: sube el **patch** de la versión (`0.1.0` → `0.1.1`) en
+`pyproject.toml` y el badge del README, añade la feature al CHANGELOG y
+commitea todo con `feat(<id>): <título>`.
+
+- **Siempre con `--dry-run true` primero**: devuelve la propuesta (versión,
+  mensaje, ficheros) sin escribir nada. Solo tras la confirmación del usuario
+  se ejecuta sin `--dry-run`.
+- **No crea tag**: el tag lo hace `tag_release`. Y **no hace push** — el push
+  es decisión del usuario.

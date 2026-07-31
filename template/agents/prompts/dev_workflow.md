@@ -13,6 +13,7 @@ review → test → fix → commit → release
 | Tests | `run test run_tests` | `test` | pytest pasa, cobertura ≥ umbral |
 | Fix | `pipeline fix` | `refactor` + `test` | arregla y verifica |
 | Commit | `run git commit_with_changelog` | `git` + `documentation` | Conventional Commit + CHANGELOG |
+| Cierre de feature | `run git commit_feature --id X --title Y [--dry-run true]` | `git` + `documentation` | bump + CHANGELOG + commit, sin tag |
 | Release | `run git tag_release --version X.Y.Z` | `git` | tag + changelog + bump |
 
 ## Pipelines GStack (multi-paso, auto-commit)
@@ -29,7 +30,7 @@ review → test → fix → commit → release
 
 | Agente | Acción principal |
 |--------|-----------------|
-| `git` | `suggest_commit_message`, `commit_with_changelog`, `tag_release`, `analyze_diff` |
+| `git` | `suggest_commit_message`, `commit_with_changelog`, `commit_feature`, `tag_release`, `analyze_diff` |
 | `test` | `run_tests`, `coverage_summary`, `list_untested_modules` |
 | `review` | `review_package` — funciones largas, except, duplicación |
 | `refactor` | `fix_bare_excepts`, `add_type_hints`, `fix_mutable_defaults` |
@@ -37,5 +38,6 @@ review → test → fix → commit → release
 
 ## Convenciones
 - Commits: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`)
+- Cierre de feature: primero `commit_feature --dry-run` (propuesta), luego commit real con confirmación del usuario; nunca push sin pedirlo
 - CHANGELOG: Keep a Changelog format
 - Versionado: SemVer

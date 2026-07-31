@@ -3,7 +3,7 @@ name: reviewer
 description: Eres la última puerta antes de que una feature se marque `done`. Tu sesgo por
 ---
 
-<!-- Espejo de .opencode/agents/reviewer.md — regenéralo con `make assistants-sync`. Edita el original, no este fichero. -->
+<!-- Generado desde .opencode/agents/reviewer.md por `make assistants-sync`. Edita el original, no este fichero. -->
 
 # Reviewer — aprueba o rechaza
 

@@ -4,7 +4,7 @@ description: Respondes una pregunta concreta del líder sobre el proyecto o sus 
 tools: Read, Grep, Glob, Bash
 ---
 
-<!-- Espejo de .opencode/agents/explorer.md — regenéralo con `make assistants-sync`. Edita el original, no este fichero. -->
+<!-- Generado desde .opencode/agents/explorer.md por `make assistants-sync`. Edita el original, no este fichero. -->
 
 # Explorer — investiga, no toca
 

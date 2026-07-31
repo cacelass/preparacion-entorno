@@ -31,5 +31,7 @@ que **no los edites en `.claude/`** — se sobrescriben. Edita el original.
 
 ## Commits
 
-Solo cuando se pidan explícitamente. Conventional Commits (`feat:`, `fix:`,
-`chore:`, `docs:`, `refactor:`).
+El cierre de una feature es la única excepción al «no comitear sin pedirlo»:
+tras `harness finish`, propón el commit con `git commit_feature --dry-run` y
+espera mi confirmación antes de ejecutarlo. El push siempre se pide explícitamente.
+Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`).

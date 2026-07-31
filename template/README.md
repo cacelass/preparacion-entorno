@@ -69,7 +69,7 @@ repositorio que gobierna cómo trabaja un agente de IA sobre él. No es un
 chatbot — es un ciclo con puerta de entrada, backlog y verificación.
 
 ```
-./init.sh → progress/ → featureslist.json → implementar → revisar → done
+./init.sh → progress/ → featureslist.json → implementar → revisar → done → commit_feature
     │
     └── si falla: el agente PARA. No se trabaja sobre un proyecto roto.
 ```
@@ -100,6 +100,10 @@ Y para arrancar el ciclo en tu asistente:
 
 **La regla que no se salta:** ninguna feature se marca `done` sin que
 `./init.sh` pase en verde. El agente demuestra su trabajo, no lo declara.
+
+**Cierre de feature:** al terminar, `git commit_feature` sube el patch de la
+versión, actualiza el CHANGELOG y propone el commit (`--dry-run` primero, con
+confirmación tuya antes de ejecutarlo). El push siempre es decisión tuya.
 
 El protocolo completo está en [`AGENTS.md`](AGENTS.md).
 

@@ -32,7 +32,7 @@ el modelo pueda ignorar.
 
 | Agente | Hace |
 |--------|------|
-| `git` | Conventional Commits, changelog, release, PRs, tag_release completo |
+| `git` | Conventional Commits, changelog, release, PRs, tag_release y commit_feature (cierre de features) |
 | `data` | EDA, detección de fugas, correlaciones |
 | `graph` | Audita figuras (vacías, aspect ratio) |
 | `docker` | Lint Dockerfile, valida docker-compose |
@@ -171,6 +171,10 @@ uv run python -m agents ask "revisa el Dockerfile"
 
 # Release completo (versión + changelog + CI + commit + tag)
 uv run python -m agents run git tag_release --version 1.9.0
+
+# Cierre de una feature del arnés (bump + CHANGELOG + commit, sin tag)
+uv run python -m agents run git commit_feature --id DATA-001 --title "EDA del dataset" --dry-run true
+uv run python -m agents run git commit_feature --id DATA-001 --title "EDA del dataset"
 
 # Entorno: sync, check, info
 uv run python -m agents run env sync

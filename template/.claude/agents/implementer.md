@@ -3,7 +3,7 @@ name: implementer
 description: Recibes **una** feature del líder. La implementas y la demuestras. No decides
 ---
 
-<!-- Espejo de .opencode/agents/implementer.md — regenéralo con `make assistants-sync`. Edita el original, no este fichero. -->
+<!-- Generado desde .opencode/agents/implementer.md por `make assistants-sync`. Edita el original, no este fichero. -->
 
 # Implementer — escribe el código
 
@@ -28,6 +28,9 @@ qué se hace ni cierras la feature: eso es del líder y del reviewer.
   uso, sin configurabilidad que nadie pidió, sin manejo de errores imposibles.
 - **Sigue el estilo que ya hay.** Mismo naming, mismos imports, misma densidad
   de comentarios que los ficheros vecinos.
+- **Si la feature es visible para el usuario, deja el README al día.** Añade la
+  línea/la sección que describa lo nuevo (qué hace, cómo se usa). El bump de
+  versión y el commit no son tuyos: los hace `git commit_feature` al cerrar.
 
 ## Dónde va cada cosa
 
@@ -96,4 +99,5 @@ EOF
 - Declarar un criterio cumplido sin el comando que lo demuestra.
 - Editar `featureslist.json` o `progress/` a mano — usa el agente `harness`.
 - Cerrar la feature tú (`harness finish`) — eso es del líder, tras el reviewer.
-- Hacer commits, ramas o push salvo petición explícita del usuario.
+- Comitear el cierre de la feature — lo hace `git commit_feature` el líder,
+  con confirmación del usuario.

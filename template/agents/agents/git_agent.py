@@ -15,6 +15,7 @@ Obsidian) y los actualiza automáticamente.
 from __future__ import annotations
 
 import os
+import re
 from datetime import date
 
 from agents.core.base_agent import AgentResult, BaseAgent
@@ -34,6 +35,7 @@ class GitAgent(BaseAgent):
     capabilities = [
         "git", "commit", "diff", "release", "pull request", "pr", "genera", "generar",
         "genera el changelog", "breaking change", "rama", "branch",
+        "cierra la feature", "cerrar feature", "commit de la feature",
     ]
 
     def __init__(self, *args, **kwargs):
@@ -47,6 +49,7 @@ class GitAgent(BaseAgent):
             # de las dos acciones de commit es la más natural para una petición genérica.
             "commit_with_changelog": ["commit", "confirma", "guarda los cambios", "haz commit"],
             "suggest_commit_message": ["sugiere", "sugerir", "mensaje", "propon un mensaje"],
+            "commit_feature": ["cierra la feature", "cerrar feature", "commit de la feature", "feature lista"],
             "tag_release": ["tag", "etiqueta", "version", "versión", "release", "publica", "lanzamiento"],
         }
 
@@ -60,6 +63,7 @@ class GitAgent(BaseAgent):
             "detect_breaking_changes": self.detect_breaking_changes,
             "prepare_pr_summary": self.prepare_pr_summary,
             "commit_with_changelog": self.commit_with_changelog,
+            "commit_feature": self.commit_feature,
             "tag_release": self.tag_release,
             "create_branch": self.create_branch,
             "merge_branch": self.merge_branch,
@@ -320,6 +324,111 @@ class GitAgent(BaseAgent):
             data={"stdout": commit_result.stdout, "changelog_updated": bool(changelog_result.success and changelog_result.data)},
             warnings=warnings,
         )
+
+    def commit_feature(self, *, id: str = "", title: str = "", message: str = "",
+                       dry_run: bool = False) -> AgentResult:
+        """
+        Cierre de una feature del arnés: README y versión al día + commit.
+
+        Es el paso que el arnés espera tras `harness finish`: sube el patch de
+        la versión (0.1.0 → 0.1.1) en pyproject.toml y README, añade la
+        feature al CHANGELOG y commitea todo junto con un mensaje Conventional
+        (`feat(<id>): <title>`). No crea tag: el tag es de `tag_release`.
+
+        Con `dry_run=True` solo PROPONE: devuelve la versión que tocaría, el
+        mensaje y los ficheros que entrarían, sin escribir nada. El líder la
+        usa para mostrar la propuesta al usuario antes de confirmar.
+        """
+        guard = self._guard_repo("commit_feature")
+        if guard:
+            return guard
+
+        if not id or not title:
+            return AgentResult(
+                False, self.name, "commit_feature",
+                "Faltan datos para cerrar la feature.",
+                needs=["¿Qué feature cierro? (--id)", "¿Cuál es su título? (--title)"],
+            )
+
+        from agents.agents.documentation_agent import DocumentationAgent
+
+        doc_agent = DocumentationAgent(context=self.ctx)
+        next_version = self._next_patch_version()
+        changed = self._proposed_files()
+        suggested = message or f"feat({id}): {title}"
+
+        if dry_run:
+            bump_part = f"bump a '{next_version}'" if next_version else "sin bump (no hay versión)"
+            return AgentResult(
+                True, self.name, "commit_feature",
+                f"Propuesta de cierre de {id}: {bump_part}, commit "
+                f"'{suggested}'. Nada escrito todavía.",
+                data={
+                    "id": id, "title": title, "next_version": next_version,
+                    "suggested_message": suggested, "changed_files": changed,
+                },
+                warnings=(
+                    ["No se pudo leer la versión en pyproject.toml — se omite el bump."]
+                    if not next_version else []
+                ),
+            )
+
+        warnings: list[str] = []
+        bump_success = False
+        if next_version:
+            bump = doc_agent.run("bump_version", new_version=next_version)
+            warnings.extend(bump.warnings)
+            bump_success = bump.success
+        else:
+            warnings.append("No se pudo leer la versión en pyproject.toml — se omite el bump.")
+
+        changelog = doc_agent.run(
+            "update_changelog", feature_id=id, feature_title=title, dry_run=False
+        )
+        if not changelog.success:
+            warnings.append(changelog.message)
+
+        stage = self.git.add("-A")
+        if not stage.ok:
+            warnings.append(f"No se pudo hacer 'git add -A': {stage.stderr.strip()}")
+
+        commit_result = self.git.commit(suggested)
+        if not commit_result.ok:
+            return AgentResult(
+                False, self.name, "commit_feature",
+                f"'git commit' falló: {commit_result.stderr.strip()}", warnings=warnings,
+            )
+
+        extras = []
+        if next_version and bump_success:
+            extras.append(f"versión {next_version}")
+        if changelog.success:
+            extras.append("CHANGELOG.md actualizado")
+        extras_str = f" ({', '.join(extras)})" if extras else ""
+        return AgentResult(
+            True, self.name, "commit_feature",
+            f"{id} cerrada con commit '{suggested}'{extras_str}.",
+            data={
+                "id": id, "title": title, "message": suggested, "next_version": next_version,
+            },
+            warnings=warnings,
+        )
+
+    def _next_patch_version(self) -> str | None:
+        """Lee `version = "X.Y.Z"` de pyproject.toml y devuelve el siguiente patch."""
+        pyproject = self.ctx.pyproject_file
+        if not pyproject.exists():
+            return None
+        match = re.search(r'^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"',
+                          pyproject.read_text(encoding="utf-8"), re.MULTILINE)
+        if not match:
+            return None
+        major, minor, patch = (int(g) for g in match.groups())
+        return f"{major}.{minor}.{patch + 1}"
+
+    def _proposed_files(self) -> list[str]:
+        """Ficheros que entrarían en el commit: cambios rastreados + sin trackear."""
+        return [path for _, path in self.git.status_porcelain()]
 
     def tag_release(self, *, version: str, message: str | None = None, since_tag: str | None = None) -> AgentResult:
         """

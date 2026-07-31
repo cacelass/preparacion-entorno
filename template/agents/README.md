@@ -159,6 +159,7 @@ uv run python -m agents list
 uv run python -m agents describe git
 uv run python -m agents run git suggest_commit_message
 uv run python -m agents run git tag_release --version 1.9.0
+uv run python -m agents run git commit_feature --id DATA-001 --title "EDA del dataset" --dry-run true
 uv run python -m agents run cicd generate_workflow
 uv run python -m agents run test run_tests
 uv run python -m agents run dependency check_outdated
@@ -218,7 +219,7 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `supervisor` | Coordina workers en **competición**: lanza N variantes de una tarea y arbitra cuál gana (secuencial → `plan`). | agente `research` |
 | `knowledge` | Dueño del grafo de conocimiento y la bóveda Obsidian: construir, resumir nodos padre, sync. | `graphify_tool` |
 | `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto y los rankea. Necesita internet. | `research_tool` |
-| `git` | Conventional Commits, changelog, release notes, breaking changes, resumen de PR, **commit+changelog en un paso** (`commit_with_changelog`), **release completo** (`tag_release`: versión + changelog + CI/CD + commit + tag) | `git_tool` |
+| `git` | Conventional Commits, changelog, release notes, breaking changes, resumen de PR, **commit+changelog en un paso** (`commit_with_changelog`), **cierre de features del arnés** (`commit_feature`: bump + CHANGELOG + commit, sin tag), **release completo** (`tag_release`: versión + changelog + CI/CD + commit + tag) | `git_tool` |
 | `data` | EDA: constantes, cardinalidad, missing, outliers, fuga de información, correlaciones | `data_io_tool`, `dataframe_analysis_tool` |
 | `graph` | Audita `reports/figures/`: figuras vacías, aspect ratio inusual | `vision_tool` |
 | `docker` | Lint de Dockerfile, validación de docker-compose | `docker_tool` |
@@ -245,7 +246,7 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `research` | Busca papers en arXiv/OpenAlex relacionados con el proyecto | `research_tool` |
 | `memory` | **Memoria proactiva**: observa las trayectorias de los agentes y mantiene un banco estructurado (facts/state/traces) para combatir el decaimiento de estado en tareas largas | `memory_tool` |
 | `doc` | **Documentación unificada**: responde dónde está algo consultando a la vez el grafo, el índice semántico y el vault | `graphify_tool`, `rag_tool` |
-| `rag` | RAG semántico local con ChromaDB + embeddings ONNX. Indexa código, prompts, docs, vault y la memoria del arnés; también URLs externas. Solo con `use_rag=true` | `rag_tool` |
+| `rag` | RAG local con ChromaDB: busca fundiendo similitud vectorial y BM25 léxico. Indexa el código de todos los módulos, prompts, docs, vault y la memoria del arnés; también URLs externas. Reindexado incremental por huella de fichero. Solo con `use_rag=true` | `rag_tool` |
 | `harness` | **Dueño del arnés**: mantiene `featureslist.json` y `progress/`, ejecuta la puerta `init.sh` y **rehúsa cerrar** una feature si no pasa o si no hay evidencia real | `process_tool` |
 
 Cada agente documenta en su propio docstring qué responsabilidades de la
@@ -262,8 +263,10 @@ de la API pública — está señalado explícitamente en su `AgentResult.warnin
 ### Agentes que colaboran entre sí (no todo tiene que ser independiente)
 
 `agents/agents/git_agent.py` es el ejemplo de referencia: `commit_with_changelog`
-llama a `DocumentationAgent.update_changelog` antes de hacer el commit, y
-`tag_release` encadena `DocumentationAgent.bump_version` +
+llama a `DocumentationAgent.update_changelog` antes de hacer el commit,
+`commit_feature` encadena `DocumentationAgent.bump_version` +
+`DocumentationAgent.update_changelog` + `git commit` (sin tag; es el cierre
+del arnés tras `harness finish`), y `tag_release` encadena `bump_version` +
 `commit_with_changelog` + `git tag` en un único flujo. El patrón es siempre
 el mismo: import perezoso (dentro del método, no a nivel de módulo, para
 evitar ciclos de import) + instanciar el otro agente con `context=self.ctx`

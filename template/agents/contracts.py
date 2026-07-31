@@ -181,9 +181,13 @@ CONTRACTS: dict[str, Contract] = {
         collaborates=("doc", "research"),
     ),
     "rag": Contract(
-        role="RAG semántico local: indexa código, prompts, docs, vault y URLs externas; busca en lenguaje natural con ChromaDB + embeddings ONNX.",
+        role="RAG local: indexa código, prompts, docs, vault, la memoria del arnés y URLs "
+             "externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) "
+             "con BM25 léxico.",
         can=(
-            "indexar el proyecto (código, prompts, docs, vault, README, CHANGELOG) en ChromaDB",
+            "indexar el proyecto (código de todos los módulos, prompts, docs, "
+            "vault, README, CHANGELOG, progress/ y featureslist.json) en ChromaDB",
+            "reindexar solo lo que cambió, y purgar del índice lo que se borró",
             "indexar URLs externas (documentación de librerías, tutoriales)",
             "buscar en el índice con consultas en lenguaje natural",
             "devolver fragmentos relevantes con puntuación de similitud",
@@ -305,20 +309,25 @@ CONTRACTS: dict[str, Contract] = {
         role="Único agente que escribe en el historial git: commits, tags, releases.",
         can=(
             "mensajes Conventional Commits desde el diff real, changelog, resumen de PR",
-            "commit_with_changelog y tag_release (flujos que encadenan documentation + git)",
+            "commit_with_changelog, commit_feature y tag_release (flujos que encadenan documentation + git)",
+            "commit_feature: cierre del arnés con bump de versión + changelog + commit, sin tag",
         ),
         cannot=(
             "escribir CHANGELOG.md/README.md él mismo → delega en documentation (su dueño)",
             "hacer push a remotos — decisión del humano",
         ),
-        needs=("la versión, para tag_release", "el mensaje, para commit si no quiere el sugerido"),
+        needs=(
+            "la versión, para tag_release",
+            "el mensaje, para commit si no quiere el sugerido",
+            "el id y el título de la feature, para commit_feature",
+        ),
         owns=("historial git (commits, tags, ramas)",),
         collaborates=("documentation", "cicd"),
     ),
     "documentation": Contract(
         role="Dueño de la documentación: CHANGELOG.md, README.md, docs/ y la versión del proyecto.",
         can=(
-            "actualizar CHANGELOG.md, detectar README ↔ Makefile desincronizados",
+            "actualizar CHANGELOG.md (también entradas por-feature), detectar README ↔ Makefile desincronizados",
             "bump_version en pyproject.toml + README, generar docs Sphinx",
         ),
         cannot=(

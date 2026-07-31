@@ -22,6 +22,7 @@ init.sh → progress/ → featureslist.json → explorer → implementer → rev
 | Implementar | subagente `implementer` | `implementer` | código + tests + `harness record` |
 | Revisar | subagente `reviewer` | `reviewer` | `harness gate` en verde + criterios uno a uno |
 | Cerrar | `run harness finish --id <ID> --evidence "..."` | `harness` | **rechaza** si la puerta falla o no hay evidencia |
+| Commit del cierre | `run git commit_feature --id <ID> --title "..." [--dry-run true]` | `git` | bump + CHANGELOG + commit, con confirmación del usuario |
 
 El `lider` decide en qué orden pasa todo esto; `harness` lo ejecuta. Ningún
 agente edita `featureslist.json` ni `progress/` a mano.
@@ -34,6 +35,15 @@ agente edita `featureslist.json` ni `progress/` a mano.
    comando que lo prueba. `finish` sin `--evidence` devuelve `needs`.
 3. **Todo subagente registra con `harness record` antes de devolver el control.**
    Lo que solo vive en la ventana de contexto se pierde.
+
+## El cierre (README + versión + commit)
+
+`harness finish` marca la feature `done`; `git commit_feature` cierra el ciclo:
+
+- `--dry-run true` devuelve la propuesta (siguiente versión patch, mensaje
+  `feat(<id>): <título>`, ficheros que entrarían) **sin escribir nada**.
+- Solo tras la confirmación del usuario se ejecuta sin `--dry-run`: bump de
+  versión, entrada en CHANGELOG y commit. Sin tag, sin push.
 
 ## Contexto: qué NO hacer
 
@@ -56,6 +66,7 @@ El arnés decide y verifica; el trabajo determinista lo hacen los agentes:
 | Saber si el equipo va bien | `audit` | `suggest` |
 | Contexto de sesiones anteriores | `memory` | `status`, `search` |
 | Buscar dónde está algo | `doc` | `search` |
+| Cerrar la feature (versión + changelog + commit) | `git` | `commit_feature` |
 
 ```bash
 uv run python -m agents --json run plan brief --text "<descripción de la feature>"

@@ -19,6 +19,7 @@ sigue estos pasos **en orden**, antes de escribir una sola línea de código.
 5. delegar                      explorer → implementer → reviewer
 6. verificar                    ./init.sh en verde + criterios uno a uno
 7. done                         featureslist.json + resumen en history.md
+8. commit_feature               README + versión al día, propón commit, confirma
 ```
 
 ## La regla que no se salta
@@ -41,6 +42,21 @@ cuenta.
 ./init.sh --json     # salida estructurada para consumo por agentes
 
 uv run python -m agents --json run harness gate    # lo mismo, vía agente
+```
+
+## Cierre de una feature: versión + commit
+
+Al marcar una feature `done`, el líder cierra el ciclo con `git commit_feature`:
+sube el **patch** de la versión (`0.1.0` → `0.1.1`) en `pyproject.toml` y el
+badge del README, añade la feature al CHANGELOG y commitea todo con un mensaje
+Conventional. **Primero en `--dry-run` para proponer y pedir tu OK; el commit
+real solo se ejecuta tras tu confirmación.** El push sigue siendo decisión
+tuya, siempre explícita.
+
+```bash
+uv run python -m agents --json run git commit_feature --id <ID> --title "<t>" --dry-run true
+# revisa la propuesta (versión, mensaje, ficheros) y confirma
+uv run python -m agents --json run git commit_feature --id <ID> --title "<t>"
 ```
 
 ## Piezas del arnés
@@ -76,6 +92,7 @@ uv run python -m agents --json run harness record --agent explorer --id DATA-001
 uv run python -m agents --json run harness finish --id DATA-001 --evidence "$(make test 2>&1 | tail -5)"
 uv run python -m agents --json run harness block --id DATA-001 --reason "falta el dataset"
 uv run python -m agents --json run harness add --id API-002 --title "..." --criteria "a;b"
+uv run python -m agents --json run git commit_feature --id DATA-001 --title "..." --dry-run true
 ```
 
 ## Memoria externa: por qué existe `progress/`
@@ -97,9 +114,10 @@ Las tres memorias del proyecto no se pisan:
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
 | `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 {% if use_rag %}
-Y las tres son buscables: `progress/` y `featureslist.json` entran en el índice
-semántico, así que tras cerrar una feature basta con `make index-rag` para poder
-preguntarle al histórico en lenguaje natural:
+Y las tres son buscables: `progress/` y `featureslist.json` entran en el índice,
+así que tras cerrar una feature basta con `make index-rag` para poder
+preguntarle al histórico en lenguaje natural. El reindexado es incremental y
+**sustituye** lo que cambió, así que el histórico no acumula versiones viejas:
 
 ```bash
 uv run python -m agents --json run rag search --query "¿por qué elegimos este modelo?"
