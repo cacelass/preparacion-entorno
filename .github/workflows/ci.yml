@@ -106,3 +106,48 @@ jobs:
       - name: Vulnerability scan (pip-audit)
         working-directory: /tmp/generated
         run: uv run pip-audit 2>/dev/null || echo "  (pip-audit requiere deps instaladas)"
+
+  # `validate-template` prueba que la plantilla renderiza y `smoke` que el
+  # proyecto arranca. Nadie probaba que el .github/workflows/ci.yml que le
+  # entregamos al usuario PASE — y llevaba roto dos formas distintas: `uv sync
+  # --frozen` con uv.lock en el .gitignore, y `mypy --strict` con 193 errores.
+  # Este job ejecuta ese workflow tal cual, sobre un clon limpio del proyecto,
+  # asi que lo que se rompa se rompe aqui y no en el repositorio de un usuario.
+  ci-generado:
+    name: CI del proyecto generado
+    runs-on: ubuntu-latest
+    needs: validate-template
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar copier y pyyaml
+        run: pip install copier pyyaml
+
+      # Un proyecto con todos los extras ligeros activos: es el que mas
+      # superficie del workflow ejercita (mas `--extra`, mas modulos a tipar).
+      # `redes_neuronales` queda fuera a proposito — arrastra torch y el coste
+      # no compensa para lo que este job comprueba.
+      - name: Generar proyecto
+        run: |
+          cat > /tmp/ci-data.yml <<'YAML'
+          project_name: Proyecto CI
+          ml_type: supervisado
+          use_api: true
+          use_rag: true
+          use_monitoring: true
+          use_duckdb: true
+          use_optuna: true
+          graphify_mode: "no"
+          YAML
+          copier copy --trust --defaults --vcs-ref=HEAD \
+            --data-file /tmp/ci-data.yml \
+            . /tmp/proyecto-ci
+
+      - name: Ejecutar su CI sobre un clon limpio
+        run: python .github/scripts/run_generated_ci.py /tmp/proyecto-ci
