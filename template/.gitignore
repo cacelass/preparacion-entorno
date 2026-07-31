@@ -29,7 +29,10 @@ pip-wheel-metadata/
 MANIFEST
 
 # --- uv ---
-uv.lock
+# uv.lock SÍ se commitea. Esto no es una librería: es un proyecto de datos, y
+# el lock es lo único que hace reproducible el entorno entre tu máquina, la de
+# tu compañero y CI. Además el workflow hace `uv sync --frozen`, que falla con
+# «Unable to find lockfile» si el lock no viaja en el repositorio.
 
 # --- Jupyter ---
 .ipynb_checkpoints/

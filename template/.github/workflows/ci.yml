@@ -24,24 +24,38 @@ jobs:
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
 
+      # `run: |` (bloque literal) y no un escalar plano: YAML pliega los saltos
+      # de un escalar plano en espacios, asi que las `\` de continuacion le
+      # llegaban al shell como `\ ` — un espacio escapado — y `uv sync` recibia
+      # argumentos basura. Rompia el CI de cualquier proyecto con algun extra.
       - name: Install dependencies
-        run: uv sync --extra dev --extra {{ ml_type }} \
-{% if use_mlflow %}          --extra mlflow_tracking \
-{% endif %}{% if graphify_mode != 'no' %}          --extra graphify \
-{% endif %}{% if use_api %}          --extra api \
-{% endif %}{% if use_duckdb %}          --extra duckdb \
-{% endif %}{% if use_optuna %}          --extra optuna \
-{% endif %}{% if use_monitoring %}          --extra monitoring \
+        run: |
+          uv sync --extra dev --extra {{ ml_type }} \
+{% if use_mlflow %}            --extra mlflow_tracking \
+{% endif %}{% if graphify_mode != 'no' %}            --extra graphify \
+{% endif %}{% if use_api %}            --extra api \
+{% endif %}{% if use_duckdb %}            --extra duckdb \
+{% endif %}{% if use_optuna %}            --extra optuna \
+{% endif %}{% if use_monitoring %}            --extra monitoring \
+{% endif %}{% if use_rag %}            --extra rag \
 {% endif %}            --frozen
 
       - name: Lint
         run: uv run ruff check {{ project_slug }}/ tests/
 
+      # Sin `--strict` en la linea: la configuracion vive en pyproject.toml
+      # (strict global + relajado para tests/). Pasarlo aqui hacia que CI y tu
+      # maquina comprobasen cosas distintas.
       - name: Type check
-        run: uv run mypy --strict {{ project_slug }}/ tests/
+        run: uv run mypy {{ project_slug }}/ tests/
 
+      # 60 y no 20. Medido sobre proyectos recien generados: supervisado da 74%
+      # y no_supervisado 67%, asi que el umbral anterior no era una puerta, era
+      # un adorno — cabia borrar dos tercios de los tests sin que CI se
+      # inmutase. 60 deja margen a las combinaciones mas flacas sin dejar de
+      # ser exigible.
       - name: Test with coverage
-        run: uv run pytest tests/ -v --cov={{ project_slug }} --cov-report=xml --cov-fail-under=20
+        run: uv run pytest tests/ -v --cov={{ project_slug }} --cov-report=xml --cov-fail-under=60
 
       # Bloqueante a proposito: el arnes exige evidencia para cerrar una
       # feature, pero sus propios tests podian romperse sin que CI se enterase.

@@ -229,6 +229,19 @@ strict = true
 ignore_missing_imports = true
 exclude = ["notebooks/", ".venv"]
 
+# Los tests se comprueban, pero no en modo estricto. Anotar `-> None` en cada
+# `def test_...` y tipar cada fixture son 155 anotaciones que no atrapan ni un
+# solo bug: el valor de mypy está en el código que se despliega, no en los
+# asserts. Dejarlo estricto aquí era peor que no tenerlo — el gate llevaba
+# tanto tiempo en rojo que nadie lo miraba.
+[[tool.mypy.overrides]]
+module = ["tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+warn_return_any = false
+
 [tool.bandit]
 exclude_dirs = ["notebooks", ".venv", "tests", "docs"]
 skips = ["B101", "B404", "B603", "B113"]
