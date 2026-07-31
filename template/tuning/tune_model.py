@@ -20,6 +20,9 @@ Configurar el número de trials en main.py:
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 warnings.filterwarnings("ignore")
 
 import joblib
@@ -50,7 +53,7 @@ _MINIMIZE = True    # minimize RMSE
 {% if ml_type == "supervisado" or ml_type == "hibrido" %}
 
 {% if model_type == "todos" or model_type == "RandomForest" %}
-def _objective_rf(trial, X_train, y_train):
+def _objective_rf(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
 {% if task_type == "clasificacion" %}
     from sklearn.ensemble import RandomForestClassifier
     model = RandomForestClassifier(
@@ -72,12 +75,12 @@ def _objective_rf(trial, X_train, y_train):
     )
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 {% endif %}
 
 
 {% if model_type == "todos" or model_type == "KNN" %}
-def _objective_knn(trial, X_train, y_train):
+def _objective_knn(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
 {% if task_type == "clasificacion" %}
     from sklearn.neighbors import KNeighborsClassifier
     model = KNeighborsClassifier(
@@ -94,12 +97,12 @@ def _objective_knn(trial, X_train, y_train):
     )
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 {% endif %}
 
 
 {% if model_type == "todos" or model_type == "DecisionTree" %}
-def _objective_dt(trial, X_train, y_train):
+def _objective_dt(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
 {% if task_type == "clasificacion" %}
     from sklearn.tree import DecisionTreeClassifier
     model = DecisionTreeClassifier(
@@ -121,13 +124,13 @@ def _objective_dt(trial, X_train, y_train):
     )
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 {% endif %}
 
 
 {% if model_type == "todos" or model_type == "LogisticRegression" %}
 {% if task_type == "clasificacion" %}
-def _objective_lr(trial, X_train, y_train):
+def _objective_lr(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
     from sklearn.linear_model import LogisticRegression
     model = LogisticRegression(
         C            = trial.suggest_float("C", 1e-3, 100.0, log=True),
@@ -137,13 +140,13 @@ def _objective_lr(trial, X_train, y_train):
         random_state = 42,
     )
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return scores.mean()
+    return float(scores.mean())
 {% endif %}
 {% endif %}
 
 
 {% if use_xgboost or model_type == "XGBoost" %}
-def _objective_xgb(trial, X_train, y_train):
+def _objective_xgb(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
 {% if task_type == "clasificacion" %}
     from xgboost import XGBClassifier
     model = XGBClassifier(
@@ -172,12 +175,12 @@ def _objective_xgb(trial, X_train, y_train):
     )
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 {% endif %}
 
 
 {% if use_lightgbm or model_type == "LightGBM" %}
-def _objective_lgbm(trial, X_train, y_train):{% if task_type == "clasificacion" %}
+def _objective_lgbm(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:{% if task_type == "clasificacion" %}
     from lightgbm import LGBMClassifier
     model = LGBMClassifier(
         n_estimators      = trial.suggest_int("n_estimators",    50,  500, step=50),
@@ -206,12 +209,12 @@ def _objective_lgbm(trial, X_train, y_train):{% if task_type == "clasificacion" 
     )
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 {% endif %}
 
 
 {% if use_catboost or model_type == "CatBoost" %}
-def _objective_catboost(trial, X_train, y_train):
+def _objective_catboost(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
 {% if task_type == "clasificacion" %}
     from catboost import CatBoostClassifier
     model = CatBoostClassifier(
@@ -239,14 +242,14 @@ def _objective_catboost(trial, X_train, y_train):
     )
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 {% endif %}
 
 
 # ---------------------------------------------------------------------------
 # Mapa modelo → función objetivo
 # ---------------------------------------------------------------------------
-_OBJECTIVES: dict = {}
+_OBJECTIVES: dict[str, Callable[[optuna.Trial, Any, Any], float]] = {}
 {% if model_type == "todos" or model_type == "RandomForest" %}
 _OBJECTIVES["RandomForest"] = _objective_rf
 {% endif %}
@@ -271,7 +274,7 @@ _OBJECTIVES["CatBoost"] = _objective_catboost
 {% if model_type == "todos" or model_type == "SVM" %}
 
 
-def _objective_svm(trial, X_train, y_train):
+def _objective_svm(trial: optuna.Trial, X_train: Any, y_train: Any) -> float:
 {% if task_type == "clasificacion" %}
     from sklearn.svm import SVC
     from sklearn.pipeline import Pipeline
@@ -302,7 +305,7 @@ def _objective_svm(trial, X_train, y_train):
     ])
 {% endif %}
     scores = cross_val_score(model, X_train, y_train, cv=5, scoring=_SCORING)
-    return -scores.mean() if _MINIMIZE else scores.mean()
+    return float(-scores.mean() if _MINIMIZE else scores.mean())
 
 
 _OBJECTIVES["SVM"] = _objective_svm
@@ -476,17 +479,17 @@ _OBJECTIVES = {
 # Motor principal de tuning
 # ---------------------------------------------------------------------------
 def tune_models(
-    X_train,
-    y_train=None,
+    X_train: Any,
+    y_train: Any = None,
     n_trials: int = 30,
-    timeout: int = None,
+    timeout: int | None = None,
 {% if ml_type == "redes_neuronales" %}
     input_dim:  int = None,
     output_dim: int = None,
 {% endif %}
-    artifacts_dir=None,
-    reports_dir=None,
-) -> dict[str, dict]:
+    artifacts_dir: Path | None = None,
+    reports_dir: Path | None = None,
+) -> dict[str, dict[str, Any]]:
     """
     Optimiza hiperparámetros de todos los modelos activos con Optuna.
 
@@ -518,7 +521,7 @@ def tune_models(
         y_arr = None
 
     results = []
-    best_params_all: dict[str, dict] = {}
+    best_params_all: dict[str, dict[str, Any]] = {}
 
     print(f"\n{'='*60}")
     print(f"  Optuna — optimizando {len(_OBJECTIVES)} modelo(s), {n_trials} trials c/u")
@@ -560,7 +563,7 @@ def tune_models(
         def _obj(trial): return objective_fn(trial, X_arr)
 {% else %}
         direction = "maximize" if not _MINIMIZE else "minimize"
-        def _obj(trial): return objective_fn(trial, X_arr, y_arr)
+        def _obj(trial: optuna.Trial) -> float: return objective_fn(trial, X_arr, y_arr)
 {% endif %}
         study = optuna.create_study(direction=direction, sampler=sampler)
         study.optimize(_obj, n_trials=n_trials, timeout=timeout, show_progress_bar=False)

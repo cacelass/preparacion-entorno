@@ -1,4 +1,6 @@
 {% if ml_type == 'supervisado' %}
+from typing import Any
+
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -12,7 +14,7 @@ plt.style.use("ggplot")
 plt.rcParams["figure.figsize"] = (12, 7)
 
 
-def plot_distributions(df: pd.DataFrame, target_col: str = None) -> None:
+def plot_distributions(df: pd.DataFrame, target_col: str | None = None) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if target_col in num_cols:
@@ -88,7 +90,7 @@ def plot_categorical_vs_target(df: pd.DataFrame, target_col: str, max_cols: int 
     print("    categorical_vs_target.png guardado")
 
 
-def plot_feature_importance(models: dict, feature_names: list) -> None:
+def plot_feature_importance(models: dict[str, Any], feature_names: list[str]) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     supported = {}
     for name, model in models.items():
@@ -121,7 +123,7 @@ def plot_feature_importance(models: dict, feature_names: list) -> None:
     print("    feature_importance.png guardado")
 
 
-def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
+def plot_pca_variance(pca_or_X: Any, n_components: int | None = None) -> None:
     """
     Curva de varianza explicada acumulada por PCA.
 
@@ -210,6 +212,7 @@ def plot_pairplot(df: pd.DataFrame, target_col: str, max_features: int = 6) -> N
 
 
 {% elif ml_type == 'no_supervisado' %}
+from typing import Any
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -256,7 +259,7 @@ def plot_correlation_matrix(df: pd.DataFrame) -> None:
     print("    correlation_matrix.png guardado")
 
 
-def plot_elbow_and_silhouette(metrics: dict) -> None:
+def plot_elbow_and_silhouette(metrics: dict[str, Any]) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     k_range = metrics["k_range"]
     n_plots = 3 if "db_scores" in metrics else 2
@@ -294,7 +297,7 @@ def plot_elbow_and_silhouette(metrics: dict) -> None:
     print(f"    elbow_silhouette.png guardado  (mejor k silhouette: {best_k})")
 
 
-def plot_dendrogram(X, method: str = "ward", color_threshold: float = None) -> None:
+def plot_dendrogram(X: Any, method: str = "ward", color_threshold: float | None = None) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(15, 6))
     ax.set_title(f"Dendrograma — linkage='{method}'", fontsize=14)
@@ -311,7 +314,7 @@ def plot_dendrogram(X, method: str = "ward", color_threshold: float = None) -> N
     print("    dendrogram.png guardado")
 
 
-def plot_pca_variance(X, n_components: int = None) -> None:
+def plot_pca_variance(X: Any, n_components: int | None = None) -> None:
     """
     Curva de varianza explicada acumulada por PCA.
     Acepta un array escalado o un objeto PCA ya ajustado.
@@ -355,7 +358,7 @@ def plot_pca_variance(X, n_components: int = None) -> None:
         print(f"    pca_variance.png guardado  (no se alcanza 95% de varianza)")
 
 
-def plot_umap(X, labels=None, model_name: str = "UMAP") -> None:
+def plot_umap(X: Any, labels: Any = None, model_name: str = "UMAP") -> None:
     """
     Proyección UMAP 2D del espacio de features.
 
@@ -396,7 +399,7 @@ def plot_umap(X, labels=None, model_name: str = "UMAP") -> None:
     print(f"    umap_{model_name}.png guardado")
 
 
-def plot_clusters_pca(X, labels, model_name: str = "Clustering") -> None:
+def plot_clusters_pca(X: Any, labels: Any, model_name: str = "Clustering") -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     pca  = PCA(n_components=2)
     X_2d = pca.fit_transform(X)
@@ -415,7 +418,7 @@ def plot_clusters_pca(X, labels, model_name: str = "Clustering") -> None:
     plt.close(fig)
 
 
-def plot_cluster_profiles(X, labels, feature_names: list = None) -> None:
+def plot_cluster_profiles(X: Any, labels: Any, feature_names: list[str] | None = None) -> None:
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     n_features   = X.shape[1]
     feature_names = feature_names or [f"Feature_{i}" for i in range(n_features)]
@@ -442,6 +445,7 @@ def plot_cluster_profiles(X, labels, feature_names: list = None) -> None:
 
 
 {% elif ml_type == 'redes_neuronales' %}
+from typing import Any
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -715,6 +719,7 @@ def plot_reliability_diagram(probas, y_true, model_name, T=None, n_bins=10):
 
 
 {% elif ml_type == 'hibrido' %}
+from typing import Any
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -825,7 +830,7 @@ def plot_pca_variance(pca_or_X, n_components: int = None) -> None:
         print(f"    pca_variance.png guardado  (no se alcanza 95% de varianza)")
 
 
-def plot_umap(X, labels=None, model_name: str = "UMAP") -> None:
+def plot_umap(X: Any, labels: Any = None, model_name: str = "UMAP") -> None:
     """
     Proyección UMAP 2D. Si se pasan labels, colorea por clase/cluster.
     Ideal para visualizar el espacio reducido antes del clasificador.

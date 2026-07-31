@@ -3,6 +3,8 @@
 predict_model.py — Evaluación de modelos {{ ml_type }}.
 Tarea: {{ task_type }}
 """
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import joblib
@@ -37,11 +39,11 @@ DECISION_THRESHOLD: float = 0.5
 
 
 def evaluate_models(
-    models: dict,
-    X_train,
-    y_train,
-    X_test,
-    y_test,
+    models: dict[str, Any],
+    X_train: Any,
+    y_train: Any,
+    X_test: Any,
+    y_test: Any,
 {% if task_type == "clasificacion" %}
     threshold: float = DECISION_THRESHOLD,
 {% endif %}
@@ -185,7 +187,7 @@ def evaluate_models(
 
 
 {% if task_type == "clasificacion" %}
-def _plot_confusion_matrix(y_true, y_pred, model_name: str) -> None:
+def _plot_confusion_matrix(y_true: Any, y_pred: Any, model_name: str) -> None:
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     cm   = confusion_matrix(y_true, y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
@@ -384,16 +386,16 @@ def _shap_beeswarm(shap_values, X_explain, feat_names, model_name, max_display):
 
 {% endif %}
 
-def predict_new(model_name: str, X_new) -> np.ndarray:
+def predict_new(model_name: str, X_new: Any) -> np.ndarray:
     """Carga un modelo y predice sobre nuevas muestras (ya preprocesadas)."""
     path = MODELS_DIR / f"{model_name}.joblib"
     if not path.exists():
         raise FileNotFoundError(f"Modelo no encontrado: {path}")
-    return joblib.load(path).predict(X_new)
+    return np.asarray(joblib.load(path).predict(X_new))
 
 
 {% if task_type == "clasificacion" %}
-def predict_proba_new(model_name: str, X_new) -> np.ndarray:
+def predict_proba_new(model_name: str, X_new: Any) -> np.ndarray:
     """Carga un modelo y devuelve probabilidades de clase."""
     path = MODELS_DIR / f"{model_name}.joblib"
     if not path.exists():
@@ -401,7 +403,7 @@ def predict_proba_new(model_name: str, X_new) -> np.ndarray:
     model = joblib.load(path)
     if not hasattr(model, "predict_proba"):
         raise ValueError(f"{model_name} no soporta predict_proba")
-    return model.predict_proba(X_new)
+    return np.asarray(model.predict_proba(X_new))
 
 
 # ---------------------------------------------------------------------------
@@ -512,7 +514,7 @@ def try_model() -> None:
     # ── 3. Pedir valores al usuario ────────────────────────────────────
     print(f"\nIntroduce los valores para el modelo '{model_name}':")
     print("  (deja en blanco para usar 0 como valor por defecto)\n")
-    row = {}
+    row: dict[str, str | float] = {}
     for feat in feature_names:
         raw = input(f"  {feat}: ").strip()
         try:
@@ -561,6 +563,7 @@ def try_model() -> None:
 
 
 {% elif ml_type == 'no_supervisado' %}
+from typing import Any
 """
 predict_model.py — Evaluación de modelos no supervisados (clustering).
 """
@@ -578,7 +581,7 @@ from sklearn.decomposition import PCA
 from {{ project_slug }}.utils.paths import MODELS_DIR, FIGURES_DIR, REPORTS_DIR
 
 
-def evaluate_models(models: dict, X) -> pd.DataFrame:
+def evaluate_models(models: dict[str, Any], X: Any) -> pd.DataFrame:
     """
     Evalúa modelos de clustering con métricas internas:
       - Silhouette Score  → [-1, +1]; más cercano a +1 es mejor.
@@ -627,7 +630,7 @@ def evaluate_models(models: dict, X) -> pd.DataFrame:
     return df_results
 
 
-def plot_dendrogram(X, method: str = "ward", color_threshold: float = None) -> None:
+def plot_dendrogram(X: Any, method: str = "ward", color_threshold: float | None = None) -> None:
     """
     Dendrograma de clustering jerárquico.
     Cómo leer el corte: busca el tramo vertical más largo sin horizontales
@@ -650,7 +653,7 @@ def plot_dendrogram(X, method: str = "ward", color_threshold: float = None) -> N
     print(f"    dendrogram.png guardado (method='{method}')")
 
 
-def _plot_clusters_pca(X, labels, model_name: str) -> None:
+def _plot_clusters_pca(X: Any, labels: Any, model_name: str) -> None:
     pca  = PCA(n_components=2)
     X_2d = pca.fit_transform(X)
     var_exp = pca.explained_variance_ratio_
@@ -669,7 +672,7 @@ def _plot_clusters_pca(X, labels, model_name: str) -> None:
     print(f"    clusters_{model_name}_pca.png guardado")
 
 
-def load_models(model_names: list | None = None) -> dict:
+def load_models(model_names: list[str] | None = None) -> dict[str, Any]:
     if model_names is None:
         model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
     models = {}
@@ -785,6 +788,7 @@ def try_model() -> None:
 
 
 {% elif ml_type == 'redes_neuronales' %}
+from typing import Any
 """
 predict_model.py — Evaluación y exportación de predicciones (PyTorch).
 Arquitectura : {{ nn_model }}

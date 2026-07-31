@@ -1,5 +1,5 @@
 {% macro load_models_macro() %}
-def load_models(model_names: list | None = None) -> dict:
+def load_models(model_names: list[str] | None = None) -> dict[str, Any]:
     """Carga modelos desde disco."""
     if model_names is None:
         model_names = [p.stem for p in MODELS_DIR.glob("*.joblib")]
@@ -14,6 +14,9 @@ def load_models(model_names: list | None = None) -> dict:
     return models
 {% endmacro %}
 {% if ml_type == "supervisado" %}
+from collections.abc import Iterable
+from typing import Any
+
 import numpy as np
 import joblib
 from contextlib import nullcontext
@@ -111,17 +114,17 @@ from {{ project_slug }}.utils.paths import MODELS_DIR, ARTIFACTS_DIR
 # Configuración de modelos
 # ---------------------------------------------------------------------------
 
-def _load_best_params(model_name: str) -> dict:
+def _load_best_params(model_name: str) -> dict[str, Any]:
     """Carga los mejores hiperparámetros de Optuna si existen."""
     path = ARTIFACTS_DIR / f"best_params_{model_name}.joblib"
     if path.exists():
-        params = joblib.load(path)
+        params: dict[str, Any] = joblib.load(path)
         print(f"    [{model_name}] best_params cargados desde Optuna: {params}")
         return params
     return {}
 
 
-def _build_models() -> dict:
+def _build_models() -> dict[str, Any]:
     """
     Define los modelos a entrenar.
     Tarea: {{ task_type }}
@@ -561,7 +564,7 @@ def _build_models() -> dict:
 
 {% if model_type == "todos" or model_type == "KNN" %}
 
-def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
+def _find_best_k(X_train: Any, y_train: Any, k_range: Iterable[int] = range(1, 21)) -> int:
     """Busca el k óptimo para KNN por cross-validation."""
 {% if task_type == "clasificacion" %}
     scoring = "f1_weighted"
@@ -579,18 +582,18 @@ def _find_best_k(X_train, y_train, k_range=range(1, 21)) -> int:
         ).mean()
         for k in k_range
     }
-    best_k = max(scores, key=scores.get)
+    best_k = max(scores, key=lambda k: scores[k])
     print(f"    KNN mejor k={best_k} ({scoring}={scores[best_k]:.3f})")
-    return best_k
+    return int(best_k)
 
 {% endif %}
 
 def train_models(
-    X_train,
-    y_train,
+    X_train: Any,
+    y_train: Any,
     tune_knn: bool = True,
     cv_evaluate: bool = True,
-) -> dict:
+) -> dict[str, Any]:
     """
     Entrena modelos de {{ task_type }} y los guarda en models/.
 
@@ -698,6 +701,9 @@ def train_models(
 
 
 {% elif ml_type == "no_supervisado" %}
+from collections.abc import Iterable
+from typing import Any
+
 import joblib
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
 from sklearn.cluster import KMeans
@@ -730,7 +736,7 @@ from {{ project_slug }}.utils.paths import MODELS_DIR
 # Configuración de modelos
 # ---------------------------------------------------------------------------
 
-def _build_models(n_clusters: int = 3) -> dict:
+def _build_models(n_clusters: int = 3) -> dict[str, Any]:
     """
     Define los modelos de clustering a ajustar.
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
@@ -808,7 +814,7 @@ def _build_models(n_clusters: int = 3) -> dict:
 
 
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
-def find_optimal_k(X, k_range=range(2, 11)) -> dict:
+def find_optimal_k(X: Any, k_range: Iterable[int] = range(2, 11)) -> dict[str, Any]:
     """
     Calcula el método del codo (inercia), el Silhouette Score,
     el Davies-Bouldin Score y el Calinski-Harabasz Score para cada k.
@@ -854,7 +860,7 @@ def find_optimal_k(X, k_range=range(2, 11)) -> dict:
 
 {% endif %}
 
-def train_models(X, n_clusters: int = 3) -> dict:
+def train_models(X: Any, n_clusters: int = 3) -> dict[str, Any]:
     """
     Ajusta todos los modelos definidos en _build_models() y los guarda en models/.
 
@@ -895,7 +901,7 @@ def train_models(X, n_clusters: int = 3) -> dict:
 
 
 {% if cluster_model == "todos" or cluster_model == "KMeans" %}
-def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
+def train_kmeans_pipeline(X_train: Any, y_train: Any, n_clusters: int = 50) -> Any:
     """
     Pipeline KMeans → LogisticRegression.
     Usa el clustering como reducción de dimensionalidad antes de un clasificador.
@@ -927,6 +933,9 @@ def train_kmeans_pipeline(X_train, y_train, n_clusters: int = 50):
 
 
 {% elif ml_type == "redes_neuronales" %}
+from collections.abc import Iterable
+from typing import Any
+
 import os
 import math
 import joblib
@@ -1727,6 +1736,9 @@ def load_checkpoint(input_dim: int, output_dim: int, checkpoint_path: str):
 
 
 {% elif ml_type == "hibrido" %}
+from collections.abc import Iterable
+from typing import Any
+
 import numpy as np
 import joblib
 

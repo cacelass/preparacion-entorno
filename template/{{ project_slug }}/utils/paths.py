@@ -18,7 +18,7 @@ RUNS_DIR = PROJECT_DIR / "runs"  # TensorBoard logs
 _dirs_created = False
 
 
-def ensure_dirs():
+def ensure_dirs() -> None:
     global _dirs_created
     if _dirs_created:
         return

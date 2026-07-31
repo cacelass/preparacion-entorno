@@ -22,7 +22,9 @@ Genera:
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -39,7 +41,7 @@ MONITORING_DIR = REPORTS_DIR / "monitoring"
 {% if ml_type == "supervisado" or ml_type == "hibrido" %}
 {% if task_type == "clasificacion" %}
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-_METRICS = {
+_METRICS: dict[str, Callable[[Any, Any], float]] = {
     "accuracy":  lambda y, p: accuracy_score(y, p),
     "f1":        lambda y, p: f1_score(y, p, average="weighted", zero_division=0),
     "precision": lambda y, p: precision_score(y, p, average="weighted", zero_division=0),
@@ -126,10 +128,10 @@ def check_drift(
 # ---------------------------------------------------------------------------
 {% if ml_type == "supervisado" or ml_type == "hibrido" %}
 def check_performance(
-    y_true,
-    y_pred,
-    baseline_path: Path = None,
-) -> dict:
+    y_true: Any,
+    y_pred: Any,
+    baseline_path: Path | None = None,
+) -> dict[str, Any]:
     """
     Calcula métricas actuales y las compara con el baseline guardado.
 
@@ -187,9 +189,9 @@ def check_performance(
 # ---------------------------------------------------------------------------
 # Generación de informe HTML
 # ---------------------------------------------------------------------------
-def _build_html(drift_df: pd.DataFrame, perf: dict = None) -> str:
+def _build_html(drift_df: pd.DataFrame, perf: dict[str, Any] | None = None) -> str:
     """Genera un HTML minimalista con los resultados de monitorización."""
-    drift_html = drift_df.to_html(index=False, border=0, classes="table")
+    drift_html: str = drift_df.to_html(index=False, border=0, classes="table")
     n_drift    = int(drift_df["drift_detected"].sum()) if "drift_detected" in drift_df else 0
     n_total    = len(drift_df)
     status     = "Sin drift significativo" if n_drift == 0 else f"Drift detectado en {n_drift}/{n_total} features"
@@ -246,14 +248,14 @@ def _build_html(drift_df: pd.DataFrame, perf: dict = None) -> str:
 # Punto de entrada principal
 # ---------------------------------------------------------------------------
 def run_monitoring(
-    reference: pd.DataFrame = None,
-    current: pd.DataFrame = None,
+    reference: pd.DataFrame | None = None,
+    current: pd.DataFrame | None = None,
 {% if ml_type == "supervisado" or ml_type == "hibrido" %}
-    y_true=None,
-    y_pred=None,
+    y_true: Any = None,
+    y_pred: Any = None,
 {% endif %}
     threshold: float = DRIFT_THRESHOLD,
-    monitoring_dir: Path = None,
+    monitoring_dir: Path | None = None,
 ) -> None:
     """
     Ejecuta la monitorización completa y genera el informe.

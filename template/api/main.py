@@ -14,6 +14,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -174,14 +175,14 @@ def _preprocess_input(features: dict[str, Any]) -> np.ndarray:
     else:
         X = df.values
 
-    return X.astype(np.float32)
+    return np.asarray(X, dtype=np.float32)
 
 
 # ---------------------------------------------------------------------------
 # Ciclo de vida de la app
 # ---------------------------------------------------------------------------
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Arrancando API de {{ project_name }}...")
     _load_artifacts()
     if not _state["model_loaded"]:

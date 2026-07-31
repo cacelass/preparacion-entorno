@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 from {{ project_slug }}.utils.paths import RAW_DATA_DIR
 import os
@@ -40,8 +42,8 @@ import duckdb as _duckdb
 
 def load_data_duckdb(
     filename: str,
-    query: str = None,
-    sample_n: int = None,
+    query: str | None = None,
+    sample_n: int | None = None,
 ) -> pd.DataFrame:
     """
     Carga datos con DuckDB: soporta CSV, Parquet y JSON.
@@ -95,7 +97,7 @@ def load_data_duckdb(
     return df
 
 
-def query_duckdb(sql: str, filename: str = None) -> pd.DataFrame:
+def query_duckdb(sql: str, filename: str | None = None) -> pd.DataFrame:
     """
     Ejecuta un query SQL arbitrario con DuckDB.
 
@@ -212,7 +214,7 @@ def polars_to_pandas(df_polars) -> pd.DataFrame:
 
 {% endif %}
 
-def download_data(url: str, filename: str, params: dict | None = None, api_key_env: str | None = None) -> pd.DataFrame:
+def download_data(url: str, filename: str, params: dict[str, Any] | None = None, api_key_env: str | None = None) -> pd.DataFrame:
     """
     Descarga datos desde una API externa y los guarda en data/raw/.
 

@@ -1,5 +1,5 @@
 {% macro apply_logcols_macro() %}
-def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
+def _apply_logcols(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """
     Aplica transformación logarítmica np.log1p() a las columnas indicadas.
     Configura LOGCOLS en la sección de constantes de este fichero.
@@ -26,6 +26,8 @@ def _apply_logcols(df: pd.DataFrame, cols: list) -> pd.DataFrame:
     return df
 {% endmacro %}
 {% if ml_type == 'supervisado' %}
+from typing import Any
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -39,7 +41,7 @@ from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 # ---------------------------------------------------------------------------
 # Configuración de codificación ordinal
 # ---------------------------------------------------------------------------
-ORDINAL_MAPPINGS: dict = {
+ORDINAL_MAPPINGS: dict[str, dict[str, int]] = {
     # Ejemplo:
     # "education": {
     #     "illiterate": 1, "basic.4y": 2, "basic.6y": 3, "basic.9y": 4,
@@ -48,7 +50,7 @@ ORDINAL_MAPPINGS: dict = {
     # },
 }
 
-COLS_TO_DROP: list = [
+COLS_TO_DROP: list[str] = [
     # "duration",     # fuga de datos
     # "nr_employed",  # alta correlación con euribor3m
 ]
@@ -56,7 +58,7 @@ COLS_TO_DROP: list = [
 # Columnas a las que aplicar transformación logarítmica (np.log1p).
 # Útil para features con distribución muy sesgada (skewness > 1).
 # Ejemplo: ["amount", "salary", "tenure_days"]
-LOGCOLS: list = []
+LOGCOLS: list[str] = []
 
 
 def preprocess_data(
@@ -65,8 +67,8 @@ def preprocess_data(
     scaler_type: str = "standard",
     test_size: float = 0.2,
     random_state: int = 42,
-    use_pca=None,
-):
+    use_pca: int | float | None = None,
+) -> tuple[Any, Any, Any, Any]:
     """
     Pipeline completo de preprocesado para aprendizaje supervisado.
 
@@ -202,7 +204,7 @@ def preprocess_data(
     return X_train, X_test, y_train, y_test
 
 
-def _apply_pca(X_train, X_test, n_components):
+def _apply_pca(X_train: Any, X_test: Any, n_components: int | float) -> tuple[Any, Any]:
     """
     Aplica PCA a train/test y guarda el objeto PCA en artifacts/.
 
@@ -307,7 +309,7 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
         pca = joblib.load(pca_path)
         X = pca.transform(X)
 
-    return X
+    return np.asarray(X)
 
 
 {% elif ml_type == 'no_supervisado' %}
@@ -319,7 +321,7 @@ from loguru import logger
 from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 # Columnas a las que aplicar transformación logarítmica (np.log1p).
-LOGCOLS: list = []
+LOGCOLS: list[str] = []
 
 
 def preprocess_data(df: pd.DataFrame) -> np.ndarray:
@@ -376,7 +378,7 @@ def preprocess_data(df: pd.DataFrame) -> np.ndarray:
     pd.DataFrame(X_scaled, columns=df.columns).to_csv(
         PROCESSED_DATA_DIR / "X_processed.csv", index=False
     )
-    return X_scaled
+    return np.asarray(X_scaled)
 
 
 def process_input(df_new: pd.DataFrame) -> np.ndarray:
@@ -446,7 +448,7 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
             le = LabelEncoder()
             df[col] = le.fit_transform(df[col].astype(str))
 
-    return scaler.transform(df).astype(np.float32)
+    return np.asarray(scaler.transform(df), dtype=np.float32)
 
 
 {{ apply_logcols_macro() }}
@@ -463,7 +465,7 @@ from loguru import logger
 from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 # Columnas a las que aplicar transformación logarítmica (np.log1p).
-LOGCOLS: list = []
+LOGCOLS: list[str] = []
 
 
 def preprocess_data(
@@ -625,7 +627,7 @@ from {{ project_slug }}.utils.paths import PROCESSED_DATA_DIR, ARTIFACTS_DIR
 
 COLS_TO_DROP: list = []
 ORDINAL_MAPPINGS: dict = {}
-LOGCOLS: list = []
+LOGCOLS: list[str] = []
 
 
 def preprocess_data(
@@ -980,7 +982,7 @@ def process_input(df_new: pd.DataFrame) -> np.ndarray:
             logger.debug(f"process_input: {artifact} → shape {X_scaled.shape}")
             break
 
-    return X_scaled
+    return np.asarray(X_scaled)
 
 
 {{ apply_logcols_macro() }}
