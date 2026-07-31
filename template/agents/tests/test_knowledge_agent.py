@@ -17,9 +17,13 @@ def know_context(tmp_path):
 def test_status_reports_graphify_availability(know_context):
     agent = KnowledgeAgent(context=know_context)
     result = agent.status()
-    assert result.success
-    assert isinstance(result.data["graphify_available"], bool)
+    assert result.data["graphify_available"] == GraphifyTool.is_available(know_context.root)
     assert isinstance(result.data["graph_exists"], bool)
+    if result.data["graphify_available"] or result.data["graph_exists"]:
+        assert result.success
+    else:
+        assert not result.success
+        assert any("graphify" in w for w in result.warnings)
 
 
 def test_status_warns_when_no_vault(know_context):
