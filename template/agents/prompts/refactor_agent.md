@@ -17,3 +17,33 @@ Reglas:
   agentes, no del proyecto del usuario).
 - Si dry_run=False, cada cambio debe ser un commit independiente para
   poder revertirlo si algo sale mal.
+
+<!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
+
+## Acciones
+
+| Acción | Argumentos |
+|--------|------------|
+| `run refactor fix_mutable_defaults` ⚠️ pide confirmación | `--within`, `--dry_run` |
+| `run refactor fix_bare_excepts` ⚠️ pide confirmación | `--within`, `--dry_run` |
+| `run refactor add_type_hints` ⚠️ pide confirmación | `--within`, `--dry_run` |
+| `run refactor fix_weights_only` ⚠️ pide confirmación | `--within`, `--dry_run` |
+
+## Límites
+
+**Rol.** Único agente autorizado a modificar código fuente del paquete, siempre con dry_run primero.
+
+**No se deshacen** (la puerta de permisos las bloquea sin `--yes`; propón, no ejecutes): `fix_mutable_defaults`, `fix_bare_excepts`, `add_type_hints`, `fix_weights_only`
+
+**No hace:**
+- refactorizar sin revisión previa: dry_run=True es el modo por defecto, el humano aprueba
+- tocar notebooks → notebook
+- tocar el Makefile → make
+
+**Necesita que le den:** qué archivo/paquete tocar, o confirmación para aplicar (dry_run=False)
+
+**Escribe en (nadie más toca esto):** codigo fuente del paquete ({project_slug}/)
+
+**Se apoya en:** review
+
+<!-- END AUTOGEN -->

@@ -109,10 +109,16 @@ class BaseAgent(ABC):
         delegate_to) queda registrada en el log de auditoría
         (`agents/workspace/audit/audit.jsonl`, ver `agents/audit.py`) — es
         la base para medir y mejorar a los agentes con el agente `audit`.
+
+        Y es también la puerta: las acciones que el contrato del agente marca
+        como destructivas no se ejecutan por aquí sin `confirm=True` (ver
+        `agents/permissions.py`). Este es el camino de los automatismos; el
+        que se salta la puerta —llamar al método directo— es el de una
+        persona escribiendo Python a propósito.
         """
         import time
 
-        from agents import audit
+        from agents import audit, permissions, redaction
 
         available = self.actions()
         if action not in available:
@@ -120,6 +126,19 @@ class BaseAgent(ABC):
                 f"El agente '{self.name}' no soporta la acción '{action}'. "
                 f"Acciones disponibles: {sorted(available)}"
             )
+
+        confirmado = bool(kwargs.pop("confirm", False))
+        if not confirmado and permissions.requiere_confirmacion(self.name, action, kwargs):
+            mensaje, needs = permissions.peticion(self.name, action, kwargs)
+            # Se audita: lo que un agente INTENTÓ hacer y no se le dejó es
+            # justo el dato que hace falta para saber si la puerta estorba o
+            # está salvando el repositorio.
+            audit.record(
+                self.ctx, agent=self.name, action=action, success=False,
+                duration_ms=0.0, message="bloqueado: falta confirmación",
+                kwarg_names=sorted(kwargs),
+            )
+            return AgentResult(False, self.name, action, mensaje, needs=needs)
 
         start = time.perf_counter()
         try:
@@ -135,6 +154,11 @@ class BaseAgent(ABC):
                 kwarg_names=sorted(kwargs),
             )
             raise
+
+        # Se redacta ANTES de auditar y de devolver: el `message` va a la
+        # ventana del modelo y a un fichero en disco, y ninguno de los dos es
+        # sitio para una credencial (ver agents/redaction.py).
+        redaction.redactar_resultado(result)
 
         audit.record(
             self.ctx, agent=self.name, action=action, success=result.success,

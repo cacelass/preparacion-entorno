@@ -86,7 +86,10 @@ def test_install_from_git_valid_agent_end_to_end_via_cli(tmp_path):
     repo = _make_external_repo(tmp_path, VALID_AGENT_SOURCE)
 
     result = subprocess.run(
-        [sys.executable, "-m", "agents", "run", "installer", "install_from_git", "--repo_url", str(repo)],
+        # `--yes` autoriza la puerta de permisos: instalar código de terceros
+        # es destructivo, así que sin esto la CLI se para y pregunta.
+        [sys.executable, "-m", "agents", "run", "installer", "install_from_git",
+         "--repo_url", str(repo), "--yes"],
         cwd=project_dir, capture_output=True, text=True, timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr

@@ -76,15 +76,28 @@ def render_block(agent_name: str, agent) -> str:
     """El bloque autogenerado de un agente."""
     lineas = [BEGIN, "", "## Acciones", "", "| Acción | Argumentos |", "|--------|------------|"]
 
+    contrato = contract_for(agent_name)
+    destructivas = contrato.destructive if contrato is not None else ()
+
     acciones = agent.actions()
     for nombre in acciones:
-        lineas.append(f"| `run {agent_name} {nombre}` | {_signature_args(acciones[nombre])} |")
+        # La marca va en la tabla y no solo en los límites: es la línea que el
+        # asistente tiene delante en el momento de elegir la acción.
+        marca = " ⚠️ pide confirmación" if nombre in destructivas else ""
+        lineas.append(
+            f"| `run {agent_name} {nombre}`{marca} | {_signature_args(acciones[nombre])} |"
+        )
     if not acciones:
         lineas.append("| _(sin acciones)_ | — |")
 
-    contrato = contract_for(agent_name)
     if contrato is not None:
         lineas += ["", "## Límites", "", f"**Rol.** {contrato.role}", ""]
+        if destructivas:
+            lineas.append(
+                "**No se deshacen** (la puerta de permisos las bloquea sin `--yes`; "
+                "propón, no ejecutes): " + ", ".join(f"`{a}`" for a in destructivas)
+            )
+            lineas.append("")
         if contrato.cannot:
             lineas.append("**No hace:**")
             lineas += [f"- {item}" for item in contrato.cannot]

@@ -59,18 +59,27 @@ class GStack:
     Parámetros
     ----------
     auto_commit : bool
-        Si True, hace `git add -A && git commit` entre cada paso.
+        Si True, hace `git add -A && git commit` entre cada paso. **Requiere
+        autorización**: sin `confirm=True` (o `DSKIT_ASSUME_YES=1`) el commit
+        no se hace y queda anotado en el log de eventos. Un pipeline que
+        escribe en el historial de git sin que nadie lo haya pedido es
+        exactamente lo que la puerta de permisos existe para impedir, y este
+        camino no pasa por `BaseAgent.run` porque usa `GitTool` directamente.
     commit_on_error : bool
-        Si True y un paso falla, hace commit de lo acumulado antes de detenerse.
+        Si True y un paso falla, hace commit de lo acumulado antes de
+        detenerse. Sujeto a la misma autorización.
+    confirm : bool
+        Autoriza los commits automáticos de esta stack.
     log_events : bool
         Si True, escribe cada acción a ``agents/workspace/events.jsonl``.
     """
 
     def __init__(self, auto_commit: bool = False, commit_on_error: bool = True, log_events: bool = True,
-                 context=None):
+                 context=None, confirm: bool = False):
         self._steps: list[StackStep] = []
         self.auto_commit = auto_commit
         self.commit_on_error = commit_on_error
+        self.confirm = confirm
         self.log_events = log_events
         self._ctx = context or get_context()
         self._orch = Orchestrator(context=self._ctx)
@@ -161,6 +170,16 @@ class GStack:
             pass
 
     def _commit_step(self, index: int, step: StackStep, success: bool) -> None:
+        from agents import permissions
+
+        if not (self.confirm or permissions.puerta_desactivada()):
+            self._log_evento_suelto({
+                "index": index, "agent": step.agent, "action": step.action,
+                "event": "auto_commit_bloqueado",
+                "message": "auto-commit omitido: la stack no está autorizada "
+                           "(GStack(confirm=True) o DSKIT_ASSUME_YES=1)",
+            })
+            return
         try:
             from agents.tools.git_tool import GitTool
             git = GitTool(repo_root=self._ctx.root)
@@ -179,6 +198,67 @@ class GStack:
             git.commit(msg)
         except Exception:
             pass
+
+    def _log_evento_suelto(self, entrada: dict) -> None:
+        """Anota en el log algo que no es el resultado de un paso."""
+        if not self.log_events:
+            return
+        try:
+            log_path = self._ctx.agent_workspace("gstack") / "events.jsonl"
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(
+                    {"timestamp": datetime.now(timezone.utc).isoformat(), **entrada},
+                    ensure_ascii=False,
+                ) + "\n")
+        except Exception:  # noqa: BLE001 — el log nunca tumba la ejecución
+            pass
+
+    def to_mermaid(self, results: list[AgentResult] | None = None) -> str:
+        """
+        Vuelca la stack como diagrama Mermaid.
+
+        Una stack con `run_if` deja de leerse como una lista en cuanto tiene
+        más de tres pasos: hay ramas que se ejecutan y ramas que no, y el
+        `summary` de texto no enseña la forma, solo el resultado. Pegando esto
+        en el markdown de `harness/progress/` se ve el flujo — que es todo lo que el
+        «graph engineering» ofrece de verdad sobre una máquina de estados que
+        este proyecto ya tenía.
+
+        Con `results` (los de un `StackResult`) colorea lo ejecutado, lo
+        omitido y lo que falló.
+        """
+        estados = {}
+        if results:
+            for i, r in enumerate(results):
+                if r.action == "__skipped__":
+                    estados[i] = "omitido"
+                else:
+                    estados[i] = "ok" if r.success else "fallo"
+
+        lineas = ["flowchart TD", "    inicio([inicio])"]
+        previo = "inicio"
+        for i, step in enumerate(self._steps):
+            nodo = f"p{i}"
+            etiqueta = f"{step.agent}.{step.action}"
+            if step.run_if is not None:
+                etiqueta += " (condicional)"
+            lineas.append(f'    {nodo}["{etiqueta}"]')
+            flecha = "-.->" if step.run_if is not None else "-->"
+            lineas.append(f"    {previo} {flecha} {nodo}")
+            if step.auto_commit_message or self.auto_commit:
+                lineas.append(f"    {nodo} -.->|auto-commit| {nodo}")
+            previo = nodo
+
+        lineas.append(f"    {previo} --> fin([fin])")
+        for i, estado in estados.items():
+            lineas.append(f"    class p{i} {estado}")
+        if estados:
+            lineas += [
+                "    classDef ok fill:#d7f5dd,stroke:#2f9e44",
+                "    classDef fallo fill:#ffe3e3,stroke:#e03131",
+                "    classDef omitido fill:#f1f3f5,stroke:#adb5bd,stroke-dasharray:4",
+            ]
+        return "\n".join(lineas)
 
     @property
     def event_log_path(self) -> Path | None:

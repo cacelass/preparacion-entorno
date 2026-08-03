@@ -1,6 +1,17 @@
 {
-  "$comment": "Configuración de Claude Code para {{ project_name }}. El hook cierra el ciclo del arnés: al terminar la sesión se ejecuta la puerta para no dejar el proyecto en un estado roto sin que nadie se entere. Se usa --quick porque un SessionEnd no es el momento de esperar a la suite entera; la completa la ejecuta 'harness finish' antes de cerrar cualquier feature.",
+  "$comment": "Configuración de Claude Code para {{ project_name }}. Dos hooks. PreToolUse es la frontera de seguridad: antes de cada Bash/Read/Write/Edit, 'agents.policy_guard' decide si eso se ejecuta — el modelo propone, el código dispone (ver agents/policy_guard.py y AGENTS.md). SessionEnd cierra el ciclo del arnés ejecutando la puerta para no dejar el proyecto roto sin que nadie se entere; se usa --quick porque un SessionEnd no es el momento de esperar a la suite entera, que ya la ejecuta 'harness finish' antes de cerrar cualquier feature.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Write|Edit|NotebookEdit|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run python -m agents.policy_guard"
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [
@@ -22,6 +33,17 @@
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.production)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./**/id_rsa)",
+      "Read(./**/id_ed25519)",
+      "Bash(sudo:*)",
+      "Bash(git push:*)"
     ]
   }
 }

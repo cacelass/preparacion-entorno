@@ -80,12 +80,7 @@ class Orchestrator:
         """
         decision = self.select_agent(query)
         if decision.agent_name is None:
-            return AgentResult(
-                False, "orchestrator", "dispatch",
-                f"Ningún agente registrado alcanza la confianza mínima ({MIN_CONFIDENCE}) para: '{query}'. "
-                f"Candidatos evaluados: {decision.candidates}. Prueba a invocar el agente directamente "
-                f"si sabes cuál necesitas: agents.run(nombre, accion, **kwargs).",
-            )
+            return self._sin_agente(query, decision)
 
         agent = self._get_instance(decision.agent_name)
 
@@ -115,6 +110,52 @@ class Orchestrator:
             )
 
         return self.run(decision.agent_name, chosen_action, **kwargs)
+
+    def _sin_agente(self, query: str, decision: RoutingDecision) -> AgentResult:
+        """
+        Nadie llega a la confianza mínima: antes de rendirse, mira en el índice.
+
+        El ruteo por palabras clave falla justo cuando la pregunta está bien
+        formulada pero no usa el vocabulario de ningún agente ("¿por qué
+        elegimos este modelo?"). Ahí no hay una acción que ejecutar, pero casi
+        siempre hay una respuesta escrita en el repositorio, y el RAG ya la
+        tiene indexada. Devolver dónde está es más útil que devolver la lista
+        de candidatos descartados.
+
+        No se ejecuta nada por el usuario y `success` sigue siendo `False`: es
+        una pista, no una acción. Si el RAG no está instalado o no encuentra
+        nada, se cae al mensaje de siempre.
+        """
+        cierre = (
+            f"Candidatos evaluados: {decision.candidates}. Prueba a invocar el agente "
+            f"directamente si sabes cuál necesitas: agents.run(nombre, accion, **kwargs)."
+        )
+        cabecera = (
+            f"Ningún agente registrado alcanza la confianza mínima ({MIN_CONFIDENCE}) "
+            f"para: '{query}'."
+        )
+        try:
+            from agents.tools.rag_tool import RagTool
+        except ImportError:
+            return AgentResult(False, "orchestrator", "dispatch", f"{cabecera} {cierre}")
+
+        if not RagTool.available():
+            return AgentResult(False, "orchestrator", "dispatch", f"{cabecera} {cierre}")
+
+        try:
+            hits = RagTool.search(self.ctx.root, query, top_k=3, max_per_source=1)
+        except Exception:  # noqa: BLE001 — una pista rota no debe tapar el mensaje real
+            hits = []
+        if not hits or "error" in hits[0]:
+            return AgentResult(False, "orchestrator", "dispatch", f"{cabecera} {cierre}")
+
+        pistas = "\n".join(f"  - {h['source']}:{h['line']} — {h['text'][:120]}" for h in hits)
+        return AgentResult(
+            False, "orchestrator", "dispatch",
+            f"{cabecera} No es una acción, pero el índice apunta a dónde está escrito:\n"
+            f"{pistas}\n(búsqueda completa: run rag search --query \"{query}\")\n{cierre}",
+            data={"rag_hints": hits, "candidates": decision.candidates},
+        )
 
     def run(self, agent_name: str, action: str, /, **kwargs) -> AgentResult:
         """Ejecuta una acción concreta de un agente concreto, sin pasar por el ruteo por keywords."""

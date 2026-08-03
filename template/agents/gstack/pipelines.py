@@ -1,12 +1,18 @@
 """
 gstack.pipelines — Pipelines predefinidos para flujos autónomos comunes.
 
-Cada pipeline es una función que construye y ejecuta una GStack. Todos
-gestionan sus propios commits entre pasos.
+Cada pipeline es una función que construye y ejecuta una GStack.
+
+Los commits automáticos entre pasos están **desautorizados por defecto**: sin
+`confirm=True` (o `--yes` en la CLI) el pipeline hace su trabajo y deja los
+cambios en el árbol para que los revises, anotando en el log de eventos cada
+commit que se saltó. Escribir en el historial de git es una decisión del
+humano, no un efecto secundario de un pipeline.
 
 Puedes ejecutarlos desde CLI:
     python -m agents pipeline develop
-    python -m agents pipeline release 1.2.0
+    python -m agents pipeline develop --yes      # autoriza los auto-commits
+    python -m agents pipeline release --version 1.2.0
 """
 
 from __future__ import annotations
@@ -14,12 +20,12 @@ from __future__ import annotations
 from agents.gstack.stack import GStack, StackResult
 
 
-def auto_analyze(*, auto_commit: bool = True) -> StackResult:
+def auto_analyze(*, auto_commit: bool = True, confirm: bool = False) -> StackResult:
     """
     Analiza el proyecto actual sin modificarlo: revisa código, datos,
     dependencias y entorno. Ideal como diagnóstico rápido.
     """
-    stack = GStack(auto_commit=auto_commit, commit_on_error=False)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=False, confirm=confirm)
     stack.push("env", "info")
     stack.push("env", "check_python_version")
     stack.push("git", "analyze_diff")
@@ -28,13 +34,13 @@ def auto_analyze(*, auto_commit: bool = True) -> StackResult:
     return stack.run()
 
 
-def auto_develop(*, auto_commit: bool = True) -> StackResult:
+def auto_develop(*, auto_commit: bool = True, confirm: bool = False) -> StackResult:
     """
     Pipeline de desarrollo autónomo: revisa el código, ejecuta tests,
     y si todo pasa, hace commit. Solo ejecuta test si review encuentra
     problemas no críticos — si review no encuentra nada, test se omite.
     """
-    stack = GStack(auto_commit=auto_commit, commit_on_error=True)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=True, confirm=confirm)
     stack.push("git", "analyze_diff")
     stack.push("review", "review_package", path=".", result_key="review")
     stack.push(
@@ -45,21 +51,21 @@ def auto_develop(*, auto_commit: bool = True) -> StackResult:
     return stack.run()
 
 
-def auto_release(version: str, *, auto_commit: bool = True) -> StackResult:
+def auto_release(version: str, *, auto_commit: bool = True, confirm: bool = False) -> StackResult:
     """
     Pipeline de release autónomo: ejecuta tests, genera release.
     """
-    stack = GStack(auto_commit=auto_commit, commit_on_error=False)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=False, confirm=confirm)
     stack.push("test", "run_tests")
     stack.push("git", "tag_release", version=version)
     return stack.run()
 
 
-def auto_fix(*, auto_commit: bool = True) -> StackResult:
+def auto_fix(*, auto_commit: bool = True, confirm: bool = False) -> StackResult:
     """
     Pipeline de corrección autónoma: test → review → fix → commit.
     """
-    stack = GStack(auto_commit=auto_commit, commit_on_error=True)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=True, confirm=confirm)
     stack.push("test", "run_tests", result_key="baseline")
     stack.push("review", "review_package", path=".", result_key="review")
     stack.push("refactor", "fix_bare_excepts")
@@ -69,9 +75,9 @@ def auto_fix(*, auto_commit: bool = True) -> StackResult:
     return stack.run()
 
 
-def auto_commit_cycle(*, phases: int = 3, auto_commit: bool = True) -> StackResult:
+def auto_commit_cycle(*, phases: int = 3, auto_commit: bool = True, confirm: bool = False) -> StackResult:
     """Ciclo iterativo: revisa → test → repite."""
-    stack = GStack(auto_commit=auto_commit, commit_on_error=True)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=True, confirm=confirm)
     for i in range(phases):
         stack.push("review", "review_package", path=".", result_key=f"review_{i}")
         stack.push("test", "run_tests")
@@ -79,11 +85,11 @@ def auto_commit_cycle(*, phases: int = 3, auto_commit: bool = True) -> StackResu
     return stack.run()
 
 
-def auto_data_pipeline(*, filename: str, target_col: str | None = None, auto_commit: bool = True) -> StackResult:
+def auto_data_pipeline(*, filename: str, target_col: str | None = None, auto_commit: bool = True, confirm: bool = False) -> StackResult:
     """
     Pipeline completo de datos: EDA → leakage → skewness → commit.
     """
-    stack = GStack(auto_commit=auto_commit, commit_on_error=False)
+    stack = GStack(auto_commit=auto_commit, commit_on_error=False, confirm=confirm)
     stack.push("data", "eda_report", filename=filename, target_col=target_col, result_key="eda")
     stack.push("data", "detect_skewness", filename=filename, result_key="skew")
     if target_col:

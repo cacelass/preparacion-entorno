@@ -76,6 +76,11 @@ def _parse_kwargs(pairs: list[str]) -> dict[str, Any]:
                 value = float(value) if "." in value else int(value)
             kwargs[key] = value
             key = None
+    # `--yes` es el nombre corto de la autorización de la puerta de permisos
+    # (ver agents/permissions.py). Se traduce aquí para que quien escribe en
+    # el terminal no tenga que saber cómo se llama el argumento por dentro.
+    if kwargs.pop("yes", False):
+        kwargs["confirm"] = True
     return kwargs
 
 
