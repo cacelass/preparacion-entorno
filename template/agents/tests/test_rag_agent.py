@@ -223,6 +223,30 @@ class TestLexico:
     def test_bm25_corpus_vacio(self):
         assert _Bm25([]).puntua(["algo"]) == []
 
+    def test_bm25_sobrevive_a_un_viaje_de_ida_y_vuelta_por_json(self):
+        """
+        El estado se persiste en `.rag-index/bm25.json` para no retokenizar el
+        proyecto en cada invocación de la CLI. Si el viaje por JSON cambiara
+        las puntuaciones, el índice de disco y el de memoria darían rankings
+        distintos sin que nada avisara.
+        """
+        import json as _json
+
+        docs = [
+            _tokenizar("el modelo se entrena con gradient boosting"),
+            _tokenizar("la api expone un endpoint de salud"),
+            _tokenizar("el modelo de la api se entrena aparte"),
+        ]
+        original = _Bm25(docs)
+        consulta = _tokenizar("entrenar el modelo")
+
+        renacido = _Bm25.desde_estado(_json.loads(_json.dumps(original.a_estado())))
+        assert renacido.puntua(consulta) == original.puntua(consulta)
+
+    def test_bm25_estado_no_guarda_el_idf_derivable(self):
+        estado = _Bm25([_tokenizar("uno dos")]).a_estado()
+        assert set(estado) == {"largos", "postings"}
+
     def test_rrf_premia_lo_que_sale_en_los_dos_rankings(self):
         """Salir en los dos rankings pesa más que ir primero en uno solo."""
         fusion = RagTool._rrf([["solo_vector", "en_ambos"], ["en_ambos", "solo_lexico"]])
@@ -363,8 +387,8 @@ class TestIndexIntegration:
         assert "regresión logística" not in textos
 
     def test_borrar_un_fichero_lo_saca_del_indice(self, tmp_path):
-        (tmp_path / "progress").mkdir()
-        historia = tmp_path / "progress" / "history.md"
+        (tmp_path / "harness" / "progress").mkdir(parents=True)
+        historia = tmp_path / "harness" / "progress" / "history.md"
         historia.write_text("# Historial\n\n" + "Decisión antigua sobre el pipeline. " * 20)
         (tmp_path / "README.md").write_text("# Test\n\n" + "Documento que se queda. " * 20)
         RagTool.index_project(tmp_path)
@@ -373,7 +397,7 @@ class TestIndexIntegration:
         resultado = RagTool.index_project(tmp_path)
         assert resultado["deleted_chunks"] > 0
         fuentes = {r["source"] for r in RagTool.search(tmp_path, "decisión sobre el pipeline")}
-        assert not any(s.startswith("progress/") for s in fuentes)
+        assert not any(s.startswith("harness/progress/") for s in fuentes)
 
     def test_rebuild_parte_de_cero(self, tmp_path):
         (tmp_path / "README.md").write_text("# Test\n\n" + "Contenido. " * 20)
@@ -426,7 +450,7 @@ class TestBusquedaHibrida:
 
 class TestHarnessMemoryIsIndexed:
     """
-    El histórico del arnés (progress/) y el backlog son justo lo que un agente
+    El histórico del arnés (harness/progress/) y el backlog son justo lo que un agente
     nuevo necesita poder preguntar en lenguaje natural ("¿por qué elegimos
     esto?") sin releerlo entero. Si dejan de indexarse, la memoria del arnés
     deja de ser buscable y nadie se entera.
@@ -435,9 +459,10 @@ class TestHarnessMemoryIsIndexed:
     def test_progress_se_clasifica_como_harness(self):
         from agents.tools.rag_tool import _file_type
 
-        assert _file_type("progress/history.md") == "harness"
-        assert _file_type("progress/explorer-DATA-001.md") == "harness"
-        assert _file_type("featureslist.json") == "harness"
+        assert _file_type("harness/progress/history.md") == "harness"
+        assert _file_type("harness/progress/explorer-DATA-001.md") == "harness"
+        assert _file_type("harness/featureslist.json") == "harness"
+        assert _file_type("harness/memory.md") == "harness"
 
     def test_otras_fuentes_no_se_clasifican_como_harness(self):
         from agents.tools.rag_tool import _file_type
@@ -449,16 +474,16 @@ class TestHarnessMemoryIsIndexed:
 
     @requiere_chroma
     def test_index_recoge_progress_y_backlog(self, tmp_path):
-        (tmp_path / "progress").mkdir()
-        (tmp_path / "progress" / "history.md").write_text(
+        (tmp_path / "harness" / "progress").mkdir(parents=True)
+        (tmp_path / "harness" / "progress" / "history.md").write_text(
             "# Historial\n\n## DATA-001 — EDA\n\n"
             "Elegimos K=4 porque el silhouette caía a partir de ahí. " * 5
         )
-        (tmp_path / "featureslist.json").write_text(
+        (tmp_path / "harness" / "featureslist.json").write_text(
             '{"features": [{"id": "X-1", "title": "Una feature de prueba", '
             '"description": "' + "descripción larga " * 20 + '", '
             '"acceptance_criteria": ["make test pasa"], "status": "pending"}]}'
         )
         RagTool.index_project(tmp_path)
         sources = {r["source"] for r in RagTool.search(tmp_path, "por qué elegimos K=4")}
-        assert any("progress/" in s or s == "featureslist.json" for s in sources)
+        assert any("harness/progress/" in s or s == "harness/featureslist.json" for s in sources)

@@ -2,7 +2,7 @@
 agents.tools.rag_tool — RAG local con ChromaDB: búsqueda híbrida sin API key.
 
 Indexa documentación del proyecto (código, prompts, docs, vault, README, y la
-memoria del arnés: progress/ y featureslist.json) y permite buscar en lenguaje
+memoria del arnés: harness/progress/ y harness/featureslist.json) y permite buscar en lenguaje
 natural. Sin GPU, sin API key, funciona offline.
 
 La búsqueda es **híbrida**: funde el ranking vectorial de ChromaDB con un BM25
@@ -83,9 +83,44 @@ def _file_type(source: str) -> str:
         return "prompt"
     if "/vault/" in source or source.startswith("vault/"):
         return "vault"
-    if source.startswith("progress/") or source == "featureslist.json":
+    if source.startswith("harness/"):
         return "harness"
     return "doc"
+
+
+#: Frases que en un documento recuperado no son información sino un intento de
+#: dar órdenes. La lista es corta y honesta: NO es una defensa —una inyección
+#: reformulada la esquiva sin esfuerzo—, es una señal para poder marcar el
+#: fragmento y para que un test pueda detectar que alguien envenenó el índice.
+#: La defensa de verdad es que un dato no pueda provocar nada irreversible:
+#: eso lo da la puerta de `agents/permissions.py`, no esta lista.
+_INYECCION = re.compile(
+    r"(?i)("
+    r"ignor(a|e|ar|ing)\s+(todas\s+)?(las\s+)?(instrucciones|instructions)"
+    r"|disregard\s+(all\s+)?(previous|prior)"
+    r"|olvida\s+(todo\s+)?lo\s+anterior"
+    r"|(new|nuevas?)\s+(system\s+)?(prompt|instrucciones)"
+    r"|system\s*prompt\s*[:=]"
+    r"|eres\s+un\s+asistente\s+que"
+    r"|you\s+are\s+now\s+"
+    r"|<\s*/?\s*(system|assistant)\s*>"
+    r")"
+)
+
+#: De dónde salió el texto. `repo` es lo que vive en tu repositorio y pasa por
+#: tus revisiones; `externo` es lo que se descargó de una URL y no lo ha
+#: revisado nadie. La distinción existe para que la respuesta pueda
+#: presentarlos separados en vez de mezclados y con la misma pinta.
+CONFIANZA_REPO = "repo"
+CONFIANZA_EXTERNA = "externo"
+
+
+def _confianza(source: str) -> str:
+    return CONFIANZA_EXTERNA if source.startswith("url:") else CONFIANZA_REPO
+
+
+def _parece_inyeccion(texto: str) -> bool:
+    return bool(_INYECCION.search(texto))
 
 
 def _embedder_id() -> str:
@@ -127,19 +162,28 @@ def _tokenizar(texto: str) -> list[str]:
 
 
 class _Bm25:
-    """BM25 Okapi en stdlib. Unos miles de chunks caben de sobra en memoria."""
+    """
+    BM25 Okapi en stdlib, sobre índice invertido.
 
-    def __init__(self, documentos: list[list[str]]) -> None:
+    El índice es invertido por dos razones concretas. Una: puntuar recorría
+    antes los `tf` de TODOS los chunks por cada término de la consulta, así
+    que una búsqueda costaba O(términos × chunks) aunque el término
+    apareciera en dos ficheros. Dos: las postings caben en un JSON, y eso es
+    lo que permite persistir el índice (`a_estado`/`desde_estado`) en vez de
+    releer y retokenizar el proyecto entero en cada invocación de la CLI,
+    que es de un solo disparo y no aprovecha ninguna caché en memoria.
+    """
+
+    def __init__(self, documentos: list[list[str]] | None = None) -> None:
+        documentos = documentos or []
         self.n = len(documentos)
-        self.tf = [Counter(d) for d in documentos]
         self.largos = [len(d) for d in documentos]
         self.medio = (sum(self.largos) / self.n) if self.n else 0.0
-        df: Counter = Counter()
-        for d in documentos:
-            df.update(set(d))
-        self.idf = {
-            t: math.log(1 + (self.n - c + 0.5) / (c + 0.5)) for t, c in df.items()
-        }
+        self.postings: dict[str, list[tuple[int, int]]] = {}
+        for i, doc in enumerate(documentos):
+            for termino, veces in Counter(doc).items():
+                self.postings.setdefault(termino, []).append((i, veces))
+        self.idf = _idf_desde_postings(self.postings, self.n)
 
     def puntua(self, consulta: list[str], k1: float = 1.5, b: float = 0.75) -> list[float]:
         if not self.n or not self.medio:
@@ -149,13 +193,30 @@ class _Bm25:
             idf = self.idf.get(termino)
             if idf is None:
                 continue
-            for i, tf in enumerate(self.tf):
-                f = tf.get(termino, 0)
-                if not f:
-                    continue
+            for i, f in self.postings[termino]:
                 norma = 1 - b + b * (self.largos[i] / self.medio)
                 marcadores[i] += idf * (f * (k1 + 1)) / (f + k1 * norma)
         return marcadores
+
+    def a_estado(self) -> dict[str, Any]:
+        """Estado serializable. El `idf` no se guarda: se deriva de las postings."""
+        return {"largos": self.largos, "postings": self.postings}
+
+    @classmethod
+    def desde_estado(cls, estado: dict[str, Any]) -> _Bm25:
+        obj = cls()
+        obj.largos = estado["largos"]
+        obj.n = len(obj.largos)
+        obj.medio = (sum(obj.largos) / obj.n) if obj.n else 0.0
+        obj.postings = estado["postings"]
+        obj.idf = _idf_desde_postings(obj.postings, obj.n)
+        return obj
+
+
+def _idf_desde_postings(postings: dict[str, list], n: int) -> dict[str, float]:
+    return {
+        t: math.log(1 + (n - len(p) + 0.5) / (len(p) + 0.5)) for t, p in postings.items()
+    }
 
 
 class _SoloTexto(HTMLParser):
@@ -387,6 +448,8 @@ class RagTool:
                 "file_type": _file_type(source),
                 "section_type": section_type,
                 "file_hash": file_hash,
+                "trust": _confianza(source),
+                "injection_flag": _parece_inyeccion(text),
             },
         }
 
@@ -550,8 +613,8 @@ class RagTool:
         ("vault", "*.md", True, None, "md"),
         # Memoria del arnes: el historico de features cerradas y sus decisiones
         # es lo que un agente nuevo necesita buscar en lenguaje natural sin
-        # releer todo progress/.
-        ("progress", "*.md", False, None, "md"),
+        # releer todo harness/progress/.
+        ("harness/progress", "*.md", False, None, "md"),
     )
 
     #: Ruido que nunca aporta a una busqueda semantica.
@@ -597,7 +660,7 @@ class RagTool:
 
         backlog = RagTool._backlog_a_markdown(root)
         if backlog:
-            docs.append(("featureslist.json", backlog, "md"))
+            docs.append(("harness/featureslist.json", backlog, "md"))
         return docs
 
     @staticmethod
@@ -625,7 +688,7 @@ class RagTool:
         El backlog se aplana a markdown antes de indexarlo: buscar
         "criterios de aceptacion" contra JSON crudo no devuelve nada util.
         """
-        backlog = root / "featureslist.json"
+        backlog = root / "harness/featureslist.json"
         if not backlog.exists():
             return ""
         try:
@@ -646,7 +709,7 @@ class RagTool:
     @staticmethod
     def _chunks_backlog(root: Path) -> list[dict[str, Any]]:
         texto = RagTool._backlog_a_markdown(root)
-        return RagTool.chunk_md(texto, "featureslist.json", RagTool._huella(texto)) if texto else []
+        return RagTool.chunk_md(texto, "harness/featureslist.json", RagTool._huella(texto)) if texto else []
 
     @staticmethod
     def index_project(root: Path, rebuild: bool = False) -> dict[str, Any]:
@@ -655,7 +718,7 @@ class RagTool:
 
         El add-only de antes no borraba nada: editar un fichero dejaba el chunk
         viejo dentro para siempre y borrarlo no lo sacaba del índice. Con
-        `progress/` y `featureslist.json` dentro —que cambian en cada feature—
+        `harness/progress/` y `harness/featureslist.json` dentro —que cambian en cada feature—
         eso contamina la memoria del arnés al ritmo al que se trabaja. Ahora
         cada fichero lleva su huella: si no ha cambiado no se re-embebe, y si
         cambió o desapareció, sus chunks se borran antes de reescribirlos.
@@ -720,6 +783,7 @@ class RagTool:
                 )
 
         _CORPUS_CACHE.pop(str(root / ".rag-index"), None)
+        RagTool._guardar_indice_lexico(root, collection)
         return {
             "total_chunks": collection.count(),
             "new_chunks": len(nuevos),
@@ -751,27 +815,79 @@ class RagTool:
                 metadatas=[{**c["metadata"], "type": "url"} for c in unicos],
             )
         _CORPUS_CACHE.pop(str(root / ".rag-index"), None)
+        RagTool._guardar_indice_lexico(root, collection)
         return {"chunks_indexed": len(unicos), "url": url, "replaced": len(previos)}
 
     # -- Search --------------------------------------------------------------
 
     @staticmethod
-    def _corpus(collection: Any, clave: str) -> dict[str, Any]:
-        """Corpus tokenizado para el BM25, cacheado mientras no se reindexe."""
+    def _ruta_bm25(root: Path) -> Path:
+        return root / ".rag-index" / "bm25.json"
+
+    @staticmethod
+    def _guardar_indice_lexico(root: Path, collection: Any) -> None:
+        """
+        Vuelca el índice léxico a disco al terminar de indexar.
+
+        Lo escriben `index_project` e `index_url`, que son los dos únicos
+        sitios donde la colección cambia. Si falla, no pasa nada: la búsqueda
+        lo reconstruye en memoria. Por eso se traga la excepción en vez de
+        tumbar un indexado que ya ha ido bien.
+        """
+        try:
+            datos = collection.get(include=["documents"])
+            documentos = datos["documents"] or []
+            bm25 = _Bm25([_tokenizar(d) for d in documentos])
+            payload = {"count": len(documentos), "ids": datos["ids"], "estado": bm25.a_estado()}
+            ruta = RagTool._ruta_bm25(root)
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            ruta.write_text(json.dumps(payload), encoding="utf-8")
+        except Exception:  # noqa: BLE001 — es una caché, no la fuente de verdad
+            with contextlib.suppress(OSError):
+                RagTool._ruta_bm25(root).unlink(missing_ok=True)
+
+    @staticmethod
+    def _indice_lexico(root: Path, collection: Any) -> dict[str, Any]:
+        """
+        Índice BM25: de la caché en memoria, del disco, o reconstruido.
+
+        El `count` es la validación: la colección solo la tocan `index_project`
+        e `index_url`, y ambos reescriben el fichero, así que un count que
+        cuadra significa que el volcado corresponde a lo que hay indexado.
+        Si no cuadra (o no hay fichero) se reconstruye y se vuelve a guardar.
+        """
+        clave = str(root / ".rag-index")
+        total = collection.count()
+
         guardado = _CORPUS_CACHE.get(clave)
-        if guardado is not None and guardado["n"] == collection.count():
+        if guardado is not None and guardado["n"] == total:
             return guardado
-        datos = collection.get(include=["documents", "metadatas"])
+
+        ruta = RagTool._ruta_bm25(root)
+        if ruta.exists():
+            try:
+                payload = json.loads(ruta.read_text(encoding="utf-8"))
+                if payload.get("count") == total:
+                    indice = {
+                        "n": total,
+                        "ids": payload["ids"],
+                        "bm25": _Bm25.desde_estado(payload["estado"]),
+                    }
+                    _CORPUS_CACHE[clave] = indice
+                    return indice
+            except (OSError, ValueError, KeyError):
+                pass  # volcado corrupto o de otra versión: se rehace
+
+        datos = collection.get(include=["documents"])
         documentos = datos["documents"] or []
-        corpus = {
-            "n": collection.count(),
+        indice = {
+            "n": total,
             "ids": datos["ids"],
-            "docs": documentos,
-            "metas": datos["metadatas"] or [{} for _ in documentos],
             "bm25": _Bm25([_tokenizar(d) for d in documentos]),
         }
-        _CORPUS_CACHE[clave] = corpus
-        return corpus
+        _CORPUS_CACHE[clave] = indice
+        RagTool._guardar_indice_lexico(root, collection)
+        return indice
 
     @staticmethod
     def _rrf(rankings: list[list[str]], k: int = 60) -> dict[str, float]:
@@ -786,14 +902,115 @@ class RagTool:
         return fusion
 
     @staticmethod
+    def _coseno(a: list[float], b: list[float]) -> float:
+        num = sum(x * y for x, y in zip(a, b, strict=False))
+        na = math.sqrt(sum(x * x for x in a))
+        nb = math.sqrt(sum(y * y for y in b))
+        return (num / (na * nb)) if na and nb else 0.0
+
+    @staticmethod
+    def _completar_similitudes(collection: Any, query: str, ids: list[str],
+                               similitudes: dict[str, float]) -> None:
+        """
+        Calcula el coseno de los candidatos que entraron solo por BM25.
+
+        Sin esto, un acierto léxico salía con `score` 0.0 —el valor por
+        defecto de un id que no estaba en la respuesta vectorial— y cualquier
+        `min_score` lo borraba. Es decir: el filtro de calidad se comía
+        exactamente los resultados que el híbrido existe para rescatar, y el
+        número que se imprimía al lado no ordenaba nada. Se resuelve pidiendo
+        a chroma los vectores de esos ids concretos (`get` por id, no un
+        barrido) y comparándolos con el de la consulta.
+        """
+        faltan = [cid for cid in ids if cid not in similitudes]
+        if not faltan:
+            return
+        try:
+            funcion = _embedding_function(_embedder_id())
+            if funcion is None:
+                from chromadb.utils import embedding_functions
+
+                funcion = embedding_functions.DefaultEmbeddingFunction()
+            vector_consulta = list(funcion([query])[0])
+            datos = collection.get(ids=faltan, include=["embeddings"])
+            for cid, vector in zip(datos["ids"], datos["embeddings"] or [], strict=False):
+                similitudes[cid] = round(
+                    RagTool._coseno(vector_consulta, list(vector)), 4
+                )
+        except Exception:  # noqa: BLE001 — sin coseno se ordena igual por RRF
+            return
+
+    @staticmethod
+    def _expandir(collection: Any, resultados: list[dict[str, Any]], vecinos: int) -> None:
+        """
+        Añade a cada resultado el texto de los chunks contiguos de su fichero.
+
+        El techo de `_MAX_CHUNK_CHARS` es el límite del embedder: manda sobre
+        lo que se vectoriza, no sobre lo que se devuelve. Recuperar por trozo
+        pequeño y responder con su vecindario da el contexto que le falta a un
+        fragmento suelto, sin tocar el índice.
+        """
+        por_fuente: dict[str, list[dict]] = {}
+        for r in resultados:
+            por_fuente.setdefault(r["source"], [])
+        for fuente in por_fuente:
+            try:
+                datos = collection.get(where={"source": fuente}, include=["documents", "metadatas"])
+            except Exception:  # noqa: BLE001
+                continue
+            trozos = [
+                {"id": cid, "text": doc, "line": (meta or {}).get("line", 0)}
+                for cid, doc, meta in zip(
+                    datos["ids"], datos["documents"] or [], datos["metadatas"] or [], strict=False
+                )
+            ]
+            por_fuente[fuente] = sorted(trozos, key=lambda t: t["line"])
+
+        for r in resultados:
+            trozos = por_fuente.get(r["source"]) or []
+            posicion = next((i for i, t in enumerate(trozos) if t["id"] == r["id"]), None)
+            if posicion is None:
+                r["context"] = r["text"]
+                continue
+            desde = max(0, posicion - vecinos)
+            hasta = min(len(trozos), posicion + vecinos + 1)
+            r["context"] = "\n\n".join(t["text"] for t in trozos[desde:hasta])
+            r["context_lines"] = [trozos[desde]["line"], trozos[hasta - 1]["line"]]
+
+    @staticmethod
     def search(root: Path, query: str, top_k: int = 10, hybrid: bool = True,
-               min_score: float = 0.0) -> list[dict[str, Any]]:
+               min_score: float = 0.0, *, file_type: str | None = None,
+               source: str | None = None, max_per_source: int = 0,
+               expand: int = 0) -> list[dict[str, Any]]:
         """
         Búsqueda híbrida (vectorial + BM25 léxico fundidos con RRF).
 
-        `hybrid=False` deja solo el vector. `min_score` filtra por similitud
-        coseno — con el embedder por defecto, por debajo de ~0.35 el resultado
-        casi nunca tiene que ver con la pregunta.
+        Parámetros
+        ----------
+        hybrid : bool
+            `False` deja solo el vector.
+        min_score : float
+            Umbral de **similitud coseno**. Con el embedder por defecto, por
+            debajo de ~0.35 el resultado casi nunca tiene que ver con la
+            pregunta. Se aplica antes de cortar por `top_k`, no después: si
+            no, filtrar devolvía menos resultados de los pedidos habiendo
+            candidatos válidos esperando.
+        file_type : str | None
+            `code | doc | prompt | vault | harness | url`. Se filtra en chroma
+            (`where`), así que no consume presupuesto de resultados.
+        source : str | None
+            Prefijo de ruta (`harness/progress/`, `agents/tools/`). Chroma no tiene
+            operador de prefijo, así que este se aplica después de recuperar
+            —por eso se pide de más antes de filtrar.
+        max_per_source : int
+            Tope de fragmentos por fichero. 0 = sin tope. Evita que un `top_k`
+            se lo coma entero un solo módulo largo.
+        expand : int
+            Nº de chunks vecinos a cada lado que se devuelven en `context`.
+
+        En cada resultado, `score` es lo que **ordena** (RRF si es híbrido,
+        coseno si no) y `similarity` es el coseno, o `None` si no se pudo
+        calcular.
         """
         collection, aviso = RagTool._abrir(root)
         if collection is None or aviso:
@@ -801,8 +1018,14 @@ class RagTool:
         if collection.count() == 0:
             return []
 
-        pedidos = min(top_k * 3 if hybrid else top_k, collection.count())
-        vectorial = collection.query(query_texts=[query], n_results=pedidos)
+        # Se pide de más porque los filtros de `source` y `max_per_source` se
+        # aplican después de recuperar: pedir justo `top_k` haría que un filtro
+        # devolviera media lista.
+        pedidos = min(collection.count(), max(top_k * 3, 10))
+        consulta_kwargs: dict[str, Any] = {"query_texts": [query], "n_results": pedidos}
+        if file_type:
+            consulta_kwargs["where"] = {"file_type": file_type}
+        vectorial = collection.query(**consulta_kwargs)
 
         similitudes: dict[str, float] = {}
         textos: dict[str, str] = {}
@@ -813,61 +1036,125 @@ class RagTool:
             textos[cid] = vectorial["documents"][0][i]
             metadatos[cid] = (metas_vec[0][i] if metas_vec[0] else {}) or {}
 
-        orden_vectorial = list(vectorial["ids"][0])
+        def _pasa(cid: str) -> bool:
+            meta = metadatos.get(cid) or {}
+            if file_type and meta.get("file_type") != file_type:
+                return False
+            return not (source and not str(meta.get("source", "")).startswith(source))
+
+        orden_vectorial = [cid for cid in vectorial["ids"][0] if _pasa(cid)]
+        en_lexico: set[str] = set()
 
         if not hybrid:
-            elegidos = orden_vectorial[:top_k]
+            candidatos = orden_vectorial
+            fusion: dict[str, float] = {}
         else:
-            corpus = RagTool._corpus(collection, str(root / ".rag-index"))
-            marcadores = corpus["bm25"].puntua(_tokenizar(query))
+            indice = RagTool._indice_lexico(root, collection)
+            marcadores = indice["bm25"].puntua(_tokenizar(query))
             mejores = sorted(
                 (i for i, s in enumerate(marcadores) if s > 0),
                 key=lambda i: marcadores[i],
                 reverse=True,
             )[:pedidos]
-            orden_lexico = []
-            for i in mejores:
-                cid = corpus["ids"][i]
-                orden_lexico.append(cid)
-                textos.setdefault(cid, corpus["docs"][i])
-                metadatos.setdefault(cid, corpus["metas"][i] or {})
-            fusion = RagTool._rrf([orden_vectorial, orden_lexico])
-            elegidos = sorted(fusion, key=lambda c: fusion[c], reverse=True)[:top_k]
+            ids_lexicos = [indice["ids"][i] for i in mejores]
 
-        salida = []
-        for cid in elegidos:
-            meta = metadatos.get(cid, {})
-            score = similitudes.get(cid, 0.0)
-            if score < min_score:
+            desconocidos = [cid for cid in ids_lexicos if cid not in metadatos]
+            if desconocidos:
+                datos = collection.get(ids=desconocidos, include=["documents", "metadatas"])
+                for cid, doc, meta in zip(
+                    datos["ids"], datos["documents"] or [], datos["metadatas"] or [], strict=False
+                ):
+                    textos.setdefault(cid, doc)
+                    metadatos.setdefault(cid, meta or {})
+
+            orden_lexico = [cid for cid in ids_lexicos if _pasa(cid)]
+            en_lexico = set(orden_lexico)
+            fusion = RagTool._rrf([orden_vectorial, orden_lexico])
+            candidatos = sorted(fusion, key=lambda c: fusion[c], reverse=True)
+
+        candidatos = candidatos[: max(top_k * 3, top_k)]
+        RagTool._completar_similitudes(collection, query, candidatos, similitudes)
+
+        salida: list[dict[str, Any]] = []
+        por_fuente: Counter = Counter()
+        en_vector = set(orden_vectorial)
+        for cid in candidatos:
+            similitud = similitudes.get(cid)
+            if min_score and (similitud is None or similitud < min_score):
                 continue
+            meta = metadatos.get(cid, {})
+            fuente = meta.get("source", "?")
+            if max_per_source and por_fuente[fuente] >= max_per_source:
+                continue
+            por_fuente[fuente] += 1
             salida.append({
                 "id": cid,
                 "text": textos.get(cid, "")[:500],
-                "source": meta.get("source", "?"),
+                "source": fuente,
                 "line": meta.get("line", 0),
                 "file_type": meta.get("file_type", "?"),
                 "section_type": meta.get("section_type", "?"),
-                "score": score,
-                "match": "vector" if cid in similitudes else "lexico",
+                "score": round(fusion[cid], 5) if fusion else (similitud or 0.0),
+                "similarity": similitud,
+                # `_confianza(fuente)` como respaldo: un índice construido
+                # antes de que existiera este campo no lo trae en sus
+                # metadatos, y ahí adivinarlo por el origen es exacto.
+                "trust": meta.get("trust") or _confianza(fuente),
+                "injection_flag": bool(meta.get("injection_flag", False)),
+                "match": (
+                    "ambos" if cid in en_vector and cid in en_lexico
+                    else "lexico" if cid in en_lexico else "vector"
+                ),
             })
+            if len(salida) >= top_k:
+                break
+
+        if expand > 0 and salida:
+            RagTool._expandir(collection, salida, expand)
         return salida
 
     @staticmethod
     def status(root: Path) -> dict[str, Any]:
+        """
+        Estado del índice, incluido si está al día.
+
+        Buscar sobre un índice viejo no da error: da la respuesta de ayer, en
+        silencio. Y como `make index-rag` es manual, ese silencio dura hasta
+        que alguien se acuerda. Comparando las huellas de los ficheros en
+        disco con las que quedaron grabadas en los metadatos, el desfase se
+        puede contar y avisar.
+        """
         collection, aviso = RagTool._abrir(root)
         if collection is None:
             return {"available": False, "mismatch": aviso}
         grabado = (collection.metadata or {}).get("embedder", "onnx")
-        fuentes = set()
+
+        huella_por_origen: dict[str, str] = {}
         if collection.count():
             for meta in collection.get(include=["metadatas"])["metadatas"] or []:
-                fuentes.add((meta or {}).get("source", "?"))
+                origen = (meta or {}).get("source", "?")
+                huella_por_origen[origen] = (meta or {}).get("file_hash", "")
+
+        vivos = {origen: RagTool._huella(texto) for origen, texto, _ in RagTool._documentos(root)}
+        desfasados = sorted(
+            o for o, h in vivos.items() if o in huella_por_origen and huella_por_origen[o] != h
+        )
+        nuevos = sorted(o for o in vivos if o not in huella_por_origen)
+        # Las URLs no vienen de disco: no estar en `vivos` es su estado normal.
+        borrados = sorted(
+            o for o in huella_por_origen if o not in vivos and not o.startswith("url:")
+        )
+
         return {
             "available": True,
             "total_chunks": collection.count(),
             "collection": COLLECTION_NAME,
-            "sources": len(fuentes),
+            "sources": len(huella_por_origen),
             "embedder": grabado,
             "embedder_desc": _EMBEDDERS.get(grabado, grabado),
             "mismatch": aviso,
+            "up_to_date": not (desfasados or nuevos or borrados),
+            "stale_files": desfasados,
+            "new_files": nuevos,
+            "deleted_files": borrados,
         }

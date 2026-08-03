@@ -13,12 +13,12 @@ solo no la ve.
 
 ### `index` — Construye/actualiza el índice
 Escanea el paquete principal, `api/`, `chat/`, `monitoring/`, `tuning/`,
-`agents/`, los prompts, `docs/`, `vault/`, `progress/`, `featureslist.json`,
+`agents/`, los prompts, `docs/`, `vault/`, `harness/progress/`, `harness/featureslist.json`,
 README, AGENTS.md y CHANGELOG.md.
 
 Incremental **por fichero y por huella de contenido**: lo que no ha cambiado no
 se vuelve a embeber, lo que cambió se reemplaza y lo que se borró desaparece del
-índice. Sin eso, el índice acumulaba versiones obsoletas de `progress/` a cada
+índice. Sin eso, el índice acumulaba versiones obsoletas de `harness/progress/` a cada
 feature cerrada.
 
 ```bash
@@ -72,3 +72,32 @@ El `--rebuild` no es opcional: los dos modelos dan vectores de 384 dimensiones,
 así que mezclarlos no daría error de ChromaDB — daría resultados sin sentido. El
 embedder queda grabado en los metadatos de la colección y el agente rechaza
 buscar si detecta el desajuste.
+
+<!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
+
+## Acciones
+
+| Acción | Argumentos |
+|--------|------------|
+| `run rag index` | `--rebuild` |
+| `run rag index_urls` | `--urls` (obligatorio) |
+| `run rag search` | `--query` (obligatorio) · `--top_k`, `--hybrid`, `--min_score`, `--file_type`, `--source`, `--max_per_source`, `--expand` |
+| `run rag status` | — |
+| `run rag evaluate` | `--top_k` |
+
+## Límites
+
+**Rol.** RAG local: indexa código, prompts, docs, vault, la memoria del arnés y URLs externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) con BM25 léxico.
+
+**No hace:**
+- construir o modificar el grafo graphify → knowledge
+- buscar papers académicos nuevos → research
+- ejecutar código ni modificar archivos del proyecto
+
+**Necesita que le den:** que exista un índice (ejecutar 'rag index' primero)
+
+**Escribe en (nadie más toca esto):** .rag-index/ (índice vectorial ChromaDB, gitignored)
+
+**Se apoya en:** knowledge, doc, plan
+
+<!-- END AUTOGEN -->
