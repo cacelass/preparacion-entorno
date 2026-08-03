@@ -2,11 +2,12 @@
 agents.evals.runner — Eval runner: ejecuta baterías de pruebas contra el sistema de agentes.
 
 Uso:
-    uv run python -m agents.evals.runner              # harness + smoke + routing + contracts
+    uv run python -m agents.evals.runner              # harness + rag + smoke + routing + contracts
     uv run python -m agents.evals.runner --smoke       # solo smoke
     uv run python -m agents.evals.runner --routing     # solo routing
     uv run python -m agents.evals.runner --contracts   # solo contracts
     uv run python -m agents.evals.runner --harness     # solo piezas del arnés
+    uv run python -m agents.evals.runner --rag         # solo recuperación del RAG
     uv run python -m agents.evals.runner --json        # reporte JSON
 """
 
@@ -171,7 +172,7 @@ def _check_ficheros(root, check) -> None:
         check("init.sh:+x", ejecutable,
               "ejecutable" if ejecutable else "sin bit de ejecución (chmod +x init.sh)")
 
-    for rel in ("AGENTS.md", "progress/current.md", "progress/history.md", "progress/README.md"):
+    for rel in ("AGENTS.md", "harness/progress/current.md", "harness/progress/history.md", "harness/progress/README.md"):
         check(rel, (root / rel).is_file(), "presente" if (root / rel).is_file() else "FALTA")
 
 
@@ -228,28 +229,28 @@ def _problemas_backlog(features: list) -> list[str]:
 
 
 def _check_backlog(root, check) -> None:
-    """featureslist.json: existe, es JSON y cumple el esquema."""
-    backlog = root / "featureslist.json"
+    """harness/featureslist.json: existe, es JSON y cumple el esquema."""
+    backlog = root / "harness/featureslist.json"
     if not backlog.is_file():
-        check("featureslist.json", False, "FALTA el backlog")
+        check("harness/featureslist.json", False, "FALTA el backlog")
         return
     try:
         doc = json.loads(backlog.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        check("featureslist.json", False, f"JSON inválido: {exc}")
+        check("harness/featureslist.json", False, f"JSON inválido: {exc}")
         return
 
     features = doc.get("features") if isinstance(doc, dict) else None
     if not isinstance(features, list) or not features:
-        check("featureslist.json", False, "falta la clave 'features' con una lista no vacía")
+        check("harness/featureslist.json", False, "falta la clave 'features' con una lista no vacía")
         return
 
     problemas = _problemas_backlog(features)
     if problemas:
         for problema in problemas:
-            check("featureslist.json", False, problema)
+            check("harness/featureslist.json", False, problema)
     else:
-        check("featureslist.json", True, f"{len(features)} features, esquema válido")
+        check("harness/featureslist.json", True, f"{len(features)} features, esquema válido")
 
 
 def _harness() -> list[dict]:
@@ -270,6 +271,27 @@ def _harness() -> list[dict]:
 
 
 
+def _rag() -> dict:
+    """
+    Rag test: mide la recuperación contra el juego de pruebas del proyecto.
+
+    Trae la suite ya resumida (su veredicto va por umbral, no por pleno — ver
+    `agents.evals.rag_eval.suite`). El import es perezoso y tolerante a que no
+    exista: `agents/evals/rag_eval.py` solo se genera si el proyecto se creó
+    con el extra `rag`, y una suite que revienta el runner entero por no estar
+    instalada no sirve de nada.
+    """
+    try:
+        from agents.evals.rag_eval import suite
+    except ImportError:
+        return {
+            "suite": "rag", "total": 1, "passed": 1, "failed": 0, "avg_duration_ms": 0,
+            "results": [{"agent": "rag", "success": True,
+                         "message": "no evaluado — el proyecto no incluye el módulo RAG"}],
+        }
+    return suite(get_context().root)
+
+
 def _summarize(results: list[dict], label: str) -> dict:
     total = len(results)
     passed = sum(1 for r in results if r.get("success", r.get("correct", True)))
@@ -285,13 +307,16 @@ def _summarize(results: list[dict], label: str) -> dict:
 
 
 def run_evals(smoke: bool = True, routing: bool = True, contracts: bool = True,
-              harness: bool = True, json_output: bool = False) -> EvalReport:
+              harness: bool = True, rag: bool = True,
+              json_output: bool = False) -> EvalReport:
     orchestrator = Orchestrator(context=get_context())
     agent_registry.discover()
 
     suites = {}
     if harness:
         suites["harness"] = _summarize(_harness(), "harness")
+    if rag:
+        suites["rag"] = _rag()
     if smoke:
         suites["smoke"] = _summarize(_smoke(orchestrator), "smoke")
     if routing:
@@ -355,16 +380,18 @@ def main() -> int:
     parser.add_argument("--routing", action="store_true", help="Solo routing tests")
     parser.add_argument("--contracts", action="store_true", help="Solo contracts")
     parser.add_argument("--harness", action="store_true", help="Solo harness (piezas del arnés)")
+    parser.add_argument("--rag", action="store_true", help="Solo recuperación del RAG")
     parser.add_argument("--json", "-j", action="store_true", help="Salida JSON")
     args = parser.parse_args()
 
-    selected = args.smoke or args.routing or args.contracts or args.harness
+    selected = args.smoke or args.routing or args.contracts or args.harness or args.rag
 
     report = run_evals(
         smoke=args.smoke or not selected,
         routing=args.routing or not selected,
         contracts=args.contracts or not selected,
         harness=args.harness or not selected,
+        rag=args.rag or not selected,
         json_output=args.json,
     )
     return 0 if report["success"] else 1

@@ -1,0 +1,70 @@
+{
+  "_comment": "Juego de pruebas de recuperación del RAG. Cada caso es una pregunta y las fuentes que deberían salir en el top-k. 'expected' se compara por prefijo de ruta, así que 'agents/gstack/' vale para cualquier fichero de esa carpeta. 'require' es 'any' (basta una) o 'all' (todas). Añade aquí las preguntas que en tu proyecto devuelvan basura: es el sitio donde una regresión de recuperación se convierte en un test que falla.",
+  "_thresholds": "El veredicto de la suite va por umbral, no por pleno: se espera que algunos casos fallen (son los que marcan dónde mejorar) y lo que tiene que doler es CAER por debajo de la línea. Sube los umbrales cuando mejores la recuperación, y esto detecta la regresión.",
+  "thresholds": {
+    "min_hit_rate": 0.5,
+    "min_mrr": 0.2
+  },
+  "cases": [
+    {
+      "query": "qué pasa si init.sh falla",
+      "expected": ["AGENTS.md", "agents/prompts/harness_workflow.md"],
+      "require": "any"
+    },
+    {
+      "query": "cómo se cierra una feature con evidencia real",
+      "expected": ["AGENTS.md", "agents/prompts/harness_workflow.md"],
+      "require": "any"
+    },
+    {
+      "query": "dónde se guarda el estado de la feature en curso",
+      "expected": ["harness/progress/", "AGENTS.md"],
+      "require": "any"
+    },
+    {
+      "query": "qué agente es el único que puede escribir el backlog",
+      "expected": ["agents/contracts.py", "AGENTS.md"],
+      "require": "any"
+    },
+    {
+      "query": "criterios de aceptación de las features pendientes",
+      "expected": ["harness/featureslist.json"],
+      "require": "any"
+    },
+    {
+      "query": "cómo se trocea un fichero python para indexarlo",
+      "expected": ["agents/tools/rag_tool.py"],
+      "require": "any"
+    },
+    {
+      "query": "BM25 léxico y fusión de rankings",
+      "expected": ["agents/tools/rag_tool.py"],
+      "require": "any"
+    },
+    {
+      "query": "auto commit entre pasos de un pipeline",
+      "expected": ["agents/gstack/"],
+      "require": "any"
+    },
+    {
+      "query": "ruteo de una frase en lenguaje natural al agente correcto",
+      "expected": ["agents/orchestrator.py"],
+      "require": "any"
+    },
+    {
+      "query": "detectar secretos hardcodeados en el código",
+      "expected": ["agents/tools/secrets_tool.py", "agents/agents/secrets_agent.py"],
+      "require": "any"
+    },
+    {
+      "query": "memoria de trayectorias de ejecución de los agentes",
+      "expected": ["agents/tools/memory_tool.py", "agents/agents/memory_agent.py", "agents/prompts/memory_agent.md"],
+      "require": "any"
+    },
+    {
+      "query": "cómo contribuir al proyecto y qué estilo de commits usar",
+      "expected": ["CONTRIBUTING.md"],
+      "require": "any"
+    }
+  ]
+}
