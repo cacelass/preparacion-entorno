@@ -94,7 +94,7 @@ _(qué impide avanzar y qué se necesita para desbloquearlo — vacío si nada)_
 class HarnessAgent(BaseAgent):
     name = "harness"
     description = (
-        "Dueño del arnés: lee y actualiza featureslist.json y progress/, y "
+        "Dueño del arnés: lee y actualiza harness/featureslist.json y harness/progress/, y "
         "ejecuta la puerta init.sh. No cierra una feature si la puerta no pasa."
     )
     # Ojo: "feature"/"features" NO van aquí — son del agente `data`
@@ -118,13 +118,24 @@ class HarnessAgent(BaseAgent):
         }
 
     # -- rutas ---------------------------------------------------------------
+    #: Todo el estado del arnés vive bajo `harness/`. Antes estaba repartido
+    #: por la raíz (`featureslist.json`, `progress/`, `memory.md`) y lo primero
+    #: que veía alguien al abrir el proyecto era el andamiaje de la IA, no su
+    #: proyecto de datos. Es un directorio visible y no oculto a propósito: el
+    #: backlog es justo lo que quieres que un humano abra.
+    HARNESS_DIR = "harness"
+
+    @property
+    def _harness_dir(self) -> Path:
+        return self.ctx.root / self.HARNESS_DIR
+
     @property
     def _backlog_file(self) -> Path:
-        return self.ctx.root / "featureslist.json"
+        return self._harness_dir / "featureslist.json"
 
     @property
     def _progress_dir(self) -> Path:
-        return self.ctx.root / "progress"
+        return self._harness_dir / "progress"
 
     @property
     def _current_file(self) -> Path:
@@ -142,9 +153,9 @@ class HarnessAgent(BaseAgent):
         try:
             doc = json.loads(self._backlog_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            return None, f"featureslist.json no es JSON válido: {exc}"
+            return None, f"harness/featureslist.json no es JSON válido: {exc}"
         if not isinstance(doc, dict) or not isinstance(doc.get("features"), list):
-            return None, "featureslist.json debe ser un objeto con la clave 'features' (lista)."
+            return None, "harness/featureslist.json debe ser un objeto con la clave 'features' (lista)."
         return doc, ""
 
     def _save(self, doc: dict) -> None:
@@ -251,11 +262,43 @@ class HarnessAgent(BaseAgent):
         return AgentResult(
             success=True, agent=self.name, action="next",
             message=f"Siguiente: {feat['id']} — {feat['title']}",
-            data=feat,
+            data={**feat, "antecedentes": self._antecedentes(feat)},
         )
 
+    def _antecedentes(self, feat: dict) -> list[dict]:
+        """
+        Qué se hizo antes que se parezca a esta feature, según `harness/progress/`.
+
+        `harness/progress/history.md` crece con cada feature cerrada y nadie lo relee
+        entero. Buscar en él por la descripción de lo que toca ahora es la
+        forma barata de que el líder pueda pasarle al subagente la ruta del
+        precedente en vez de nada. Se devuelven rutas y líneas, no el texto
+        completo: heredar contexto es justo lo que el arnés evita.
+
+        Si el proyecto no tiene RAG, no hay antecedentes y ya está: es
+        información de más, nunca un requisito.
+        """
+        try:
+            from agents.tools.rag_tool import RagTool
+
+            if not RagTool.available():
+                return []
+            consulta = f"{feat.get('title', '')} {feat.get('description', '')}".strip()
+            if not consulta:
+                return []
+            hits = RagTool.search(
+                self.ctx.root, consulta, top_k=3, source="harness/progress/", max_per_source=1
+            )
+        except Exception:  # noqa: BLE001 — una pista de más no puede tumbar `next`
+            return []
+        return [
+            {"source": h["source"], "line": h["line"], "extracto": h["text"][:200]}
+            for h in hits
+            if "error" not in h
+        ]
+
     def start(self, *, id: str = "", owner: str = "implementer") -> AgentResult:
-        """Abre una feature: status in_progress y progress/current.md rellenado."""
+        """Abre una feature: status in_progress y harness/progress/current.md rellenado."""
         if not id:
             return self._fail("start", "Falta el id de la feature.",
                               needs=["¿Qué feature abro? Usa el id de featureslist.json (ej. DATA-001)."])
@@ -312,7 +355,7 @@ class HarnessAgent(BaseAgent):
 
         return AgentResult(
             success=True, agent=self.name, action="start",
-            message=f"{id} abierta (in_progress) y volcada en progress/current.md.",
+            message=f"{id} abierta (in_progress) y volcada en harness/progress/current.md.",
             data={"id": id, "criteria": feat.get("acceptance_criteria", [])},
         )
 
@@ -448,7 +491,7 @@ class HarnessAgent(BaseAgent):
 
     def record(self, *, agent: str = "", id: str = "", content: str = "",
                verdict: str = "ok") -> AgentResult:
-        """Guarda el informe de un subagente en progress/<agente>-<ID>.md."""
+        """Guarda el informe de un subagente en harness/progress/<agente>-<ID>.md."""
         if not agent or not id or not content:
             missing = []
             if not agent:
@@ -498,7 +541,7 @@ class HarnessAgent(BaseAgent):
                               "verdict": verdict, "review_rounds": rounds},
                         needs=[
                             f"El reviewer ha rechazado '{id}' {rounds} veces. Repetir la misma "
-                            f"iteración no lo va a arreglar: lee progress/reviewer-{id}.md y "
+                            f"iteración no lo va a arreglar: lee harness/progress/reviewer-{id}.md y "
                             f"decide si el criterio es correcto, si la feature está mal "
                             f"planteada o si hace falta partirla en varias."
                         ],
@@ -507,7 +550,7 @@ class HarnessAgent(BaseAgent):
         return AgentResult(
             success=True, agent=self.name, action="record",
             message=(
-                f"Informe guardado en progress/{path.name}"
+                f"Informe guardado en harness/progress/{path.name}"
                 + (f" · ronda de revisión {rounds}/{MAX_REVIEW_ROUNDS}" if rounds else "")
             ),
             warnings=(

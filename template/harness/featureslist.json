@@ -1,20 +1,64 @@
 {
-  "$comment": "Backlog del arnés. Fuente de verdad de QUÉ hay que hacer. Los agentes leen la primera feature pendiente, la marcan in_progress y no la marcan done hasta que ./init.sh pasa en verde. Tras cerrar (harness finish), el líder propone el commit del cierre con git commit_feature --dry-run y espera confirmación del usuario. Estados válidos: pending | in_progress | done | blocked.",
+  "$comment": "Backlog del arnés. Fuente de verdad de QUÉ hay que hacer. El orden no es decorativo: las tres primeras features fijan el rumbo (qué se quiere resolver → qué se sabe ya del tema → qué dicen los datos) antes de que nadie escriba una línea de pipeline. Saltárselas es como se acaba entrenando un modelo muy bueno para una pregunta que a nadie le importaba. Los agentes leen la primera feature pendiente, la marcan in_progress y no la marcan done hasta que ./init.sh pasa en verde. Tras cerrar (harness finish), el líder propone el commit del cierre con git commit_feature --dry-run y espera confirmación del usuario. Estados válidos: pending | in_progress | done | blocked.",
   "version": 1,
   "project": "{{ project_name }}",
   "features": [
     {
+      "id": "SCOPE-001",
+      "title": "Definir qué se quiere resolver",
+      "description": "Antes de tocar un dato: escribir qué pregunta responde este proyecto, cómo se mide que la respuesta es buena, con qué datos se cuenta y cuándo se da por terminado. Es la feature que da rumbo a todas las demás — sin un criterio de éxito numérico, ninguna decisión posterior (qué modelo, qué features, cuándo parar) se toma sobre otra cosa que no sea intuición.",
+      "acceptance_criteria": [
+        "Existe references/00-objetivo.md con cuatro apartados: pregunta a responder, métrica de éxito, datos de partida y criterio de parada",
+        "La métrica de éxito es un número con umbral (p. ej. 'F1 macro >= 0.80 en validación'), no 'que funcione bien'",
+        "El criterio de parada dice explícitamente qué resultado haría replantear o abandonar el proyecto",
+        "El README describe el objetivo en una frase propia, no con el texto de la plantilla",
+        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "pending",
+      "depends_on": []
+    },
+    {
+      "id": "RESEARCH-001",
+      "title": "Qué se sabe ya sobre este problema",
+      "description": "Reunir el estado del arte antes de improvisar una arquitectura: qué enfoques se usan para este tipo de problema, qué métricas reporta la literatura, qué datasets públicos existen y qué callejones sin salida ya recorrió otro. Media semana de modelado se ahorra con dos horas de lectura.",
+      "acceptance_criteria": [
+        "uv run python -m agents run research find_papers devuelve success=true con al menos 3 referencias relevantes",
+        "references/01-estado-del-arte.md resume cada fuente en 2-3 líneas y dice explícitamente qué se toma de ella y qué se descarta",
+        "Queda anotado el rango de resultados que reporta la literatura, para poder saber si el baseline propio es bueno o solo lo parece",
+        "Los enfoques a probar y los descartados están escritos con su motivo, no en la cabeza de nadie",
+{% if use_rag %}        "Las URLs consultadas quedan indexadas con 'run rag index_urls --urls ...' y 'run rag search' las encuentra",
+{% endif %}        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "pending",
+      "depends_on": ["SCOPE-001"]
+    },
+    {
+      "id": "EDA-001",
+      "title": "Exploración inicial en los notebooks",
+      "description": "Recorrer los notebooks de la plantilla sobre los datos reales: 0-0 descarga, 0-1 procesamiento y 0-2 ejecución. El notebook es para mirar y descartar hipótesis; lo que sobreviva a esta exploración es lo que después se convierte en código de pipeline. Aquí se decide si los datos que hay pueden responder la pregunta de SCOPE-001 — y si no pueden, es ahora cuando hay que enterarse.",
+      "acceptance_criteria": [
+        "notebooks/0-0-{{ project_author_name }}-DescargaDatos.ipynb se ejecuta de principio a fin sin errores y deja el dataset en data/raw/",
+        "uv run python -m agents run data list_datasets encuentra el dataset descargado",
+        "uv run python -m agents run notebook extract_outputs --notebook_path notebooks/0-1-{{ project_author_name }}-ProcesamientoDatos.ipynb devuelve success=true (el notebook está ejecutado, no en blanco)",
+        "references/02-eda.md recoge los hallazgos: tamaño, tipos, nulos, cardinalidad, desbalanceo y cualquier cosa rara que convenga vigilar",
+        "Está respondido por escrito si estos datos permiten responder la pregunta de SCOPE-001, y qué falta si no",
+        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "pending",
+      "depends_on": ["RESEARCH-001"]
+    },
+    {
       "id": "DATA-001",
       "title": "EDA del dataset principal",
-      "description": "Cargar el dataset en data/raw/, generar un informe exploratorio y documentar los hallazgos: tipos, nulos, cardinalidad, distribuciones y correlaciones. Detectar fugas de información antes de construir features.",
+      "description": "Convertir la exploración del notebook en un informe reproducible: tipos, nulos, cardinalidad, distribuciones y correlaciones generados por comando y no a mano. Detectar fugas de información antes de construir features.",
       "acceptance_criteria": [
         "make data se ejecuta sin errores y deja los datos en data/processed/",
         "uv run python -m agents run data eda_report --filename <dataset> devuelve success=true",
         "El informe de fugas no reporta correlaciones sospechosas con el target sin justificar",
-        "Los hallazgos quedan escritos en progress/ y en la documentación del proyecto"
+        "Los hallazgos quedan escritos en harness/progress/ y en la documentación del proyecto"
       ],
       "status": "pending",
-      "depends_on": []
+      "depends_on": ["EDA-001"]
     },
     {
       "id": "FEAT-001",
@@ -37,6 +81,7 @@
         "make train se ejecuta sin errores y guarda el modelo en models/",
         "El número de clusters está justificado con una métrica, no elegido a ojo",
         "Existe una figura del resultado en reports/figures/ y no está vacía",
+        "El resultado se compara con el rango que reporta la literatura en RESEARCH-001",
         "make test pasa y la cobertura no baja"
       ],
 {% else %}      "title": "Baseline entrenado y evaluado",
@@ -45,6 +90,7 @@
         "make train se ejecuta sin errores y guarda el modelo en models/",
         "Las métricas de validación quedan registradas y son reproducibles con seed fija",
         "uv run python -m agents run ml check_overfitting no reporta sobreajuste sin explicar",
+        "El resultado se compara con el umbral de SCOPE-001 y con el rango de RESEARCH-001",
         "make test pasa y la cobertura no baja"
       ],
 {% endif %}      "status": "pending",

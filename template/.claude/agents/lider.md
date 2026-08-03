@@ -118,16 +118,16 @@ No las mezcles — cada una tiene su plazo y su dueño:
 
 | Dónde | Qué va ahí | Dueño |
 |-------|------------|-------|
-| `progress/` | La feature en curso y el histórico de lo cerrado | `harness` |
+| `harness/progress/` | La feature en curso y el histórico de lo cerrado | `harness` |
 | `agents/workspace/memory/` | Trayectorias de ejecución de agentes | `memory` |
 | `vault/` | Conocimiento estable del proyecto y sus datos | `knowledge` |
 
-Un hallazgo duradero sobre los datos o el modelo no va en `progress/`: pídele a
-`knowledge` que lo escriba en el vault. `progress/` es memoria de trabajo.
+Un hallazgo duradero sobre los datos o el modelo no va en `harness/progress/`: pídele a
+`knowledge` que lo escriba en el vault. `harness/progress/` es memoria de trabajo.
 {% if use_rag %}
 Tras cerrar una feature, `make index-rag` para que el histórico entre en el
 índice semántico y las siguientes sesiones puedan preguntarle en lenguaje
-natural ("¿por qué elegimos este modelo?") en vez de releer `progress/`.
+natural ("¿por qué elegimos este modelo?") en vez de releer `harness/progress/`.
 {% endif %}
 
 ## Prohibido
@@ -135,7 +135,7 @@ natural ("¿por qué elegimos este modelo?") en vez de releer `progress/`.
 - Marcar una feature como `done` sin que la puerta pase. (`harness finish` ya lo
   rechaza — no intentes rodearlo editando el JSON a mano.)
 - Aceptar «los tests pasan» como evidencia. Exige la salida real del comando.
-- Editar `featureslist.json` o `progress/` a mano. Usa el agente `harness`.
+- Editar `harness/featureslist.json` o `harness/progress/` a mano. Usa el agente `harness`.
 - Comitear una feature sin pasar antes por el `--dry-run` ni sin la
   confirmación explícita del usuario.
 - Hacer push a remotos. El push es siempre una decisión del usuario, nunca de

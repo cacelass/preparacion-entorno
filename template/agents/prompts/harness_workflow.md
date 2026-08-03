@@ -5,7 +5,7 @@ Los workflows de dominio (`data`, `ml`, `dev`...) dicen **cómo**.
 
 ## Pipeline
 ```
-init.sh → progress/ → featureslist.json → explorer → implementer → reviewer → done
+init.sh → harness/progress/ → harness/featureslist.json → explorer → implementer → reviewer → done
    │                                                                      │
    └────────────────── si init.sh falla: PARAR ───────────────────────────┘
 ```
@@ -25,7 +25,7 @@ init.sh → progress/ → featureslist.json → explorer → implementer → rev
 | Commit del cierre | `run git commit_feature --id <ID> --title "..." [--dry-run true]` | `git` | bump + CHANGELOG + commit, con confirmación del usuario |
 
 El `lider` decide en qué orden pasa todo esto; `harness` lo ejecuta. Ningún
-agente edita `featureslist.json` ni `progress/` a mano.
+agente edita `harness/featureslist.json` ni `harness/progress/` a mano.
 
 ## Las tres reglas
 
@@ -49,7 +49,7 @@ agente edita `featureslist.json` ni `progress/` a mano.
 
 - No heredes el contexto del líder a los subagentes. Pásales el ID de la
   feature, sus criterios y las rutas. Nada más.
-- No releas el repositorio en cada subagente. `progress/` existe justo para eso.
+- No releas el repositorio en cada subagente. `harness/progress/` existe justo para eso.
 - No pases el contenido de un informe de subagente a otro: pasa la **ruta**.
 
 ## Cómo engancha con los agentes Python
@@ -80,25 +80,25 @@ uv run python -m agents --json run review review_package
 |---------|-------|--------|
 | `AGENTS.md` | humano | Protocolo y reglas del juego |
 | `init.sh` | humano + `reviewer` | La puerta. El reviewer puede endurecerla |
-| `featureslist.json` | `harness` | Backlog con criterios de aceptación |
-| `progress/current.md` | `harness` | Feature en curso |
-| `progress/history.md` | `harness` | Append-only de lo cerrado |
-| `progress/<agente>-<ID>.md` | `harness` (vía `record`) | Resultado de una ejecución |
+| `harness/featureslist.json` | `harness` | Backlog con criterios de aceptación |
+| `harness/progress/current.md` | `harness` | Feature en curso |
+| `harness/progress/history.md` | `harness` | Append-only de lo cerrado |
+| `harness/progress/<agente>-<ID>.md` | `harness` (vía `record`) | Resultado de una ejecución |
 | `.opencode/agents/*.md` | cada agente | Su propia definición (automejorable) |
 
 ## Automejora
 
 Si el mismo fallo se cuela dos veces: si es automatizable va a `init.sh`; si es
 regla del proyecto va a `AGENTS.md`; si es criterio de revisión va a
-`.opencode/agents/reviewer.md`. Deja constancia en `progress/history.md`.
+`.opencode/agents/reviewer.md`. Deja constancia en `harness/progress/history.md`.
 
 ## Comandos
 
 ```bash
 make init            # ./init.sh — verificación completa
 make harness-check   # ./init.sh --quick — sin tests
-make backlog         # estado de featureslist.json
+make backlog         # estado de harness/featureslist.json
 ./init.sh --json     # salida estructurada para agentes
 uv run python -m agents.evals.runner --harness   # valida las piezas del arnés
-{% if use_rag %}make index-rag       # mete progress/ e histórico en el índice semántico
+{% if use_rag %}make index-rag       # mete harness/progress/ e histórico en el índice semántico
 {% endif %}```

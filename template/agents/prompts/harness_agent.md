@@ -9,7 +9,7 @@ Ejecuta la parte mecánica del arnés. No decide nada: los agentes markdown
 |--------|----------|
 | `status` | Recuento del backlog + qué está in_progress + qué es elegible |
 | `next` | La feature que toca (in_progress, o la primera con deps en done) |
-| `start --id <ID>` | Abre la feature y vuelca sus criterios en `progress/current.md` |
+| `start --id <ID>` | Abre la feature y vuelca sus criterios en `harness/progress/current.md` |
 | `gate [--quick true]` | Ejecuta `./init.sh` y devuelve el veredicto estructurado |
 | `finish --id <ID> --evidence "<salida real>"` | Cierra la feature y escribe el histórico |
 | `block --id <ID> --reason "<motivo>"` | Marca bloqueada |
@@ -36,6 +36,39 @@ uv run python -m agents --json run harness finish --id DATA-001 --evidence "$(ma
 
 Editar JSON a mano desde un prompt se rompe: comas, ids duplicados, estados
 inventados, un `done` que nadie verificó. Este agente hace esas operaciones
-de forma determinista y es el único dueño de `featureslist.json` y `progress/`.
+de forma determinista y es el único dueño de `harness/featureslist.json` y `harness/progress/`.
 
 Ver el ciclo completo: `skill harness_workflow`.
+
+<!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
+
+## Acciones
+
+| Acción | Argumentos |
+|--------|------------|
+| `run harness status` | — |
+| `run harness next` | — |
+| `run harness start` | `--id`, `--owner` |
+| `run harness finish` | `--id`, `--evidence`, `--changes`, `--decisions`, `--pending` |
+| `run harness block` | `--id`, `--reason` |
+| `run harness record` | `--agent`, `--id`, `--content`, `--verdict` |
+| `run harness gate` | `--quick` |
+| `run harness add` | `--id`, `--title`, `--description`, `--criteria`, `--depends_on` |
+
+## Límites
+
+**Rol.** Dueño mecánico del arnés: mantiene el backlog y el progreso, y ejecuta la puerta init.sh.
+
+**No hace:**
+- decidir QUÉ feature toca ni cómo implementarla → eso lo razonan los agentes markdown del arnés (lider, explorer, implementer, reviewer)
+- escribir código del producto → 'refactor' y el implementer
+- ejecutar los tests por su cuenta → los ejecuta init.sh, o el agente 'test'
+- cerrar una feature sin evidencia → devuelve needs, nunca la da por buena
+
+**Necesita que le den:** el id de la feature; la evidencia real de verificación para cerrarla
+
+**Escribe en (nadie más toca esto):** harness/featureslist.json, harness/progress/, harness/memory.md
+
+**Se apoya en:** plan, test, review, memory
+
+<!-- END AUTOGEN -->

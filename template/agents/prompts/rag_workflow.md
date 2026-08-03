@@ -21,7 +21,7 @@ rag index  →  rag search  →  (uso en agentes)
 ## Qué entra en el índice
 - El paquete del proyecto, `api/`, `chat/`, `monitoring/`, `tuning/` y `agents/`
 - Prompts de agentes, `docs/`, `vault/`
-- La memoria del arnés: `progress/` y `featureslist.json` (aplanado a markdown)
+- La memoria del arnés: `harness/progress/` y `harness/featureslist.json` (aplanado a markdown)
 - README, AGENTS.md, CHANGELOG.md, CONTRIBUTING.md
 
 Quedan fuera los tests y los directorios de caché. Cada chunk de código lleva su

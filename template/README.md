@@ -51,10 +51,10 @@
 │   ├── visualization/  visualize.py
 │   └── utils/          paths.py
 ├── tests/
-├── progress/           ← memoria del arnés (tarea actual + histórico)
+├── harness/progress/           ← memoria del arnés (tarea actual + histórico)
 ├── AGENTS.md           ← protocolo del arnés: punto de entrada de la IA
 ├── init.sh             ← la puerta: ¿se puede trabajar?
-├── featureslist.json   ← backlog con criterios de aceptación
+├── harness/featureslist.json   ← backlog con criterios de aceptación
 ├── main.py             ← pipeline completo
 ├── Makefile
 └── pyproject.toml
@@ -69,7 +69,7 @@ repositorio que gobierna cómo trabaja un agente de IA sobre él. No es un
 chatbot — es un ciclo con puerta de entrada, backlog y verificación.
 
 ```
-./init.sh → progress/ → featureslist.json → implementar → revisar → done → commit_feature
+./init.sh → harness/progress/ → harness/featureslist.json → implementar → revisar → done → commit_feature
     │
     └── si falla: el agente PARA. No se trabaja sobre un proyecto roto.
 ```
@@ -83,8 +83,8 @@ escriben una vez en `.opencode/agents/` y `make assistants-sync` los espeja a
 |-------|----------|
 | `AGENTS.md` | Punto de entrada. Lo primero que lee cualquier agente |
 | `init.sh` | Verifica entorno, ficheros del arnés y que los tests pasan |
-| `featureslist.json` | Qué hay que hacer, con criterios de aceptación explícitos |
-| `progress/` | Memoria fuera de la ventana de contexto: tarea actual e histórico |
+| `harness/featureslist.json` | Qué hay que hacer, con criterios de aceptación explícitos |
+| `harness/progress/` | Memoria fuera de la ventana de contexto: tarea actual e histórico |
 | `.opencode/agents/` | `lider`, `explorer`, `implementer`, `reviewer` |
 
 ```bash
@@ -95,7 +95,7 @@ make backlog         # estado de las features
 
 Y para arrancar el ciclo en tu asistente:
 
-> Lee `AGENTS.md` y sigue el protocolo: ejecuta `./init.sh`, lee `progress/` y
+> Lee `AGENTS.md` y sigue el protocolo: ejecuta `./init.sh`, lee `harness/progress/` y
 > elige la primera feature pendiente.
 
 **La regla que no se salta:** ninguna feature se marca `done` sin que

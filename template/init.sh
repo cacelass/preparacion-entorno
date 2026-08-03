@@ -92,7 +92,20 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 section "Arnés"
 
-for required in AGENTS.md featureslist.json progress/current.md progress/history.md; do
+# Migración del layout viejo (featureslist.json y progress/ en la raíz).
+# `copier update` trae los ficheros nuevos pero NO borra los viejos, así que
+# un proyecto actualizado se queda con las dos copias y el agente escribiendo
+# en una mientras alguien lee la otra. Eso no se avisa: se para, porque
+# trabajar sobre un backlog duplicado es peor que no trabajar.
+if [ -f "featureslist.json" ] || [ -d "progress" ]; then
+  fail "layout" "quedan ficheros del arnés en la raíz junto a harness/. Mueve lo tuyo y borra los viejos:"
+  printf '        git mv featureslist.json harness/featureslist.json   # si harness/ aún no lo tiene\n'
+  printf '        git mv progress harness/progress\n'
+  printf '        git mv memory.md harness/memory.md\n'
+  printf '        # si harness/ ya trae los del template, quédate con TU version y borra la otra\n'
+fi
+
+for required in AGENTS.md harness/featureslist.json harness/progress/current.md harness/progress/history.md; do
   if [ -f "$required" ]; then
     ok "$(basename "$required")" "presente"
   else
@@ -111,11 +124,11 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  3. Backlog — featureslist.json bien formado
+#  3. Backlog — harness/featureslist.json bien formado
 # ─────────────────────────────────────────────────────────────────────────────
 section "Backlog"
 
-if [ -n "$PY" ] && [ -f "featureslist.json" ]; then
+if [ -n "$PY" ] && [ -f "harness/featureslist.json" ]; then
   BACKLOG_OUT="$("$PY" - <<'PYEOF'
 import json
 import sys
@@ -124,7 +137,7 @@ VALID_STATUS = ("pending", "in_progress", "done", "blocked")
 REQUIRED = ("id", "title", "description", "acceptance_criteria", "status")
 
 try:
-    with open("featureslist.json", encoding="utf-8") as fh:
+    with open("harness/featureslist.json", encoding="utf-8") as fh:
         doc = json.load(fh)
 except json.JSONDecodeError as exc:
     print("fail\tJSON inválido: %s" % exc)
@@ -200,7 +213,7 @@ PYEOF
     esac
   done <<< "$BACKLOG_OUT"
 else
-  fail "featureslist" "no verificable (falta Python o featureslist.json)"
+  fail "featureslist" "no verificable (falta Python o harness/featureslist.json)"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -279,7 +292,7 @@ print(json.dumps({
 PYEOF
 elif [ "$ERRORS" -eq 0 ]; then
   printf '\n\033[1;32m━━ ENTORNO LISTO ━━\033[0m  %d aviso(s)\n' "$WARNINGS"
-  printf 'Puedes trabajar. Siguiente paso: lee progress/current.md y elige la primera feature pendiente.\n\n'
+  printf 'Puedes trabajar. Siguiente paso: lee harness/progress/current.md y elige la primera feature pendiente.\n\n'
 else
   printf '\n\033[1;31m━━ ENTORNO BLOQUEADO ━━\033[0m  %d error(es), %d aviso(s)\n' "$ERRORS" "$WARNINGS"
   printf 'NO empieces a implementar. Reporta estos fallos al usuario y para.\n\n'

@@ -10,7 +10,7 @@
         agents-list agents-run agents-doctor agents-memory agents-eval \
         init harness-check backlog prompts-sync prompts-check assistants-sync \
         skills opencode-init opencode-check \
-        index-rag index-rag-rebuild \
+        index-rag index-rag-rebuild eval-rag \
         recommended-tools recommended-all \
         clean clean-models clean-figures clean-all \
         run info help
@@ -97,14 +97,15 @@ help:
 	@echo "  Arnés (harness)"
 	@echo "    make init            puerta de entrada: ¿se puede trabajar? (init.sh)"
 	@echo "    make harness-check   valida la estructura del arnés sin correr tests"
-	@echo "    make backlog         muestra el estado de featureslist.json"
+	@echo "    make backlog         muestra el estado de harness/featureslist.json"
 	@echo ""
 	@echo "  Agentes"
 	@echo "    make agents-list     listar agentes disponibles"
 	@echo "    make agents-run      ejecutar un agente"
 	@echo "    make agents-doctor   diagnóstico completo con agentes"
 	@echo "    make agents-memory   estado de la memoria de agentes"
-	@echo "    make agents-eval     smoke + routing + contracts (eval de agentes)"
+	@echo "    make agents-eval     harness + rag + smoke + routing + contracts"
+	@echo "    make eval-rag        mide la recuperacion del RAG (hit_rate/recall/MRR)"
 	@echo "    make prompts-sync    regenera los prompts desde el codigo y contracts.py"
 	@echo "    make prompts-check   falla si un prompt se ha desincronizado"
 	@echo "    make assistants-sync espeja los subagentes a .claude/agents/"
@@ -318,7 +319,7 @@ harness-check:
 	@./init.sh --quick
 
 backlog:
-	@uv run $(PYTHON) -c "import json; d=json.load(open('featureslist.json')); \
+	@uv run $(PYTHON) -c "import json; d=json.load(open('harness/featureslist.json')); \
 	print(); print('  Backlog de {{ project_name }}'); print(); \
 	[print('  [%-11s] %-10s %s' % (f['status'], f['id'], f['title'])) for f in d['features']]; \
 	print()"
@@ -340,7 +341,7 @@ agents-memory:
 	uv run python -m agents run memory status
 
 agents-eval:
-	@echo "▶  Evaluación del sistema de agentes (smoke + routing + contracts)"
+	@echo "▶  Evaluación del sistema de agentes (harness + rag + smoke + routing + contracts)"
 	uv run python -m agents.evals.runner
 
 prompts-sync assistants-sync:
@@ -360,6 +361,13 @@ index-rag:
 index-rag-rebuild:
 	@echo "▶  Reconstruyendo el índice RAG desde cero..."
 	uv run python -m agents run rag index --rebuild
+
+# Mide si la búsqueda encuentra lo que debería, contra
+# agents/evals/rag_golden.json. Sin esto, tocar el troceado o el embedder es
+# fe: "parece que ahora busca mejor" no es un dato.
+eval-rag:
+	@echo "▶  Evaluando la recuperación del RAG (hit_rate / recall@k / MRR)"
+	uv run python -m agents run rag evaluate
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Skills — configuración del asistente de IA

@@ -1,6 +1,52 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/deepseek-v4-flash-free",
+{%- if use_mcp | default(false) %}
+  "mcp": {
+{%- set ns = namespace(primero=true) %}
+{%- set elegidos = mcp_servers | default([]) %}
+{%- if "filesystem (acotado a data/ y reports/)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "./data", "./reports"],
+      "enabled": true
+    }
+{%- endif %}
+{%- if "git (historial y diffs en solo lectura)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "git": {
+      "type": "local",
+      "command": ["uvx", "mcp-server-git", "--repository", "."],
+      "enabled": true
+    }
+{%- endif %}
+{%- if "fetch (descarga paginas web — CONTENIDO NO CONFIABLE)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "fetch": {
+      "type": "local",
+      "command": ["uvx", "mcp-server-fetch"],
+      "enabled": true
+    }
+{%- endif %}
+{%- if "sqlite (consulta bases SQLite de data/)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "sqlite": {
+      "type": "local",
+      "command": ["uvx", "mcp-server-sqlite", "--db-path", "./data/processed/{{ project_slug }}.db"],
+      "enabled": true
+    }
+{%- endif %}
+{%- if "time (fecha y hora, zonas horarias)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "time": {
+      "type": "local",
+      "command": ["uvx", "mcp-server-time"],
+      "enabled": true
+    }
+{%- endif %}
+  },
+{%- endif %}
   "agent": {
     "lider": {
       "description": "Punto de entrada del arnés: init.sh → progress → featureslist → delegar → verificar → done. No escribe código; orquesta subagentes con contexto mínimo y delega el trabajo determinista en los agentes Python.",
@@ -17,14 +63,14 @@
       ]
     },
     "explorer": {
-      "description": "Arnés: investiga el proyecto en solo lectura y devuelve un informe corto en progress/. No modifica nada.",
+      "description": "Arnés: investiga el proyecto en solo lectura y devuelve un informe corto en harness/progress/. No modifica nada.",
       "mode": "subagent",
       "instructions": [
         ".opencode/agents/explorer.md"
       ]
     },
     "implementer": {
-      "description": "Arnés: implementa UNA feature del backlog con tests y deja la evidencia en progress/. Lo lanza el líder, no se usa suelto.",
+      "description": "Arnés: implementa UNA feature del backlog con tests y deja la evidencia en harness/progress/. Lo lanza el líder, no se usa suelto.",
       "mode": "subagent",
       "instructions": [
         ".opencode/agents/implementer.md"

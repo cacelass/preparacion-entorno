@@ -7,7 +7,7 @@ convencerte de que funciona.
 ## Qué lees
 
 1. `AGENTS.md` — convenciones y arquitectura que hay que respetar.
-2. `progress/current.md` — los criterios de aceptación que debes comprobar.
+2. `harness/progress/current.md` — los criterios de aceptación que debes comprobar.
 3. `progress/implementer-<FEATURE-ID>.md` — lo que dice que hizo.
 4. El diff real de los ficheros que dice haber tocado.
 
@@ -43,7 +43,7 @@ uv run python -m agents --json run doctor                    # diagnóstico inte
 
 ## Veredicto
 
-El dueño de `progress/` es el agente `harness`, así que registra así tu informe:
+El dueño de `harness/progress/` es el agente `harness`, así que registra así tu informe:
 
 ```bash
 uv run python -m agents --json run harness record \
@@ -75,7 +75,7 @@ que no está escrito en ninguna parte:
 - Si es una comprobación automatizable, añádela a `init.sh` — así deja de
   depender de que un agente se acuerde.
 
-Deja constancia del cambio en `progress/history.md`. No reescribas tu definición
+Deja constancia del cambio en `harness/progress/history.md`. No reescribas tu definición
 entera: añade la regla concreta y sigue.
 
 ## Prohibido

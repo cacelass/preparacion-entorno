@@ -81,6 +81,19 @@ PINNED: list[tuple[str, dict]] = [
             use_monitoring=True,
             use_rag=True,
             use_conformal=True,
+            use_mcp=True,
+            # Todos los servidores a la vez: es el unico combo donde el
+            # generador de .mcp.json y de opencode.json tiene que encadenar
+            # varias entradas, que es donde se cuela una coma de mas.
+            # Tupla y no lista: el informe de cobertura mete cada valor en un
+            # set, y una lista no es hasheable.
+            mcp_servers=(
+                "filesystem (acotado a data/ y reports/)",
+                "git (historial y diffs en solo lectura)",
+                "fetch (descarga paginas web — CONTENIDO NO CONFIABLE)",
+                "sqlite (consulta bases SQLite de data/)",
+                "time (fecha y hora, zonas horarias)",
+            ),
             graphify_mode="graphify + obsidian vault",
         ),
     ),
@@ -315,7 +328,7 @@ for label, combo in COMBOS:
                 bugs.append((label, rel, msg))
                 print(f"  ✗ JSON    [{label}] {rel}:\n{snippet}")
             else:
-                if rel == "featureslist.json":
+                if rel == "harness/featureslist.json":
                     for problem in validate_backlog(doc):
                         bugs.append((label, rel, f"BACKLOG: {problem}"))
                         print(f"  ✗ BACKLOG [{label}] {rel}: {problem}")

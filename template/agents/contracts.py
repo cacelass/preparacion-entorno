@@ -60,7 +60,7 @@ capas y la división es estricta:
   si el trabajo vale. No aparecen en `CONTRACTS` porque no son código: no
   tienen módulo en `agents/agents/` y `validate_contracts()` audita el registro.
 - **Ejecuta** — el agente Python `harness` (abajo en este mismo diccionario).
-  Es el dueño real de `featureslist.json` y `progress/`: cambiar un estado,
+  Es el dueño real de `harness/featureslist.json` y `harness/progress/`: cambiar un estado,
   escribir el histórico o ejecutar la puerta son operaciones deterministas, y
   un LLM editando JSON a mano se equivoca.
 
@@ -77,12 +77,12 @@ Las tres memorias del proyecto no se solapan, cada una tiene su plazo:
 
 | Soporte | Dueño | Alcance |
 |---------|-------|---------|
-| `progress/` | `harness` | La feature en curso y el histórico de features |
+| `harness/progress/` | `harness` | La feature en curso y el histórico de features |
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
 | `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 
 Si un agente Python necesita saber en qué se está trabajando, LEE
-`progress/current.md` — no lo escribe.
+`harness/progress/current.md` — no lo escribe.
 """
 
 from __future__ import annotations
@@ -100,6 +100,11 @@ class Contract:
     needs: tuple[str, ...] = ()                # información que debe recibir (si falta: preguntar)
     owns: tuple[str, ...] = ()                 # recursos que SOLO este agente puede modificar
     collaborates: tuple[str, ...] = ()         # agentes a los que delega o que le delegan
+    # Acciones que no se deshacen (escriben en el historial git, modifican el
+    # código fuente, instalan cosas). No son documentación: `BaseAgent.run()`
+    # se niega a ejecutarlas sin autorización explícita — ver
+    # `agents/permissions.py`.
+    destructive: tuple[str, ...] = ()
 
     def as_dict(self) -> dict:
         return {
@@ -109,6 +114,7 @@ class Contract:
             "needs": list(self.needs),
             "owns": list(self.owns),
             "collaborates": list(self.collaborates),
+            "destructive": list(self.destructive),
         }
 
 
@@ -186,7 +192,7 @@ CONTRACTS: dict[str, Contract] = {
              "con BM25 léxico.",
         can=(
             "indexar el proyecto (código de todos los módulos, prompts, docs, "
-            "vault, README, CHANGELOG, progress/ y featureslist.json) en ChromaDB",
+            "vault, README, CHANGELOG, harness/progress/ y harness/featureslist.json) en ChromaDB",
             "reindexar solo lo que cambió, y purgar del índice lo que se borró",
             "indexar URLs externas (documentación de librerías, tutoriales)",
             "buscar en el índice con consultas en lenguaje natural",
@@ -237,6 +243,11 @@ CONTRACTS: dict[str, Contract] = {
         needs=("qué archivo/paquete tocar, o confirmación para aplicar (dry_run=False)",),
         owns=("codigo fuente del paquete ({project_slug}/)",),
         collaborates=("review",),
+        # `dry_run` es False por defecto en el código, así que la frase de
+        # `cannot` no se cumplía sola: quien aplica la regla es la puerta.
+        destructive=(
+            "fix_mutable_defaults", "fix_bare_excepts", "add_type_hints", "fix_weights_only",
+        ),
     ),
     "test": Contract(
         role="Ejecuta la suite de tests y explica los resultados.",
@@ -323,6 +334,10 @@ CONTRACTS: dict[str, Contract] = {
         ),
         owns=("historial git (commits, tags, ramas)",),
         collaborates=("documentation", "cicd"),
+        destructive=(
+            "commit_with_changelog", "commit_feature", "tag_release",
+            "create_branch", "merge_branch",
+        ),
     ),
     "documentation": Contract(
         role="Dueño de la documentación: CHANGELOG.md, README.md, docs/ y la versión del proyecto.",
@@ -417,6 +432,7 @@ CONTRACTS: dict[str, Contract] = {
         needs=("repo_url o ruta local del agente a instalar",),
         owns=("agents/external/",),
         collaborates=("env",),
+        destructive=("install_from_git", "install_from_path"),
     ),
     "doctor": Contract(
         role="Diagnóstico integral del proyecto: agrega las verificaciones de los demás.",
@@ -465,9 +481,9 @@ CONTRACTS: dict[str, Contract] = {
     "harness": Contract(
         role="Dueño mecánico del arnés: mantiene el backlog y el progreso, y ejecuta la puerta init.sh.",
         can=(
-            "leer y actualizar featureslist.json (abrir, cerrar, bloquear y añadir features)",
-            "escribir progress/current.md y añadir entradas a progress/history.md",
-            "guardar los informes de los subagentes en progress/<agente>-<FEATURE-ID>.md",
+            "leer y actualizar harness/featureslist.json (abrir, cerrar, bloquear y añadir features)",
+            "escribir harness/progress/current.md y añadir entradas a harness/progress/history.md",
+            "guardar los informes de los subagentes en harness/progress/<agente>-<FEATURE-ID>.md",
             "ejecutar ./init.sh y devolver el veredicto estructurado",
             "rechazar el cierre de una feature si la puerta no pasa o si no hay evidencia",
         ),
@@ -479,7 +495,7 @@ CONTRACTS: dict[str, Contract] = {
             "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
         ),
         needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),
-        owns=("featureslist.json", "progress/"),
+        owns=("harness/featureslist.json", "harness/progress/", "harness/memory.md"),
         collaborates=("plan", "test", "review", "memory"),
     ),
 }

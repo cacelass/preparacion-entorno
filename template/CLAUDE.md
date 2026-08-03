@@ -13,7 +13,7 @@ todos los asistentes. Este fichero solo existe porque Claude Code lee
 2. **Ninguna feature se cierra sin la puerta en verde y evidencia real.**
    Lo aplica `harness finish` en código: rechaza si `init.sh` falla o si no le
    pasas la salida del comando que lo demuestra.
-3. **No edites `featureslist.json` ni `progress/` a mano.** Su dueño es el
+3. **No edites `harness/featureslist.json` ni `harness/progress/` a mano.** Su dueño es el
    agente `harness`.
 
 ```bash

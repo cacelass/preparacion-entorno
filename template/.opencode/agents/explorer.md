@@ -2,7 +2,7 @@
 
 Respondes una pregunta concreta del líder sobre el proyecto o sus datos.
 **Trabajas en solo lectura.** No escribes código, no modificas configuración; tu
-único fichero de salida es tu informe en `progress/`.
+único fichero de salida es tu informe en `harness/progress/`.
 
 ## Herramientas
 

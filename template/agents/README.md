@@ -54,6 +54,9 @@ agents/
 ├── context.py                # SharedContext: rutas + config + workspace por agente
 ├── contracts.py              # contratos de rol: can/cannot/needs/owns por agente + validación
 ├── audit.py                  # log JSONL de toda ejecución (lo escribe BaseAgent.run)
+├── permissions.py            # la puerta: lo irreversible no se ejecuta sin --yes
+├── policy_guard.py           # hook PreToolUse: filtra Bash/Read/Write/MCP del asistente
+├── redaction.py              # tapa credenciales antes de que salgan hacia el modelo
 ├── helpers.py                # delegate_to(): colaboración entre agentes
 ├── orchestrator.py            # rutea lenguaje natural -> agente + acción
 ├── exceptions.py               # jerarquía de excepciones propia
@@ -247,7 +250,7 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `memory` | **Memoria proactiva**: observa las trayectorias de los agentes y mantiene un banco estructurado (facts/state/traces) para combatir el decaimiento de estado en tareas largas | `memory_tool` |
 | `doc` | **Documentación unificada**: responde dónde está algo consultando a la vez el grafo, el índice semántico y el vault | `graphify_tool`, `rag_tool` |
 | `rag` | RAG local con ChromaDB: busca fundiendo similitud vectorial y BM25 léxico. Indexa el código de todos los módulos, prompts, docs, vault y la memoria del arnés; también URLs externas. Reindexado incremental por huella de fichero. Solo con `use_rag=true` | `rag_tool` |
-| `harness` | **Dueño del arnés**: mantiene `featureslist.json` y `progress/`, ejecuta la puerta `init.sh` y **rehúsa cerrar** una feature si no pasa o si no hay evidencia real | `process_tool` |
+| `harness` | **Dueño del arnés**: mantiene `harness/featureslist.json` y `harness/progress/`, ejecuta la puerta `init.sh` y **rehúsa cerrar** una feature si no pasa o si no hay evidencia real | `process_tool` |
 
 Cada agente documenta en su propio docstring qué responsabilidades de la
 lista original están implementadas y cuáles quedan como extensión (p. ej.

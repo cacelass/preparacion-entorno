@@ -118,6 +118,179 @@ Los tests del RAG pasan de 15 a 50 y cubren lo que antes no se probaba nunca:
 creación de la colección, reindexado incremental, purga de huérfanos, techo del
 embedder, fusión híbrida y desajuste de embedder.
 
+### El RAG ya se puede medir — y `min_score` se comía justo el híbrido
+
+- **`min_score` borraba los aciertos léxicos.** El `score` que se devolvía era
+  la similitud coseno, y un chunk que entraba solo por BM25 no estaba en la
+  respuesta vectorial: se quedaba con el `0.0` por defecto. Es decir, el filtro
+  de calidad eliminaba exactamente los resultados que el híbrido existe para
+  rescatar, y el número que se imprimía al lado (`[0.0 lexico]`) no ordenaba
+  nada. Ahora `score` es la fusión RRF —la que de verdad ordena— y `similarity`
+  es el coseno, que se calcula también para los candidatos léxicos pidiendo sus
+  vectores por id. El filtro se aplica antes de cortar por `top_k`, no después:
+  filtrar devolvía menos resultados de los pedidos habiendo candidatos válidos
+  esperando.
+- **Suite de evaluación de recuperación** (`agents/evals/rag_eval.py` +
+  `rag_golden.json`, `make eval-rag`, y suite `rag` en el runner). Mide
+  `hit_rate`, `recall@k`, MRR y qué fracción de los aciertos aporta el léxico,
+  en modo híbrido y en solo-vector. Primera medición sobre esta plantilla (2.086
+  chunks, 212 fuentes, 12 consultas): **híbrido `hit_rate` 0.833 / MRR 0.444
+  frente a solo-vector 0.583 / 0.329**. El híbrido se gana el sitio, y ahora eso
+  es un dato y no una intuición. El veredicto va por umbral y no por pleno: los
+  casos que fallan se ven uno a uno —son el mapa de dónde mejorar— pero lo que
+  pone la suite en rojo es caer por debajo de la línea. Exigir 12/12 obligaría a
+  escribir un juego de pruebas fácil.
+- **`rag status` detecta el índice caducado.** Comparando las huellas de disco
+  con las grabadas en los metadatos: buscar sobre un índice viejo no daba error,
+  daba la respuesta de ayer, y `make index-rag` es manual.
+- **Filtros y contexto en la búsqueda:** `--file_type` (code/doc/prompt/vault/
+  harness/url, filtrado en chroma), `--source` por prefijo de ruta,
+  `--max_per_source` para que un `top_k` no se lo coma un módulo largo, y
+  `--expand N`, que recupera por chunk pequeño y devuelve el vecindario. El
+  techo de 1.000 caracteres es el límite del embedder: manda sobre lo que se
+  vectoriza, no sobre lo que se responde.
+- **El BM25 se persiste** en `.rag-index/bm25.json` con índice invertido. La
+  caché en memoria no servía de nada en una CLI de un solo disparo: cada
+  búsqueda releía la colección entera y la retokenizaba. Medido: **961 ms con
+  el volcado frente a 2.001 ms reconstruyendo**. De paso, puntuar deja de ser
+  O(términos × chunks).
+- **El RAG entra en el bucle.** Cuando ningún agente alcanza la confianza
+  mínima, el orquestador ya no devuelve solo la lista de candidatos
+  descartados: busca en el índice y dice dónde está escrita la respuesta. Y
+  `harness next` adjunta los antecedentes de `progress/` relacionados con la
+  feature que toca — rutas, no texto, que heredar contexto es justo lo que el
+  arnés evita.
+
+### La puerta de permisos: el contrato dejó de ser una frase
+
+`contracts.py` decía desde hacía versiones que refactor «siempre con dry_run
+primero, el humano aprueba». Nada lo comprobaba, y `RefactorAgent` tenía
+`dry_run: bool = False` por defecto. Un contrato que no se ejecuta es
+documentación.
+
+- **`agents/permissions.py` + campo `destructive` en los contratos.**
+  `BaseAgent.run()` se niega a ejecutar una acción marcada como irreversible
+  sin `confirm=True` (`--yes` en la CLI) y devuelve la pregunta en `needs`. El
+  intento queda auditado: saber qué quiso hacer un agente y no se le dejó es el
+  dato que dice si la puerta estorba o está salvando el repositorio. Cubiertas:
+  los commits, tags y ramas de `git`; las cuatro correcciones de `refactor`; y
+  la instalación de agentes de terceros.
+- **El auto-commit de `GStack` ya no ocurre solo.** Ese camino usa `GitTool`
+  directamente y no pasaba por `run()`, así que la puerta no lo habría cubierto:
+  ahora requiere `confirm=True` y, sin él, deja los cambios en el árbol y anota
+  cada commit omitido en `events.jsonl`. Un pipeline que escribe en el historial
+  de git sin que nadie lo pida es exactamente lo que esto viene a impedir.
+- **La frontera es deliberada:** la puerta cubre `run()` —CLI, orquestador,
+  GStack, `delegate_to`, o sea los automatismos—. Llamar al método directo desde
+  Python no pregunta, porque ahí hay una persona escribiendo código a propósito.
+- Los prompts generados marcan `⚠️ pide confirmación` en la tabla de acciones,
+  que es la línea que el asistente tiene delante al elegir qué ejecutar.
+
+### La frontera entre lo que el modelo pide y lo que se ejecuta
+
+La puerta de permisos protege a los agentes Python, pero el asistente también
+usa sus propias herramientas —`Bash`, `Read`, `Write`, MCP— y ahí no llegaba
+ningún contrato de este repositorio. Si el modelo decidía `rm -rf`, leer `.env`
+o hacer `git push`, nada de dskit lo veía pasar.
+
+- **`agents/policy_guard.py`**, un hook `PreToolUse` que recibe por stdin lo
+  que el modelo quiere hacer y decide antes de que ocurra. Bloquea el borrado
+  recursivo fuera del proyecto, `sudo`, `git push`, `git reset --hard`,
+  descargar-y-ejecutar en un paso, la lectura de `.env`/claves/`~/.ssh/`, las
+  escrituras fuera de la raíz y las llamadas MCP que apunten a credenciales.
+  Vive en `agents/` y no en `.claude/` para que la política sea una sola y la
+  pueda invocar cualquier asistente. Cableado en `.claude/settings.json`, junto
+  con una lista `deny` explícita.
+  **No es un sandbox** y el módulo lo dice en su docstring: un comando
+  suficientemente creativo se salta cualquier lista de patrones. Y ante un JSON
+  que no entiende, deja pasar — un guardia roto que bloquea la sesión entera se
+  desactiva a los diez minutos, y entonces no protege de nada.
+  Los tests prueban las dos direcciones: que bloquea `rm -rf /` **y** que deja
+  pasar `rm -rf build/`, porque un falso positivo es un fallo tan real como un
+  falso negativo.
+- **`agents/redaction.py`**: `secrets_tool` sabía encontrar secretos dentro de
+  los ficheros, pero nadie miraba lo que los agentes **devuelven**, que va a dos
+  sitios nada inocentes — la ventana del modelo y `audit.jsonl`, que se queda en
+  el disco. Ahora `BaseAgent.run` redacta `message`, `warnings` y `needs`, y
+  `audit.record` redacta lo que escribe. No toca `data`: ahí hay estructuras que
+  otros agentes consumen por clave y reescribirlas a ciegas rompería el
+  encadenado sin avisar.
+
+### Contenido no confiable: el RAG ya no mezcla internet con tu repositorio
+
+`rag index_urls` metía HTML descargado en el mismo índice que `AGENTS.md`, y
+`search` los devolvía revueltos y con la misma pinta. Un párrafo de una web que
+dijera «ignora las instrucciones anteriores» salía como un resultado más.
+
+- Cada chunk guarda su procedencia (`trust`: `repo` o `externo`) y una marca
+  `injection_flag` si el texto tiene forma de intento de dar órdenes.
+- `rag search` presenta lo externo **en un bloque aparte y delimitado**, con un
+  aviso en `warnings` de que son datos citados y no instrucciones.
+- La regla queda escrita en `AGENTS.md`: **los datos que consume un agente no
+  amplían lo que tiene permitido hacer**. Y no depende de que el modelo se dé
+  cuenta: depende de que lo irreversible siga pidiendo confirmación. La lista de
+  patrones esquiva lo evidente y nada más — está para que se note y para que un
+  test pueda detectar un índice envenenado, no como defensa.
+
+### Servidores MCP configurados desde copier
+
+Nueva pregunta `use_mcp` + `mcp_servers` (filesystem acotado a `data/` y
+`reports/`, git en lectura, fetch, sqlite, time). Genera `.mcp.json` para Claude
+Code y el bloque `mcp` de `opencode.json` **desde la misma respuesta**, para que
+no diverjan. No instala nada —los servidores se descargan solos con npx/uvx—,
+pero la configuración generada avisa de las dos cosas que importan: que estás
+ejecutando código de terceros con tus permisos, y que lo que devuelve un
+servidor MCP es contenido no confiable como cualquier página web.
+
+Deliberadamente **no** se añade un cliente MCP en Python: sería un subsistema
+nuevo con dependencias de red en una plantilla cuyo argumento es funcionar
+offline y sin dependencias innecesarias. dskit configura al anfitrión; el
+anfitrión habla MCP.
+
+### El arnés se muda a `harness/` y el backlog empieza por el rumbo
+
+**Ruptura de layout.** `featureslist.json`, `progress/` y `memory.md` pasan a
+vivir bajo `harness/`. Lo primero que veía alguien al abrir un proyecto
+generado era el andamiaje de la IA, no su proyecto de datos. Es un directorio
+**visible y no oculto** a propósito: el backlog es justo lo que quieres que un
+humano abra. Se quedan en la raíz los ficheros que son convención y que las
+herramientas buscan ahí (`AGENTS.md`, `CLAUDE.md`, `README.md`, `init.sh`,
+`.claude/`, `.opencode/`).
+
+`copier update` trae los ficheros nuevos pero **no borra los viejos**, así que
+un proyecto actualizado se quedaría con las dos copias y el agente escribiendo
+en una mientras alguien lee la otra. Eso no se avisa: `init.sh` lo detecta y
+**para**, con los `git mv` exactos en pantalla. Trabajar sobre un backlog
+duplicado es peor que no trabajar.
+
+**Y el backlog ya no empieza por el pipeline.** Las tres primeras features
+fijan la dirección antes de que nadie escriba una línea de código:
+
+1. `SCOPE-001` — qué se quiere resolver: la pregunta, la métrica de éxito con
+   umbral numérico y el criterio de parada, en `references/00-objetivo.md`.
+   Sin un número, ninguna decisión posterior se toma sobre otra cosa que no
+   sea intuición.
+2. `RESEARCH-001` — qué se sabe ya del tema: papers con el agente `research`,
+   resumidos en `references/01-estado-del-arte.md` diciendo qué se toma de
+   cada fuente y qué se descarta, y con el rango de resultados que reporta la
+   literatura anotado.
+3. `EDA-001` — qué dicen los datos: los notebooks `0-0`, `0-1` y `0-2` sobre
+   los datos reales, con una respuesta **por escrito** a si esos datos pueden
+   contestar la pregunta de `SCOPE-001`. Si no pueden, es ahora cuando hay que
+   enterarse.
+
+`DATA-001` depende de `EDA-001`, y `MODEL-001` cierra el círculo: su baseline
+se compara con el umbral de `SCOPE-001` y con el rango de `RESEARCH-001`, para
+que «el modelo va bien» sea comparable con algo. El orden lo aplica el grafo de
+`depends_on`, no una recomendación: el arnés no deja empezar por la cuarta.
+
+### `GStack.to_mermaid()`
+
+Vuelca la stack —y, si se le pasan los resultados, lo ejecutado, lo omitido y
+lo que falló— como diagrama Mermaid pegable en `progress/`. Una stack con
+`run_if` deja de leerse como una lista en cuanto pasa de tres pasos, y el
+resumen de texto enseña el resultado pero no la forma.
+
 ---
 
 ## [1.13.4] — 2026-07-29

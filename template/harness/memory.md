@@ -5,4 +5,3 @@ recordar en futuras sesiones. Este archivo lo lee el agente al inicio de
 cada sesión — cualquier anotación aquí persiste entre sesiones.
 
 ---
-

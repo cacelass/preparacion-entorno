@@ -1,4 +1,4 @@
-# progress/ — memoria externa del arnés
+# harness/progress/ — memoria externa del arnés
 
 Esta carpeta existe para resolver un problema concreto: **el teléfono
 descompuesto entre agentes.** Cuando el líder lanza un subagente, ese subagente
@@ -6,7 +6,7 @@ arranca con el contexto vacío. Si el resultado de su trabajo solo vive en su
 ventana de contexto, se pierde en cuanto termina.
 
 La regla es: **todo subagente escribe su resultado en un fichero de esta
-carpeta antes de devolver el control.** El siguiente agente lee `progress/` en
+carpeta antes de devolver el control.** El siguiente agente lee `harness/progress/` en
 vez de releer el repositorio entero — menos tokens, menos degradación.
 
 ## Ficheros
@@ -52,11 +52,11 @@ La cabecera (fecha y veredicto) la pone `harness record`; tú aportas el cuerpo:
 
 ## Las otras dos memorias
 
-`progress/` no es la única memoria del proyecto, y no se pisan:
+`harness/progress/` no es la única memoria del proyecto, y no se pisan:
 
 | Dónde | Dueño | Plazo |
 |-------|-------|-------|
-| `progress/` | `harness` | La feature en curso y el histórico de features |
+| `harness/progress/` | `harness` | La feature en curso y el histórico de features |
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
 | `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 
@@ -66,7 +66,7 @@ de trabajo, no de archivo.
 
 ## Buscable, no solo legible
 
-Esta carpeta y `featureslist.json` entran en el índice semántico del proyecto,
+Esta carpeta y `harness/featureslist.json` entran en el índice semántico del proyecto,
 así que el histórico se consulta en lenguaje natural en vez de releyéndolo:
 
 ```bash

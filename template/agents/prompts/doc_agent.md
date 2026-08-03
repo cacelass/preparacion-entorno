@@ -24,3 +24,33 @@ Combina 3 fuentes de conocimiento: **graphify** (grafo estructural), **RAG** (b�
 - `doc search` es el punto de entrada único para preguntas sobre el proyecto
 - Cuando un agente necesita contexto, puede delegar a `doc` en vez de consultar cada fuente por separado
 - El subagente `doc` en opencode permite chatear directamente con la documentación del proyecto
+
+<!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
+
+## Acciones
+
+| Acción | Argumentos |
+|--------|------------|
+| `run doc search` | `--query` (obligatorio) · `--sources` |
+| `run doc graph_query` | `--question` (obligatorio) · `--budget`, `--no_cache` |
+| `run doc rag_search` | `--query` (obligatorio) · `--top_k` |
+| `run doc vault_grep` | `--pattern` (obligatorio) |
+| `run doc neighbors` | `--node` (obligatorio) · `--limit` |
+| `run doc list_references` | — |
+| `run doc index` | — |
+| `run doc status` | — |
+
+## Límites
+
+**Rol.** Documentación unificada: responde dónde está algo consultando grafo, índice semántico y vault, y navega el grafo.
+
+**No hace:**
+- escribir documentación → eso es de 'documentation' (README, CHANGELOG) o 'knowledge' (vault)
+- construir el grafo ni el índice → delega en 'knowledge' y 'rag'
+- responder si ninguna fuente está disponible → lo dice, no inventa
+
+**Necesita que le den:** la pregunta en lenguaje natural
+
+**Se apoya en:** rag, knowledge
+
+<!-- END AUTOGEN -->

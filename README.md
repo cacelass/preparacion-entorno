@@ -48,7 +48,7 @@ Y con un **arnés de IA** dentro del propio repositorio: un entorno que gobierna
 Un modelo de IA genera código mucho más rápido de lo que un humano lo revisa. El arnés (*harness*) es el entorno que pone las riendas: vive dentro del repositorio generado, así que viaja con el proyecto y lo comparte todo el equipo.
 
 ```
-./init.sh → progress/ → featureslist.json → implementar → revisar → done
+./init.sh → harness/progress/ → harness/featureslist.json → implementar → revisar → done
     │
     └── si falla: el agente PARA. No se trabaja sobre un proyecto roto.
 ```
@@ -57,8 +57,8 @@ Un modelo de IA genera código mucho más rápido de lo que un humano lo revisa.
 |---|---|
 | `AGENTS.md` | Punto de entrada. Lo primero que lee cualquier agente |
 | `init.sh` | La puerta: entorno, ficheros del arnés, backlog y suite de tests |
-| `featureslist.json` | Backlog con criterios de aceptación **verificables** |
-| `progress/` | Memoria fuera de la ventana de contexto: tarea actual e histórico |
+| `harness/featureslist.json` | Backlog con criterios de aceptación **verificables** |
+| `harness/progress/` | Memoria fuera de la ventana de contexto: tarea actual e histórico |
 | `.opencode/agents/` | Los cuatro agentes del arnés |
 
 **La regla que no se salta:** ninguna feature se marca `done` sin que `./init.sh` pase en verde y sin evidencia real del comando que lo demuestra. No es una instrucción en un prompt — la aplica `harness finish` en Python, así que no se puede rodear pidiéndoselo amablemente al modelo.
@@ -259,7 +259,7 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 ```bash
 make help        # ver todos los comandos disponibles
 make init        # la puerta del arnés: ¿se puede trabajar?
-make backlog     # estado de featureslist.json
+make backlog     # estado de harness/featureslist.json
 make pipeline    # pipeline completo: data → features → train → predict
 make run         # ejecuta main.py
 make data        # solo ingesta de datos
@@ -322,11 +322,13 @@ nombre_proyecto/
 ├── AGENTS.md                     ← protocolo del arnés: fuente única de reglas
 ├── CLAUDE.md                     ← puntero a AGENTS.md para Claude Code
 ├── init.sh                       ← la puerta: ¿se puede trabajar?
-├── featureslist.json             ← backlog con criterios de aceptación
-├── progress/                     ← memoria del arnés
-│   ├── current.md                ← feature en curso
-│   ├── history.md                ← append-only de lo cerrado
-│   └── <agente>-<ID>.md          ← informe de cada subagente
+├── harness/                      ← TODO el estado del arnés, fuera de la raíz
+│   ├── featureslist.json         ← backlog con criterios de aceptación
+│   ├── memory.md                 ← preferencias que persisten entre sesiones
+│   └── progress/                 ← memoria fuera de la ventana de contexto
+│       ├── current.md            ← feature en curso
+│       ├── history.md            ← append-only de lo cerrado
+│       └── <agente>-<ID>.md      ← informe de cada subagente
 ├── .opencode/agents/             ← lider · explorer · implementer · reviewer
 ├── .claude/                      ← settings.json (hook SessionEnd) + agents/ espejados
 ├── agents/                       ← agentes especializados, docs y utilidades de release
@@ -387,7 +389,7 @@ nombre_proyecto/
 | **Arnés** | |
 | `make init` | Ejecuta `./init.sh` — la puerta |
 | `make harness-check` | Solo estructura del arnés, sin tests |
-| `make backlog` | Estado de `featureslist.json` |
+| `make backlog` | Estado de `harness/featureslist.json` |
 | **Agentes** | |
 | `make agents-list` | Lista los 30 agentes |
 | `make agents-doctor` | Diagnóstico integral |

@@ -18,3 +18,36 @@ Combate el *behavioral state decay* en tareas largas. Observa, almacena, provee 
 - Decisión del usuario → fact: `note(key="convention:x", value="usar Y")`
 - Tarea en progreso → state: `note(key="task:pending", value="...", kind="state")`
 - No inyectes si no es necesario. El silencio también es decisión.
+
+<!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
+
+## Acciones
+
+| Acción | Argumentos |
+|--------|------------|
+| `run memory status` | — |
+| `run memory note` | `--key`, `--value` (obligatorio) · `--kind` |
+| `run memory recall` | `--key` (obligatorio) |
+| `run memory forget` | `--key` (obligatorio) |
+| `run memory search` | `--query` (obligatorio) · `--kind`, `--limit` |
+| `run memory snapshot` | — |
+| `run memory inject` | `--context`, `--max_entries` |
+| `run memory observe` | `--max_entries` |
+| `run memory decay` | — |
+| `run memory clear` | `--kind` |
+
+## Límites
+
+**Rol.** Memoria proactiva: observa trayectorias de agentes y mantiene un banco de memoria estructurado contra el decaimiento del estado en tareas largas.
+
+**No hace:**
+- modificar el workspace de otros agentes — solo escribe en agents/workspace/memory/
+- ejecutar acciones de dominio — solo observa e inyecta contexto
+
+**Necesita que le den:** el log de auditoría para observar
+
+**Escribe en (nadie más toca esto):** agents/workspace/memory/
+
+**Se apoya en:** audit
+
+<!-- END AUTOGEN -->

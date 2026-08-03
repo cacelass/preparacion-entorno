@@ -228,7 +228,7 @@ class DoctorAgent(BaseAgent):
         """
         missing = [
             rel
-            for rel in ("init.sh", "featureslist.json", "progress/current.md", "AGENTS.md")
+            for rel in ("init.sh", "harness/featureslist.json", "harness/progress/current.md", "AGENTS.md")
             if not (self.ctx.root / rel).exists()
         ]
         if missing:
@@ -237,10 +237,10 @@ class DoctorAgent(BaseAgent):
         try:
             import json
 
-            doc = json.loads((self.ctx.root / "featureslist.json").read_text(encoding="utf-8"))
+            doc = json.loads((self.ctx.root / "harness/featureslist.json").read_text(encoding="utf-8"))
             features = doc.get("features", [])
         except (OSError, json.JSONDecodeError) as exc:
-            return {"ok": False, "message": f"featureslist.json ilegible: {exc}"}
+            return {"ok": False, "message": f"harness/featureslist.json ilegible: {exc}"}
 
         pending = sum(1 for f in features if f.get("status") == "pending")
         running = [f.get("id") for f in features if f.get("status") == "in_progress"]

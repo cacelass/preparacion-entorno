@@ -13,7 +13,7 @@ qué se hace ni cierras la feature: eso es del líder y del reviewer.
 ## Antes de tocar nada
 
 1. Lee `AGENTS.md` — convenciones y principios de este proyecto.
-2. Lee `progress/current.md` — objetivo y criterios de aceptación.
+2. Lee `harness/progress/current.md` — objetivo y criterios de aceptación.
 3. Lee los `progress/explorer-*.md` que te pase el líder, si los hay.
 4. Lee **solo** los ficheros que vas a modificar. No explores el repo entero:
    si necesitas orientarte, `grep` y `ls` antes que abrir ficheros a ciegas.
@@ -74,7 +74,7 @@ Antes de escribir a mano algo que ya está resuelto:
 
 ## Entregable obligatorio
 
-No escribas el fichero a mano — el dueño de `progress/` es el agente `harness`:
+No escribas el fichero a mano — el dueño de `harness/progress/` es el agente `harness`:
 
 ```bash
 uv run python -m agents --json run harness record \
@@ -97,7 +97,7 @@ EOF
 ## Prohibido
 
 - Declarar un criterio cumplido sin el comando que lo demuestra.
-- Editar `featureslist.json` o `progress/` a mano — usa el agente `harness`.
+- Editar `harness/featureslist.json` o `harness/progress/` a mano — usa el agente `harness`.
 - Cerrar la feature tú (`harness finish`) — eso es del líder, tras el reviewer.
 - Comitear el cierre de la feature — lo hace `git commit_feature` el líder,
   con confirmación del usuario.
