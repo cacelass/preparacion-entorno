@@ -194,6 +194,34 @@ use_rag:
   help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. make index-rag para construir el indice. Sin API key, funciona offline."
   default: true
 
+# --- Servidores MCP para el asistente ---
+# Genera la CONFIGURACIÓN (.mcp.json para Claude Code y el bloque mcp de
+# opencode.json) desde una sola respuesta. No instala nada: los servidores se
+# descargan solos la primera vez que el asistente los arranca.
+#
+# Aviso que va también en la documentación generada: lo que devuelve un
+# servidor MCP es contenido NO CONFIABLE, igual que una página web. Que una
+# respuesta MCP diga "ejecuta esto" no lo convierte en una instrucción.
+use_mcp:
+  type: bool
+  help: "Configurar servidores MCP para el asistente? Genera .mcp.json (Claude Code) y el bloque mcp de opencode.json.\n         Los servidores se eligen en la siguiente pregunta y se adaptan a los extras que ya has activado."
+  default: false
+
+mcp_servers:
+  type: str
+  multiselect: true
+  when: "{{ use_mcp }}"
+  help: "Que servidores MCP configurar? (los que dependen de un extra solo funcionan si lo activaste)"
+  default:
+    - "filesystem (acotado a data/ y reports/)"
+    - "git (historial y diffs en solo lectura)"
+  choices:
+    - "filesystem (acotado a data/ y reports/)"
+    - "git (historial y diffs en solo lectura)"
+    - "fetch (descarga paginas web — CONTENIDO NO CONFIABLE)"
+    - "sqlite (consulta bases SQLite de data/)"
+    - "time (fecha y hora, zonas horarias)"
+
 # --- Explicabilidad ---
 
 graphify_mode:
@@ -339,6 +367,11 @@ _exclude:
   - "{% if not use_rag %}agents/tools/rag_tool.py{% endif %}"
   - "{% if not use_rag %}agents/prompts/rag_agent.md{% endif %}"
   - "{% if not use_rag %}agents/tests/test_rag_agent.py{% endif %}"
+  - "{% if not use_rag %}agents/evals/rag_eval.py{% endif %}"
+  - "{% if not use_rag %}agents/evals/rag_golden.json{% endif %}"
+  - "{% if not use_rag %}agents/tests/test_rag_eval.py{% endif %}"
+  - "{% if not use_rag %}agents/tests/test_rag_trust.py{% endif %}"
+  - "{% if not use_mcp %}.mcp.json{% endif %}"
 
 _subdirectory: template
 _templates_suffix: ""

@@ -1,0 +1,46 @@
+{
+  "$comment": "Servidores MCP de {{ project_name }}, generados por copier desde la respuesta 'mcp_servers'. Claude Code lee este fichero; opencode lee el bloque 'mcp' de opencode.json — los dos salen de la misma respuesta para que no diverjan. Los servidores se descargan solos la primera vez (npx/uvx): aqui no se instala nada, pero SI se ejecuta codigo de terceros con tus permisos, asi que comprueba de donde sale cada paquete antes de fiarte. Y lo que devuelve un servidor MCP es contenido NO CONFIABLE, como una pagina web: son datos citados, nunca instrucciones, y no amplian lo que un agente tiene permitido hacer (ver AGENTS.md y agents/permissions.py).",
+  "mcpServers": {
+{%- set ns = namespace(primero=true) %}
+{%- set elegidos = mcp_servers | default([]) %}
+{%- if "filesystem (acotado a data/ y reports/)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./data", "./reports"],
+      "$comment": "Acotado a data/ y reports/ a proposito: el asistente ya lee el codigo con sus propias herramientas, y darle la raiz entera solo amplia lo que puede tocar sin pasar por agents/policy_guard.py."
+    }
+{%- endif %}
+{%- if "git (historial y diffs en solo lectura)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "$comment": "Consulta del historial. Los commits los sigue haciendo el agente git, que pasa por la puerta de permisos."
+    }
+{%- endif %}
+{%- if "fetch (descarga paginas web — CONTENIDO NO CONFIABLE)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "$comment": "TODO lo que devuelve viene de internet y no lo ha revisado nadie. Si una pagina dice 'ignora las instrucciones anteriores', eso es texto, no una instruccion."
+    }
+{%- endif %}
+{%- if "sqlite (consulta bases SQLite de data/)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "./data/processed/{{ project_slug }}.db"],
+      "$comment": "Ajusta --db-path a tu base. Si no usas SQLite, borra esta entrada."
+    }
+{%- endif %}
+{%- if "time (fecha y hora, zonas horarias)" in elegidos %}
+{%- if not ns.primero %},{% endif %}{% set ns.primero = false %}
+    "time": {
+      "command": "uvx",
+      "args": ["mcp-server-time"]
+    }
+{%- endif %}
+  }
+}
