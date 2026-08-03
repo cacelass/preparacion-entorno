@@ -139,6 +139,16 @@ api = [
 # Monitorización: drift detection y performance tracking
 monitoring = [
     "evidently>=0.4,<1.0",
+    # nltk entra de forma transitiva por evidently. La 3.10.1 trae un hook de
+    # importación (`nltk/inisec.py`) contra el secuestro de módulos desde el
+    # directorio actual (CWE-427) que está roto: bloquea importaciones que NO
+    # vienen del CWD —desde otro directorio llega a bloquear `locale`, de la
+    # stdlib— así que un simple `import nltk` revienta y con él `import
+    # evidently`. El remedio que sugiere el propio error (`-P`,
+    # `PYTHONSAFEPATH=1`) tampoco funciona; verificado que 3.9.2 y 3.10.0 sí
+    # importan. Se excluye solo esa versión para que la corrección de upstream
+    # entre sola.
+    "nltk!=3.10.1",
 ]
 {% endif %}
 
