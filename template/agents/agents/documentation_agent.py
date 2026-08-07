@@ -13,6 +13,7 @@ Conoce el formato exacto que ya usa este template:
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import date
 
@@ -42,6 +43,7 @@ class DocumentationAgent(BaseAgent):
         return {
             "check_readme_makefile_sync": self.check_readme_makefile_sync,
             "update_changelog": self.update_changelog,
+            "update_prd": self.update_prd,
             "build_docs": self.build_docs,
             "bump_version": self.bump_version,
         }
@@ -138,6 +140,140 @@ class DocumentationAgent(BaseAgent):
         return AgentResult(
             True, self.name, "update_changelog", "CHANGELOG.md actualizado.", data=entry,
         )
+
+    # -- PRD vivo -------------------------------------------------------------
+    def update_prd(self, *, dry_run: bool = False) -> AgentResult:
+        """
+        Genera `docs/prd.md` a partir del estado REAL del proyecto: el objetivo
+        (`references/00-objetivo.md`), el backlog (`harness/featureslist.json`)
+        y los contratos Gherkin (`features/*.feature`).
+
+        Es un documento DERIVADO, no una fuente de verdad: si el backlog
+        cambia, `docs/prd.md` se queda atrás hasta que se vuelve a ejecutar
+        esta acción. Por eso el `lider` la llama al cerrar una feature. Un PRD
+        a mano siempre acaba desfasado; este nace del mismo JSON que guía el
+        arnés.
+        """
+        sections: list[str] = []
+        warnings: list[str] = []
+
+        objetivo = self._objetivo_section()
+        sections.append(objetivo["markdown"])
+
+        backlog = self._backlog_section()
+        sections.append(backlog["markdown"])
+        warnings.extend(backlog["warnings"])
+
+        contratos = self._gherkin_section()
+        sections.append(contratos["markdown"])
+        warnings.extend(contratos["warnings"])
+
+        prd = self._render_prd(sections)
+
+        if dry_run:
+            return AgentResult(
+                True, self.name, "update_prd",
+                "PRD generado en modo dry_run (no se escribió en disco).",
+                data={"markdown": prd, "path": "docs/prd.md"}, warnings=warnings,
+            )
+
+        target = self.ctx.docs_dir / "prd.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(prd, encoding="utf-8")
+        return AgentResult(
+            True, self.name, "update_prd",
+            "docs/prd.md regenerado desde el estado actual del proyecto.",
+            data={"path": str(target.relative_to(self.ctx.root))}, warnings=warnings,
+        )
+
+    def _objetivo_section(self) -> dict:
+        """El objetivo del proyecto desde references/00-objetivo.md (SCOPE-001)."""
+        ref = self.ctx.root / "references" / "00-objetivo.md"
+        if not ref.exists():
+            return {
+                "markdown": (
+                    "## Objetivo\n\n"
+                    "_(sin definir — ejecuta la feature SCOPE-001 del backlog, que escribe "
+                    "`references/00-objetivo.md` con la pregunta, la métrica de éxito y el "
+                    "criterio de parada)_\n"
+                )
+            }
+        return {"markdown": f"## Objetivo\n\n{ref.read_text(encoding='utf-8').strip()}\n"}
+
+    def _backlog_section(self) -> dict:
+        """Resumen del backlog: recuento por estado + features listadas."""
+        backlog_file = self.ctx.root / "harness" / "featureslist.json"
+        if not backlog_file.exists():
+            return {
+                "markdown": "## Alcance\n\n_(no hay backlog: falta harness/featureslist.json)_\n",
+                "warnings": [],
+            }
+        try:
+            doc = json.loads(backlog_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            return {
+                "markdown": "## Alcance\n\n_(backlog ilegible: " + str(exc) + ")_\n",
+                "warnings": [f"harness/featureslist.json ilegible: {exc}"],
+            }
+
+        features = doc.get("features", []) if isinstance(doc, dict) else []
+        if not features:
+            return {"markdown": "## Alcance\n\n_(backlog vacío)_\n", "warnings": []}
+
+        counts: dict[str, int] = {}
+        for f in features:
+            status = f.get("status", "pending")
+            counts[status] = counts.get(status, 0) + 1
+
+        lines = ["## Alcance", ""]
+        resumen = " · ".join(f"{v} {k}" for k, v in sorted(counts.items()))
+        lines.append(f"**Backlog:** {resumen}")
+        lines.append("")
+        lines.append("| Feature | Estado | Título |")
+        lines.append("|---------|--------|--------|")
+        for f in features:
+            fid = f.get("id", "?")
+            status = f.get("status", "pending")
+            title = (f.get("title") or "").replace("|", "\\|")
+            lines.append(f"| {fid} | {status} | {title} |")
+        lines.append("")
+
+        # El PRD también es un roadmap: las features con depends_on ordenan el trabajo.
+        por_hacer = [f for f in features if f.get("status") not in ("done", "blocked")]
+        if por_hacer:
+            lines.append("**Pendiente de cerrar:** " + ", ".join(
+                f.get("id", "?") for f in por_hacer
+            ))
+            lines.append("")
+
+        return {"markdown": "\n".join(lines), "warnings": []}
+
+    def _gherkin_section(self) -> dict:
+        """Los contratos Gherkin existentes (features/*.feature), si el proyecto los tiene."""
+        features_dir = self.ctx.root / "features"
+        if not features_dir.is_dir():
+            return {"markdown": "", "warnings": []}
+        contratos = sorted(features_dir.glob("*.feature"))
+        if not contratos:
+            return {"markdown": "", "warnings": []}
+
+        lines = ["## Contratos de aceptación (Gherkin)", ""]
+        for c in contratos:
+            first = c.read_text(encoding="utf-8").strip().splitlines()
+            titulo = next((ln for ln in first if ln.startswith("Feature:")), c.name)
+            lines.append(f"- `{c.name}` — {titulo.removeprefix('Feature:').strip()}")
+        lines.append("")
+        return {"markdown": "\n".join(lines), "warnings": []}
+
+    def _render_prd(self, sections: list[str]) -> str:
+        header = (
+            f"# Product Requirements Document\n\n"
+            f"> Documento **generado** (`documentation update_prd`) desde el estado del "
+            f"proyecto: `references/00-objetivo.md`, `harness/featureslist.json` y "
+            f"`features/*.feature`. No lo edites a mano — se sobrescribe. "
+            f"Actualizado: {date.today().isoformat()}\n"
+        )
+        return header + "\n" + "\n".join(s for s in sections if s) + "\n"
 
     def build_docs(self) -> AgentResult:
         """

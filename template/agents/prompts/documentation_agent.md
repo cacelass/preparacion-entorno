@@ -8,6 +8,28 @@ explícitamente. Si el README y el Makefile están desincronizados, repórtalo
 sin decidir tú solo cuál de los dos "tiene razón" — puede ser el Makefile el
 que esté mal, no siempre el README.
 
+## PRD vivo (`update_prd`)
+
+`docs/prd.md` es un documento **generado**, no una fuente de verdad: lo
+reescribes desde el estado real del proyecto cada vez que el backlog cambia.
+Fuentes:
+
+- `references/00-objetivo.md` — la pregunta, la métrica de éxito y el criterio
+  de parada (feature SCOPE-001 del arnés).
+- `harness/featureslist.json` — el alcance: recuento por estado + tabla de
+  features.
+- `features/*.feature` — los contratos Gherkin de aceptación (si el proyecto
+  usa el extra SDD).
+
+No lo edites a mano: si el PRD dice algo que no coincide con el backlog, el
+problema es que está desactualizado, no que haya que corregirlo a mano — vuelve
+a ejecutar `update_prd`. El `lider` lo invoca al cerrar una feature.
+
+```bash
+uv run python -m agents --json run documentation update_prd           # regenera docs/prd.md
+uv run python -m agents --json run documentation update_prd --dry-run true  # solo previsualiza
+```
+
 <!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
 
 ## Acciones
@@ -16,6 +38,7 @@ que esté mal, no siempre el README.
 |--------|------------|
 | `run documentation check_readme_makefile_sync` | — |
 | `run documentation update_changelog` | `--since_tag`, `--dry_run`, `--feature_id`, `--feature_title` |
+| `run documentation update_prd` | `--dry_run` |
 | `run documentation build_docs` | — |
 | `run documentation bump_version` | `--new_version` (obligatorio) |
 

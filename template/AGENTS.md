@@ -75,6 +75,12 @@ Conventional. **Primero en `--dry-run` para proponer y pedir tu OK; el commit
 real solo se ejecuta tras tu confirmación.** El push sigue siendo decisión
 tuya, siempre explícita.
 
+El **PRD** (`docs/prd.md`) es un documento *derivado*, no una fuente de
+verdad: el `lider` lo regenera con `documentation update_prd` al cerrar una
+feature, así nace del mismo JSON del backlog que guía el arnés y nunca se
+desfasa. Si dice algo que no coincide con `harness/featureslist.json`, el
+problema es que está desactualizado — se regenera, no se edita a mano.
+
 ```bash
 uv run python -m agents --json run git commit_feature --id <ID> --title "<t>" --dry-run true
 # revisa la propuesta (versión, mensaje, ficheros) y confirma

@@ -361,6 +361,8 @@ CONTRACTS: dict[str, Contract] = {
         can=(
             "actualizar CHANGELOG.md (también entradas por-feature), detectar README ↔ Makefile desincronizados",
             "bump_version en pyproject.toml + README, generar docs Sphinx",
+            "regenerar docs/prd.md (PRD vivo) desde references/00-objetivo.md, "
+            "harness/featureslist.json y features/*.feature",
         ),
         cannot=(
             "hacer commit de lo que escribe → git",

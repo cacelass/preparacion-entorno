@@ -33,6 +33,9 @@ uv run python -m agents --json run harness finish --id <FEATURE-ID> \
   --evidence "<salida literal de make test / init.sh>" \
   --changes "<rutas tocadas>" --decisions "<lo no obvio>"
 
+# 5b. PRD vivo: el backlog cambió, docs/prd.md debe seguirle.
+uv run python -m agents --json run documentation update_prd
+
 # 6. Cierre: README + versión + commit. Propón primero, no comitees sin OK.
 uv run python -m agents --json run git commit_feature --id <FEATURE-ID> --title "<título>" \
   --dry-run true        # devuelve la propuesta: versión, mensaje y ficheros
