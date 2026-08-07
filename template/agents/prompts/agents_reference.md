@@ -14,10 +14,9 @@ de decisión de tus agentes, no un sustituto de ellos.**
 
 - **Razonan** — `lider`, `explorer`, `implementer`, `reviewer`: markdown en
   `.opencode/agents/`. Deciden *qué* se hace, *cómo* y *cuándo está hecho*.
-- **Ejecutan** — los {% if use_rag %}28{% else %}27{% endif %} agentes Python de la tabla de abajo. Acciones
+- **Ejecutan** — los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes Python de la tabla de abajo. Acciones
   deterministas, sin ambigüedad. Entre ellos, `harness` es el dueño mecánico
   del backlog y del progreso.
-
 ```
 [usuario] → lider (primary)
               ├── explorer / implementer / reviewer   ← razonan, contexto limpio
@@ -35,27 +34,28 @@ el modelo pueda ignorar.
 | `git` | Conventional Commits, changelog, release, PRs, tag_release y commit_feature (cierre de features) |
 | `data` | EDA, detección de fugas, correlaciones |
 | `graph` | Audita figuras (vacías, aspect ratio) |
-| `docker` | Lint Dockerfile, valida docker-compose |
+{% if use_docker %}| `docker` | Lint Dockerfile, valida docker-compose |{% endif %}
 | `ml` | Inspecciona modelos, importancia, overfitting |
 | `review` | Funciones largas, except desnudos, duplicación |
 | `documentation` | Sincroniza README/Makefile, CHANGELOG, bump versión |
 | `notebook` | Extrae salidas de notebooks, inserta comentarios |
-| `installer` | Instala agentes externos en `agents/external/` |
+{% if proyecto_perfil in ['completo', 'manual'] %}| `installer` | Instala agentes externos en `agents/external/` |{% endif %}
 | `cicd` | Genera y valida workflows de CI/CD |
 | `test` | Ejecuta pytest, resumen cobertura, módulos sin test |
+{% if use_sdd %}| `mutation` | **Mutation testing y CRAP**: ejecuta tools/mutate.py (¿muerden los tests?) y mide el riesgo de cambio por función |{% endif %}
 | `dependency` | Detecta paquetes desactualizados y vulnerabilidades |
 | `secrets` | Escanea secretos hardcodeados |
-| `mlflow` | Lista runs, mejor run, comparativa rendimiento |
-| `api` | Verifica endpoints documentados vs declarados |
+{% if use_mlflow %}| `mlflow` | Lista runs, mejor run, comparativa rendimiento |{% endif %}
+{% if use_api %}| `api` | Verifica endpoints documentados vs declarados |{% endif %}
 | `env` | Gestiona el entorno: python version, uv sync, uv add |
 | `make` | Valida Makefile, cadena del pipeline, sugiere targets |
 | `refactor` | Refactoriza código: type hints, mutable defaults, bare excepts |
 | `doctor` | Diagnóstico integral: entorno, git, datos, código, tests, dependencias |
 | `plan` | **Jefe de proyecto**: encargo → preguntas → delegación → qué verificar |
-| `audit` | **Auditor del equipo**: mide uso, éxito y duración; propone mejoras |
-| `supervisor` | Coordina workers en competición y arbitra la mejor propuesta |
-| `knowledge` | Construye y mantiene el grafo de conocimiento + bóveda Obsidian |
-| `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |
+{% if proyecto_perfil in ['completo', 'manual'] %}| `audit` | **Auditor del equipo**: mide uso, éxito y duración; propone mejoras |
+| `supervisor` | Coordina workers en competición y arbitra la mejor propuesta |{% endif %}
+{% if graphify_mode != "no" %}| `knowledge` | Construye y mantiene el grafo de conocimiento + bóveda Obsidian |{% endif %}
+{% if proyecto_perfil in ['completo', 'manual'] %}| `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |{% endif %}
 | `memory` | **Memoria proactiva**: observa trayectorias de agentes, mantiene un banco estructurado (facts/state/traces) e inyecta contexto para combatir *behavioral state decay* en tareas largas |
 | `doc` | **Documentación unificada y navegación del grafo**: busca en graphify (estructura), RAG (semántica) y vault Obsidian (notas) |
 | `harness` | **Dueño del arnés**: backlog (`harness/featureslist.json`) y progreso (`harness/progress/`); ejecuta la puerta y **rehúsa cerrar** una feature sin `init.sh` en verde y evidencia real |
@@ -227,7 +227,7 @@ agents/
 ## Integración con opencode
 
 El agente **primary** es el `lider` del arnés — es con quien hablas por defecto.
-El `orquestador` pasó a **subagente**: es el gateway a los {% if use_rag %}28{% else %}27{% endif %} agentes Python,
+El `orquestador` pasó a **subagente**: es el gateway a los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes Python,
 al que el líder delega las acciones sueltas vía
 `uv run python -m agents [ask|run|pipeline|doctor]`.
 
@@ -240,7 +240,7 @@ al que el líder delega las acciones sueltas vía
               └── orquestador (subagent) ── routing por keywords
                        │
                        └── [Python agent system]
-                           ├── {% if use_rag %}28 agents (harness, git, test, review, docker, rag, doc...){% else %}27 agents (harness, git, test, review, docker, doc...){% endif %}
+                           ├── {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agents (harness, git, test, review, docker{% if use_sdd %}, mutation{% endif %}{% if use_rag %}, rag{% endif %}, doc...)
                            ├── GStack pipelines (develop, fix, release...)
                            └── audit trail + contracts
 ```

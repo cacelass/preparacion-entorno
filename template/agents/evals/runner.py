@@ -124,9 +124,19 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
 def _routing(orchestrator: Orchestrator) -> list[dict]:
     """
     Routing test: frases conocidas deben rutear al agente correcto.
+
+    Se saltan los benchmarks cuyo agente esperado no está registrado: el
+    proyecto puede haberse generado sin extras (perfil minimo/estandar), y un
+    agente ausente no es un fallo de ruteo — es un agente que no existe. El
+    número de benchmarks ejecutados queda en `data["total"]` para no confundir
+    "todo rutea bien" con "no probé nada".
     """
+    agent_registry.discover()
+    presentes = set(agent_registry.all())
     results = []
     for query, expected_agent in ROUTING_BENCHMARKS:
+        if expected_agent not in presentes:
+            continue
         start = time.monotonic()
         decision = orchestrator.select_agent(query)
         duration = time.monotonic() - start

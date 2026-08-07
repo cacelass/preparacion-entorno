@@ -68,6 +68,12 @@ El arnés decide y verifica; el trabajo determinista lo hacen los agentes:
 | Buscar dónde está algo | `doc` | `search` |
 | Cerrar la feature (versión + changelog + commit) | `git` | `commit_feature` |
 
+**Perfiles reducidos.** En `minimo`/`estandar` algunos agentes no existen
+(`audit`, `supervisor`, `research`, `installer`; y `api`/`docker`/`mlflow`/
+`knowledge`/`rag`/`mutation` si su extra está apagado). Antes de delegar,
+confirma con `uv run python -m agents list`. Un agente ausente devuelve
+`success=false` — no es un fallo, es un proyecto sin ese extra.
+
 ```bash
 uv run python -m agents --json run plan brief --text "<descripción de la feature>"
 uv run python -m agents --json run test run_tests

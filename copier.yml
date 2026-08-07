@@ -6,6 +6,20 @@
 # Permite actualizar el proyecto en el futuro con: copier update
 _answers_file: .copier-answers.yml
 
+# --- Perfil de proyecto ---
+# Controla qué extras y qué agentes se instalan. Los perfiles automáticos
+# (minimo/estandar/completo) fijan los defaults del resto de opciones y NO
+# preguntan por ellas; solo "manual" las pregunta una a una.
+proyecto_perfil:
+  type: str
+  help: "Perfil del proyecto: minimo (núcleo DS puro) | estandar (núcleo + arnés de calidad: RAG + spec-driven) | completo (todos los extras) | manual (eliges cada opción)"
+  choices:
+    - minimo
+    - estandar
+    - completo
+    - manual
+  default: estandar
+
 # --- Proyecto ---
 project_name:
   type: str
@@ -67,7 +81,8 @@ task_type:
 use_mlflow:
   type: bool
   help: "Integrar MLflow para tracking de experimentos, artifacts y Model Registry?"
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 
 # --- Arquitectura de red neuronal (solo redes_neuronales) ---
@@ -148,57 +163,64 @@ cluster_model:
 use_monitoring:
   type: bool
   help: "Añadir modulo de monitorizacion? (drift detection, performance tracking, make monitor)"
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- Optuna ---
 use_optuna:
   type: bool
   help: "Añadir optimizacion de hiperparametros con Optuna? (make tune)"
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- DuckDB ---
 use_duckdb:
   type: bool
   help: "Añadir carga de datos con DuckDB? (CSV/Parquet/JSON con SQL, muy rapido en datasets grandes)"
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- API REST (FastAPI) ---
 use_api:
   type: bool
   help: "Generar API REST con FastAPI para servir el modelo entrenado? (make serve)\n         Requiere ejecutar make train antes de make serve. La API arranca aunque no haya modelo,\n         pero /predict devolverá 503 hasta que haya pesos en models/."
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- Docker (interfaz web de chat) ---
 use_docker:
   type: bool
   help: "Generar configuracion Docker con interfaz web de chat para el modelo? (make docker-run)"
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- Calibración de confianza (solo redes_neuronales) ---
 use_calibration:
   type: bool
   help: "Calibrar confianza del modelo con Temperature Scaling? (entrena T post-hoc en validacion)"
-  default: false
-  when: "{{ ml_type == 'redes_neuronales' }}"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' and ml_type == 'redes_neuronales' }}"
 
 # --- Conformal Prediction (supervisado, hibrido, redes_neuronales) ---
 use_conformal:
   type: bool
   help: "Añadir Conformal Prediction (sets/intervalos con garantia de cobertura, distribution-free)?"
-  default: false
-  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' or ml_type == 'redes_neuronales' }}"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' and (ml_type == 'supervisado' or ml_type == 'hibrido' or ml_type == 'redes_neuronales') }}"
 
 # --- RAG local (ChromaDB + BM25) ---
 use_rag:
   type: bool
   help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. make index-rag para construir el indice. Sin API key, funciona offline."
-  default: true
+  default: "{{ proyecto_perfil in ['estandar', 'completo'] }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- SDD: spec-driven development (flujo Uncle Bob, sin tmux) ---
 use_sdd:
   type: bool
   help: "Añadir el ciclo spec-driven (Robert C. Martin / BettaTech)? Contrato Gherkin con puerta humana antes de codear,\n         agente de mutation testing (tools/mutate.py) y métrica CRAP. Sin tmux ni agentes LLM en paralelo: solo restricciones\n         duras en código, como el resto del arnés."
-  default: false
+  default: "{{ proyecto_perfil in ['estandar', 'completo'] }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 # --- Servidores MCP para el asistente ---
 # Genera la CONFIGURACIÓN (.mcp.json para Claude Code y el bloque mcp de
@@ -211,7 +233,8 @@ use_sdd:
 use_mcp:
   type: bool
   help: "Configurar servidores MCP para el asistente? Genera .mcp.json (Claude Code) y el bloque mcp de opencode.json.\n         Los servidores se eligen en la siguiente pregunta y se adaptan a los extras que ya has activado."
-  default: false
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 mcp_servers:
   type: str
@@ -237,32 +260,33 @@ graphify_mode:
     - "no"
     - "solo graphify"
     - "graphify + obsidian vault"
-  default: "no"
+  default: "{{ 'graphify + obsidian vault' if proyecto_perfil == 'completo' else 'no' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
 
 use_shap:
   type: bool
   help: "Añadir SHAP (explicabilidad de modelos)? Genera bar + beeswarm por modelo."
-  default: false
-  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' and (ml_type == 'supervisado' or ml_type == 'hibrido') }}"
 
 # --- Boosting opcional (solo supervisado e hibrido) ---
 use_xgboost:
   type: bool
   help: "Añadir XGBoost a _build_models()?"
-  default: false
-  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' and (ml_type == 'supervisado' or ml_type == 'hibrido') }}"
 
 use_lightgbm:
   type: bool
   help: "Añadir LightGBM a _build_models()?"
-  default: false
-  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' and (ml_type == 'supervisado' or ml_type == 'hibrido') }}"
 
 use_catboost:
   type: bool
   help: "Añadir CatBoost a _build_models()? (boosting nativo para categoricas)"
-  default: false
-  when: "{{ ml_type == 'supervisado' or ml_type == 'hibrido' }}"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' and (ml_type == 'supervisado' or ml_type == 'hibrido') }}"
 
 # --- Licencia y versiones ---
 project_open_source_license:
@@ -307,12 +331,21 @@ _message_before_copy: >-
   {% elif graphify_mode == "solo graphify" %}
     graphify activado. Ejecuta 'uv run python -m graphify build' para generar el grafo de conocimiento.
   {% endif %}
+  {% if proyecto_perfil == 'completo' or proyecto_perfil == 'manual' %}
+    NOTA: se instalaron las dependencias automáticamente (perfil {{ proyecto_perfil }}).
+  {% else %}
+    NOTA: no se instalan dependencias automáticamente. Ejecuta `make setup` cuando
+  quieras tener el entorno listo (perfil {{ proyecto_perfil }}).
+  {% endif %}
   Generando proyecto '{{ project_name }}' ({{ ml_type }})...
 
 _tasks:
   # El arnés arranca con init.sh — asegura el bit de ejecución en el destino.
   - "chmod +x init.sh"
+  # La instalación de dependencias es opt-in: solo en completo/manual. En
+  # minimo/estandar el proyecto nace sin venv y `make setup` lo instala.
   - >-
+    {% if proyecto_perfil == 'completo' or proyecto_perfil == 'manual' %}
     uv sync --extra dev --extra {{ ml_type }}
     {% if use_mlflow %}--extra mlflow_tracking{% endif %}
     {% if graphify_mode != 'no' %}--extra graphify{% endif %}
@@ -336,6 +369,7 @@ _tasks:
     {% endif %}
     {% if use_rag %}
     && uv run python -c 'import chromadb; print("chromadb OK")'
+    {% endif %}
     {% endif %}
   # Los prompts llevan un bloque derivado del código y de contracts.py, y los
   # subagentes se espejan a .claude/: se genera aquí para que el proyecto nazca
@@ -384,7 +418,35 @@ _exclude:
   - "{% if not use_sdd %}agents/prompts/mutation_agent.md{% endif %}"
   - "{% if not use_sdd %}agents/tests/test_mutation_agent.py{% endif %}"
   - "{% if not use_sdd %}features{% endif %}"
-
+  # --- Gating de agentes por extra: el agente solo existe si su feature está activa ---
+  - "{% if not use_api %}agents/agents/api_agent.py{% endif %}"
+  - "{% if not use_api %}agents/prompts/api_agent.md{% endif %}"
+  - "{% if not use_api %}agents/tests/test_api_agent.py{% endif %}"
+  - "{% if not use_docker %}agents/agents/docker_agent.py{% endif %}"
+  - "{% if not use_docker %}agents/prompts/docker_agent.md{% endif %}"
+  - "{% if not use_docker %}agents/tests/test_docker_agent.py{% endif %}"
+  - "{% if not use_docker %}agents/tests/test_docker_tool.py{% endif %}"
+  - "{% if not use_mlflow %}agents/agents/mlflow_agent.py{% endif %}"
+  - "{% if not use_mlflow %}agents/prompts/mlflow_agent.md{% endif %}"
+  - "{% if not use_mlflow %}agents/tests/test_mlflow_agent.py{% endif %}"
+  - "{% if graphify_mode == 'no' %}agents/agents/knowledge_agent.py{% endif %}"
+  - "{% if graphify_mode == 'no' %}agents/prompts/knowledge_agent.md{% endif %}"
+  - "{% if graphify_mode == 'no' %}agents/tests/test_knowledge_agent.py{% endif %}"
+  # --- Poda de periféricos: agentes de equipo/competición solo en completo/manual ---
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/agents/installer_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/prompts/installer_agent.md{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/tests/test_installer_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/agents/supervisor_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/prompts/supervisor_agent.md{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/tests/test_supervisor_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/agents/research_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/prompts/research_agent.md{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/tests/test_research_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/tests/test_research_tool.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/agents/audit_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/prompts/audit_agent.md{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/tests/test_audit_agent.py{% endif %}"
+  - "{% if proyecto_perfil in ['minimo', 'estandar'] %}agents/tests/test_audit.py{% endif %}"
 
 _subdirectory: template
 _templates_suffix: ""

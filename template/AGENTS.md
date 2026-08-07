@@ -123,6 +123,75 @@ uv run python -m agents --json run harness add --id API-002 --title "..." --crit
 uv run python -m agents --json run git commit_feature --id DATA-001 --title "..." --dry-run true
 ```
 
+## Qué agentes hay según el perfil
+
+Este proyecto se generó con el perfil **`{{ proyecto_perfil }}`**. El conjunto de
+agentes Python no es fijo: depende del perfil y de los extras elegidos. No
+asumas que un agente existe — comprueba lo que hay instalado:
+
+```bash
+uv run python -m agents list                # los agentes disponibles, desde la CLI
+uv run python -m agents describe <agente>   # acciones y contrato de uno
+```
+
+| Perfil | Agentes | Qué incluye |
+|--------|---------|-------------|
+| `minimo` | {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} | Núcleo de calidad (harness, git, test, review, data, ml...) |
+| `estandar` | núcleo + rag + mutation | Arnés de calidad: RAG + spec-driven |
+| `completo` | todos | Todos los agentes, incluidos periféricos (supervisor, research, audit, installer) y extras |
+| `manual` | según lo elegido | Lo que hayas marcado una a una |
+
+La regla que importa para delegar:
+
+> **Si un agente no está instalado, `delegate_to` devuelve `success=false`. Antes
+> de delegar una acción, confirma con `agents list` que el agente existe.** No
+> es un error del arnés: es un proyecto que no incluye ese extra.
+
+Los agentes ligados a extras se excluyen cuando el extra está apagado
+(api, docker, mlflow, knowledge/grafo, rag, mutation). Los periféricos de
+equipo (supervisor, research, audit, installer) solo existen en `completo` y
+`manual`. La documentación de `orquestador.md` y `agents_reference.md` ya
+refleja qué skills son aplicables a este perfil.
+{% if use_sdd %}
+## Spec-driven: el contrato antes del código
+
+Este proyecto se generó con el extra `use_sdd`, así que las features pasan por
+una puerta humana **antes** de escribir producción, siguiendo el ciclo de
+Robert C. Martin (sin tmux ni agentes en paralelo: solo restricciones duras):
+
+```
+pending → write_feature → spec_ready → [aprobación humana] → in_progress
+    → implementer (TDD) → reviewer → mutation (¿muerden los tests?) → done
+```
+
+1. **Contrato.** `harness write_feature --id <ID>` escribe
+   `features/<ID>.feature` (un escenario Given-When-Then por criterio de
+   aceptación, o el Gherkin que le pases en `--content`) y deja la feature en
+   `spec_ready`. El fichero es el estado de la spec, fuera del JSON.
+2. **Puerta humana.** Solo `harness approve --id <ID>` —un paso explícito del
+   humano, nunca del líder— mueve la feature a `in_progress`. La ambigüedad
+   se resuelve antes de codear, en el punto de máximo apalancamiento.
+3. **Código.** El `implementer` implementa contra los escenarios del
+   `.feature` con TDD (test primero, uno a la vez).
+4. **Mutación.** Antes del `finish`, el `reviewer` puede pedir
+   `run mutation run_mutation_testing --target <módulo>`: muta operadores del
+   código y ejecuta la suite por cada mutante. Un `survived` significa que hay
+   código que los tests no protegen — aunque la cobertura diga lo contrario.
+   La métrica CRAP (`run mutation crap_report`) complementa: complejidad ×
+   cobertura, umbral 30.
+
+```bash
+uv run python -m agents --json run harness write_feature --id DATA-001
+uv run python -m agents --json run harness approve --id DATA-001
+uv run python -m agents --json run mutation run_mutation_testing --target {{ project_slug }}/features/build_features.py
+uv run python -m agents --json run mutation crap_report --target {{ project_slug }}/utils.py
+```
+
+Los ficheros `features/*.feature` los escribe solo `harness` (un recurso, un
+dueño). Si los escenarios no capturan el comportamiento, es un fallo del
+contrato, no del código: se reescribe el `.feature` y se vuelve a aprobar.
+{% endif %}
+
 ## Memoria externa: por qué existe `harness/progress/`
 
 La ventana de contexto se degrada mucho antes de llenarse. Por eso el estado
@@ -357,7 +426,7 @@ información, hazlo.
 
 ## Referencia (bajo demanda)
 
-El catálogo — los {% if use_rag %}28{% else %}27{% endif %} agentes con su responsabilidad, los workflows por
+El catálogo — los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes con su responsabilidad, los workflows por
 dominio, GStack, la arquitectura y el vault — vive aparte para no ocupar
 contexto en cada sesión:
 
