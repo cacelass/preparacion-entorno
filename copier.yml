@@ -417,7 +417,7 @@ _exclude:
   - "{% if not use_sdd %}agents/tools/mutation_tool.py{% endif %}"
   - "{% if not use_sdd %}agents/prompts/mutation_agent.md{% endif %}"
   - "{% if not use_sdd %}agents/tests/test_mutation_agent.py{% endif %}"
-  - "{% if not use_sdd %}features{% endif %}"
+  - "{% if not use_sdd %}features/*{% endif %}"
   # --- Gating de agentes por extra: el agente solo existe si su feature está activa ---
   - "{% if not use_api %}agents/agents/api_agent.py{% endif %}"
   - "{% if not use_api %}agents/prompts/api_agent.md{% endif %}"
