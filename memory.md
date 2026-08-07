@@ -76,3 +76,96 @@ Checklist de áreas clave a inspeccionar y herramientas a incorporar, según rev
 - Contrato en contracts.py, prompts, test, workflow skill
 - `make index-rag` en Makefile, CI lo incluye en agent tests
 - `.rag-index/` gitignored en root + template
+
+## SDD: spec-driven development (Ago 2026)
+
+Flujo de Robert C. Martin / BettaTech adaptado a dskit (sin tmux, sin agentes
+LLM en paralelo — solo restricciones duras en código):
+
+- Copier option `use_sdd` (bool, default false). Excluye/inclye condicionalmente:
+  `tools/mutate.py`, `agents/agents/mutation_agent.py`, `agents/tools/mutation_tool.py`,
+  `agents/prompts/mutation_agent.md`, `agents/tests/test_mutation_agent.py`, `features/`.
+- Agente `mutation` (`mutation_agent.py`): `run_mutation_testing` (ejecuta
+  `tools/mutate.py`, resumen killed/survived/score) y `crap_report` (CRAP =
+  cc²·(1−cov/100)³+cc, radon + pytest-cov, umbral 30). `target` es OBLIGATORIO
+  (si tiene default, el smoke test del runner lo ejecuta y falla).
+- `tools/mutate.py`: mutador AST sin dependencias, muta operadores de
+  comparación/booleanos/True/False, ejecuta pytest por mutante in-place con
+  backup + restore en finally. `--tests` acepta directorio o archivo.
+- Gherkin en `harness_agent.py`: estado `spec_ready`, acciones `write_feature`
+  (genera `features/<id>.feature` con un escenario por criterio) y `approve`
+  (puerta humana → `in_progress`). `validate_gherkin` valida estructura mínima.
+- `harness` ahora es dueño de `features/` (contracts.py owns).
+- Conteo de agentes en prompts/AGENTS.md/opencode.json: usar
+  `{{ 27 + (1 if use_rag else 0) + (1 if use_sdd else 0) }}` (no `{% if %}` fijo).
+
+### PRD vivo (`documentation update_prd`)
+
+- `docs/prd.md` es un documento DERIVADO, no fuente de verdad: se regenera
+  desde `references/00-objetivo.md` (SCOPE-001), `harness/featureslist.json`
+  y `features/*.feature`. Nunca se edita a mano — se re-ejecuta la acción.
+- El `lider` lo invoca al cerrar cada feature (paso 5b del protocolo).
+- No es un "agente que escribe el PRD": eso duplicaría SCOPE-001 + la puerta
+  Gherkin. El valor es que nace del mismo JSON que guía el arnés y no se desfasa.
+
+## Perfiles de proyecto (Ago 2026)
+
+copier.yml gana `proyecto_perfil` (minimo | estandar | completo | manual,
+default estandar). En minimo/estandar NO se pregunta por cada extra — los
+defaults se derivan del perfil; solo "manual" pregunta uno a uno.
+
+| Perfil | Agentes | Extras |
+|--------|---------|--------|
+| minimo | 19 (núcleo) | todo apagado |
+| estandar | 21 (núcleo + rag + mutation) | rag+sdd on, mcp/api/docker/mlflow off |
+| completo | 29 (todos) | todo on + periféricos |
+| manual | según respuestas | pregunta cada uno |
+
+### Gating de agentes (`_exclude`)
+
+- Por extra: `api_agent`, `docker_agent`, `mlflow_agent`, `knowledge_agent`
+  (+ prompts + tests) se excluyen si su extra está apagado. `knowledge` solo
+  existe si `graphify_mode != 'no'`.
+- Poda de periféricos: `installer`, `supervisor`, `research`, `audit`
+  (+ prompts + tests) solo en completo/manual.
+- `audit.py` (módulo de logging del sistema) NO se excluye — solo `audit_agent.py`.
+- Los CONTRATOS de los podados SE MANTIENEN en contracts.py: `validate_contracts`
+  tolera "en CONTRACTS pero no registrado" (verificado), así el gating no rompe
+  el test de contracts.
+- `_routing` en evals/runner.py salta benchmarks cuyo agente no está registrado.
+- Conteo de agentes: base 19 + extras; fórmula en prompts:
+  `{{ 19 + (1 if use_rag) + (1 if use_sdd) + (1 if use_api) + (1 if use_docker)
+  + (1 if use_mlflow) + (1 if graphify_mode != 'no')
+  + (4 if proyecto_perfil in ['completo','manual']) }}`
+
+### Sync opt-in
+
+`_tasks` ya NO instala dependencias en minimo/estandar (solo `chmod +x init.sh`
++ `prompts_sync`). El proyecto nace sin venv; README/`make setup` documentan el
+primer paso. En completo/manual el uv sync se mantiene.
+
+### Mitigación de riesgos (verificada)
+
+- Nadie importa knowledge/api/docker/mlflow/supervisor/research/audit/installer
+  a nivel de módulo; `delegate_to` devuelve `success=false` si el agente no existe.
+- `doc`/`plan` degradan sin knowledge/grafo (mensajes de "fuente no disponible").
+- Documentado para el arnés en AGENTS.md ("Qué agentes hay según el perfil"),
+  harness_workflow.md, orquestador.md, agents_reference.md.
+
+### Lecciones de los videos (BettaTech / Uncle Bob)
+
+1. El 70% del flujo Uncle Bob ya existía en dskit (lider/implementer/reviewer +
+   gate en código). Lo que aporta valor: mutation testing, CRAP y contrato Gherkin.
+2. **No portar tmux/swarm-forge**: quema tokens y el propio video 1 lo desaconseja.
+   La conclusión correcta es "restricciones duras en CI/código, IA de supervisión".
+3. La cobertura por líneas no prueba que los tests «muerdan» — un test puede
+   cubrir una línea y no detectar su lógica rota. La mutación lo verifica.
+
+### Lección Waymo (Y Combinator, "la demo es el 1% del trabajo")
+
+Principio de diseño para dskit (no es spec de feature):
+- La demo es el 1%: la cola de problemas difíciles apenas se mueve con cada ola de IA.
+- "Cuenta tus nueves antes de las vistas de tu demo" → el gate de init.sh/evidencia.
+- La evaluación y las métricas son el foso → `agents-eval`/`init.sh`/`evals/runner.py`.
+- Los fallos en smoke de un render `--defaults` (slug vacío, sin extras) son
+  preexistentes del entorno de prueba, no del agente nuevo.
