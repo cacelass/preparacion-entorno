@@ -7,6 +7,56 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [No publicado]
 
+### Spec-driven: el contrato antes del código
+
+El flujo de Robert C. Martin / BettaTech, adaptado sin tmux ni agentes LLM en
+paralelo — solo restricciones duras en código, como el resto del arnés. Nuevo
+extra `use_sdd` (activo en el perfil `estandar`):
+
+- **Contrato Gherkin con puerta humana.** `harness write_feature` escribe
+  `features/<ID>.feature` (un escenario Given-When-Then por criterio de
+  aceptación) y deja la feature en `spec_ready`. Solo `harness approve` —un
+  paso explícito del humano— la mueve a `in_progress`. La ambigüedad se
+  resuelve antes de codear.
+- **Mutation testing sin dependencias.** `tools/mutate.py` muta operadores del
+  código (agente `mutation`): si un mutante sobrevive a la suite, hay un hueco
+  que la cobertura por líneas no ve. La métrica CRAP
+  (`cc²·(1−cov/100)³+cc`, umbral 30) complementa la cobertura con la
+  complejidad ciclomática (radon).
+
+### PRD vivo
+
+`docs/prd.md` es un documento **derivado**, no una fuente de verdad: se
+regenera con `documentation update_prd` desde `references/00-objetivo.md`
+(el SCOPE-001 del arnés), `harness/featureslist.json` y `features/*.feature`.
+Nace del mismo JSON que guía el arnés, así que nunca se desfasa — si dice algo
+que no coincide con el backlog, se regenera, no se edita a mano. El `lider` lo
+invoca al cerrar cada feature.
+
+### Perfiles de proyecto: menos preguntas, menos peso
+
+Nueva opción `proyecto_perfil` (`minimo | estandar | completo | manual`,
+default `estandar`). En los perfiles automáticos **no se pregunta** por cada
+extra — los defaults se derivan del perfil; solo `manual` pregunta uno a uno.
+
+| Perfil | Agentes | Qué incluye |
+|--------|---------|-------------|
+| `minimo` | 19 (núcleo) | Harness + agentes de calidad |
+| `estandar` | 21 | Núcleo + RAG + spec-driven |
+| `completo` | 29 | Todos, incluidos los periféricos |
+| `manual` | según respuestas | Cada opción se pregunta |
+
+Dos consecuencias de peso:
+
+- **Gating de agentes por extra.** `api`, `docker`, `mlflow`, `knowledge`,
+  `rag`, `mutation` y los periféricos (`installer`, `supervisor`, `research`,
+  `audit`) solo se instalan si su extra/perfil lo pide. Un proyecto `minimo`
+  baja de 29 a 19 agentes. `delegate_to` devuelve `success=false` si el agente
+  no existe — documentado para el arnés en `AGENTS.md`.
+- **Sync opt-in.** En `minimo`/`estandar` el proyecto ya no instala
+  dependencias al generarse (`make setup` lo hace). Generar pasa de minutos+GB
+  a segundos.
+
 ### El CI del proyecto generado nunca se había ejecutado — y estaba roto
 
 `validate_template.py` probaba que la plantilla renderiza y `smoke` que el
