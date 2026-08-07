@@ -88,6 +88,26 @@ jobs:
             . /tmp/generated
           ls /tmp/generated
 
+      # Los perfiles minimo/estandar ya no instalan deps al generarse (sync
+      # opt-in): el entorno se prepara aqui, como hace `make setup` en local.
+      # `ml_type` y los extras se leen del data-file porque el combo JSON los
+      # lleva dentro de `data`, no como claves de la matriz.
+      - name: Instalar dependencias
+        working-directory: /tmp/generated
+        run: |
+          ML=$(grep -oP '^ml_type:\s*\K\S+' /tmp/copier-data.yml)
+          EXTRAS="--extra dev --extra $ML"
+          for flag in mlflow graphify api duckdb optuna monitoring rag; do
+            if grep -qE "^use_${flag}: (true|yes|on|1)$" /tmp/copier-data.yml; then
+              case "$flag" in
+                mlflow)  EXTRAS="$EXTRAS --extra mlflow_tracking" ;;
+                graphify) EXTRAS="$EXTRAS --extra graphify" ;;
+                *)        EXTRAS="$EXTRAS --extra $flag" ;;
+              esac
+            fi
+          done
+          uv sync $EXTRAS
+
       - name: Smoke tests
         working-directory: /tmp/generated
         run: |
@@ -148,6 +168,13 @@ jobs:
           copier copy --trust --defaults --vcs-ref=HEAD \
             --data-file /tmp/ci-data.yml \
             . /tmp/proyecto-ci
+
+      # El sync post-generación es opt-in en el perfil estandar (default): el
+      # proyecto nace sin venv ni uv.lock. El CI del proyecto generado usa
+      # `uv sync --frozen`, que exige el lock — se crea aquí una vez.
+      - name: Generar uv.lock
+        working-directory: /tmp/proyecto-ci
+        run: uv lock
 
       - name: Ejecutar su CI sobre un clon limpio
         run: python .github/scripts/run_generated_ci.py /tmp/proyecto-ci
