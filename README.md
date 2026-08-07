@@ -94,6 +94,23 @@ Los prompts de los agentes se **derivan del código**: cada uno conserva su crit
 
 ## Características
 
+### Perfil de proyecto
+`proyecto_perfil` (default `estandar`) decide qué extras y qué agentes se
+instalan de una vez. En `minimo`/`estandar`/`completo` **no se pregunta** por
+cada extra — los defaults se derivan del perfil; solo `manual` pregunta uno a
+uno (el flujo detallado clásico).
+
+| Perfil | Agentes | Qué incluye |
+|--------|---------|-------------|
+| `minimo` | ~19 (núcleo) | Harness + agentes de calidad (git, test, review, data, ml...) |
+| `estandar` | núcleo + rag + mutation | Arnés de calidad: RAG + spec-driven |
+| `completo` | todos | Todos los extras + periféricos (supervisor, research, audit, installer) |
+| `manual` | según lo elegido | Cada opción se pregunta una a una |
+
+En `minimo`/`estandar` el proyecto **no instala dependencias al generarse** —
+ejecuta `make setup` cuando quieras tener el entorno listo. En `completo`/`manual`
+el `uv sync` automático se mantiene.
+
 ### Tipos de ML y arquitecturas
 - **4 tipos de ML**: `supervisado`, `no_supervisado`, `redes_neuronales`, `hibrido`
 - **2 tipos de tarea** (`task_type`): `clasificacion` o `regresion`
@@ -112,6 +129,7 @@ Los prompts de los agentes se **derivan del código**: cada uno conserva su crit
 | `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
 | `use_docker` | Docker + interfaz de chat Gradio | `make docker-run` |
 | `use_rag` | RAG local (ChromaDB + BM25): indexa el código, los prompts, los docs y la memoria del arnés, y busca fundiendo vector y léxico. Sin API key, offline | `make index-rag` |
+| `use_sdd` | Spec-driven (Robert C. Martin): contrato Gherkin con puerta humana antes de codear, agente de mutation testing y métrica CRAP | `make mutation` · `make crap` |
 | `use_conformal` | Conformal Prediction — sets/intervalos con garantía de cobertura, *distribution-free* | automático |
 | `use_calibration` | Temperature Scaling — calibra la confianza del modelo *(redes_neuronales)* | automático |
 | `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | automático |
@@ -125,13 +143,14 @@ Los prompts de los agentes se **derivan del código**: cada uno conserva su crit
 - **TorchMetrics** en bucle de entrenamiento y evaluación NN (Accuracy/F1/Precision/Recall para clasificación, MAE/RMSE/R² para regresión)
 - **Early stopping** y **validation split** configurables en redes neuronales
 - **TensorBoard** integrado en redes neuronales (`make tb`)
-- **30 agentes especializados** en `agents/` para changelog, releases, CI/CD, tests, dependencias, API, datos, modelos y documentación — con contratos que impiden que dos agentes escriban el mismo recurso
+- **19–29 agentes especializados** en `agents/` (según el perfil) para changelog, releases, CI/CD, tests, dependencias, API, datos, modelos y documentación — con contratos que impiden que dos agentes escriban el mismo recurso y gating por perfil (los ligados a un extra solo se instalan si el extra está activo)
 - **`make check`** — lint + typecheck + test + arnés, la batería completa
 - **`make smoke`** — tests de humo que verifican que el pipeline arranca sin errores
 - **`make profile`** — profiling con cProfile + snakeviz
 - **`make lock`** — regenera `uv.lock` tras cambios en dependencias
 - **CI que ejecuta la puerta del arnés** y comprueba que los prompts no se han desincronizado del código
-- `uv sync` automático tras generar el proyecto
+- **PRD vivo**: `docs/prd.md` se regenera desde el backlog al cerrar cada feature (`documentation update_prd`)
+- `uv sync` automático tras generar el proyecto *(solo en perfiles `completo`/`manual`; en `minimo`/`estandar` ejecuta `make setup`)*
 
 ---
 
@@ -223,6 +242,7 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `project_author_name` | texto | siempre | Nombre del autor |
 | `project_author_email` | email | siempre | Email (validado) |
 | `project_description` | texto | siempre | Descripción breve |
+| `proyecto_perfil` | `minimo` · `estandar` · `completo` · `manual` | siempre | Perfil: fija los defaults de los extras y no pregunta por ellos (default `estandar`) |
 | `ml_type` | `supervisado` · `no_supervisado` · `redes_neuronales` · `hibrido` | siempre | Determina el código generado |
 | `task_type` | `clasificacion` · `regresion` | supervisado, redes_neuronales, hibrido | Tipo de tarea |
 | `model_type` | `todos` · `RandomForest` · `ExtraTrees` · `GradientBoosting` · `AdaBoost` · `XGBoost` · `LightGBM` · `CatBoost` · `LogisticRegression` · `KNN` · `DecisionTree` · `SVM` | supervisado, hibrido | Modelo a entrenar |
@@ -230,20 +250,22 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `nn_model` | `MLP` · `CNN1D` · `LSTM` · `GRU` · `Transformer` · `ResNet` | redes_neuronales | Arquitectura |
 | `optimizer_type` | `AdamW` · `Adam` · `SGD` · `RMSProp` · `Adagrad` | redes_neuronales | Optimizador PyTorch |
 | `nn_loss_fn` | `Auto` · `CrossEntropyLoss` · `MSELoss` · `L1Loss` · `BCEWithLogitsLoss` | redes_neuronales | Función de pérdida |
-| `use_xgboost` | true/false | supervisado, hibrido | Añade XGBoost |
-| `use_lightgbm` | true/false | supervisado, hibrido | Añade LightGBM |
-| `use_catboost` | true/false | supervisado, hibrido | Añade CatBoost |
-| `use_shap` | true/false | supervisado, hibrido | SHAP values |
-| `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | siempre | Grafo de conocimiento + vault Obsidian opcional |
-| `use_mlflow` | true/false | siempre | MLflow tracking |
-| `use_monitoring` | true/false | siempre | Drift + performance monitoring |
-| `use_optuna` | true/false | siempre | HPO con Optuna |
-| `use_duckdb` | true/false | siempre | DuckDB SQL sobre ficheros |
-| `use_api` | true/false | siempre | API REST FastAPI |
-| `use_docker` | true/false | siempre | Docker + chat Gradio |
-| `use_rag` | true/false | siempre | RAG local híbrido (ChromaDB + BM25) — por defecto `true` |
-| `use_conformal` | true/false | supervisado, hibrido, redes_neuronales | Conformal Prediction |
-| `use_calibration` | true/false | redes_neuronales | Temperature Scaling |
+| `use_xgboost` | true/false | manual + supervisado, hibrido | Añade XGBoost |
+| `use_lightgbm` | true/false | manual + supervisado, hibrido | Añade LightGBM |
+| `use_catboost` | true/false | manual + supervisado, hibrido | Añade CatBoost |
+| `use_shap` | true/false | manual + supervisado, hibrido | SHAP values |
+| `graphify_mode` | `no` · `solo graphify` · `graphify + obsidian vault` | manual | Grafo de conocimiento + vault Obsidian opcional |
+| `use_mlflow` | true/false | manual | MLflow tracking |
+| `use_monitoring` | true/false | manual | Drift + performance monitoring |
+| `use_optuna` | true/false | manual | HPO con Optuna |
+| `use_duckdb` | true/false | manual | DuckDB SQL sobre ficheros |
+| `use_api` | true/false | manual | API REST FastAPI |
+| `use_docker` | true/false | manual | Docker + chat Gradio |
+| `use_rag` | true/false | manual | RAG local híbrido (ChromaDB + BM25) — activo en `estandar`/`completo` |
+| `use_sdd` | true/false | manual | Spec-driven: contrato Gherkin + mutation testing + CRAP — activo en `estandar`/`completo` |
+| `use_mcp` | true/false | manual | Servidores MCP para el asistente (filesystem, git, fetch...) |
+| `use_conformal` | true/false | manual + supervisado, hibrido, redes_neuronales | Conformal Prediction |
+| `use_calibration` | true/false | manual + redes_neuronales | Temperature Scaling |
 | `project_open_source_license` | `No license file` · `MIT` · `BSD-3-Clause` · `Apache-2.0` | siempre | Licencia del proyecto generado |
 | `python_version` | `3.10`–`3.13` | siempre | Versión de Python |
 | `project_version` | texto | siempre | Versión inicial del proyecto |
