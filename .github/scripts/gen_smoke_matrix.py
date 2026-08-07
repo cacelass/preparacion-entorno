@@ -133,6 +133,8 @@ FLAGS: dict[str, dict] = {
     "use_monitoring": {"coste": 2},
     "use_docker": {"coste": 1},
     "use_rag": {"coste": 2},
+    # use_sdd no instala dependencias nuevas (el mutador es stdlib): coste 0.
+    "use_sdd": {"coste": 0},
     "graphify_mode": {"coste": 2, "valores": ["solo graphify", "graphify + obsidian vault"]},
 }
 

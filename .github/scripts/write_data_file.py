@@ -56,6 +56,8 @@ BASE = {
     # explicito para que la matriz pueda apagarlo y para que se vea que se
     # esta instalando chromadb en cada job.
     "use_rag": True,
+    "use_sdd": False,
+    "proyecto_perfil": "estandar",
     "graphify_mode": "no",
 }
 
@@ -83,6 +85,9 @@ VALID_KEYS = {
     "use_calibration",
     "use_conformal",
     "use_rag",
+    "use_sdd",
+    "use_mcp",
+    "proyecto_perfil",
     "graphify_mode",
     "project_slug",
     "project_name",

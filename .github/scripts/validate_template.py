@@ -38,6 +38,7 @@ STD = dict(
 )
 
 DEFAULTS = dict(
+    proyecto_perfil="estandar",
     model_type="todos",
     cluster_model="todos",
     nn_model="MLP",
@@ -56,6 +57,8 @@ DEFAULTS = dict(
     use_calibration=False,
     use_conformal=False,
     use_rag=False,
+    use_sdd=False,
+    use_mcp=False,
     graphify_mode="no",
 )
 
@@ -136,6 +139,11 @@ def variables_de_copier() -> tuple[dict[str, list], dict]:
     Leerlas en vez de copiarlas a mano es lo que impide la deriva: una opcion
     nueva entra sola en la matriz, y no puede pasar lo de `use_rag` — que
     existia desde hacia versiones y no aparecia en ninguna combinacion.
+
+    `proyecto_perfil` no ramifica en la matriz: es un driver global cuyos 4
+    valores solo cambian los DEFAULTS de los extras, y la logica del render
+    depende de los valores de `use_*`/`graphify_mode`, no del perfil. Se deja
+    fijado en `DEFAULTS` (estandar) y se excluye aqui.
     """
     import yaml
 
@@ -145,6 +153,8 @@ def variables_de_copier() -> tuple[dict[str, list], dict]:
     for nombre, spec in doc.items():
         if nombre.startswith("_") or not isinstance(spec, dict) or "type" not in spec:
             continue
+        if nombre == "proyecto_perfil":
+            continue
         if "choices" in spec:
             valores = list(spec["choices"])
         elif spec["type"] == "bool":
@@ -152,7 +162,13 @@ def variables_de_copier() -> tuple[dict[str, list], dict]:
         else:
             continue  # los str libres no ramifican el render
         variables[nombre] = valores
-        defaults[nombre] = spec.get("default", valores[0])
+        # Los defaults derivados del perfil son strings Jinja ("{{ ... }}"):
+        # aqui se resuelven al valor que tendria el perfil estandar, porque la
+        # matriz no puede renderizar un string Jinja como si fuera el valor.
+        default = spec.get("default", valores[0])
+        if isinstance(default, str) and default.startswith("{{"):
+            default = DEFAULTS.get(nombre, valores[0])
+        defaults[nombre] = default
     return variables, defaults
 
 
