@@ -84,6 +84,9 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("haz commit de los cambios", "git"),
     ("sugiere un mensaje de commit", "git"),
     ("ejecuta los tests", "test"),
+    ("haz mutation testing al módulo de features", "mutation"),
+    ("ejecuta el mutation testing", "mutation"),
+    ("calcula la métrica CRAP de utils.py", "mutation"),
     ("revisa el Dockerfile", "docker"),
     ("diagnóstico del proyecto", "doctor"),
     ("actualiza el changelog", "documentation"),
@@ -155,7 +158,7 @@ def _contracts() -> list[dict]:
 
 
 HARNESS_AGENTS = ("lider", "implementer", "reviewer", "explorer")
-HARNESS_STATUS = ("pending", "in_progress", "done", "blocked")
+HARNESS_STATUS = ("pending", "spec_ready", "in_progress", "done", "blocked")
 HARNESS_REQUIRED = ("id", "title", "description", "acceptance_criteria", "status")
 
 

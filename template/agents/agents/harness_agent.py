@@ -15,6 +15,7 @@ forma de saltársela pidiéndoselo amablemente al modelo.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -23,7 +24,7 @@ from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.tools.process_tool import run_command
 
-VALID_STATUS = ("pending", "in_progress", "done", "blocked")
+VALID_STATUS = ("pending", "spec_ready", "in_progress", "done", "blocked")
 REQUIRED_FIELDS = ("id", "title", "description", "acceptance_criteria", "status")
 
 #: Rechazos seguidos del reviewer antes de bloquear la feature y escalar.
@@ -36,6 +37,30 @@ _RECHAZOS = ("rechazado", "rechaza", "rejected", "fail", "ko")
 
 def _es_rechazo(verdict: str) -> bool:
     return verdict.strip().lower() in _RECHAZOS
+
+
+def validate_gherkin(text: str) -> list[str]:
+    """
+    Valida la estructura mínima de un contrato Gherkin sin dependencias.
+
+    No es un parser completo de Gherkin: comprueba lo que el arnés necesita
+    (una Feature, al menos un Scenario, y pasos Given/When/Then en cada uno)
+    para que un `.feature` escrito a mano no pase la puerta con un formato
+    roto. La semántica —si los escenarios capturan bien el comportamiento—
+    es de la revisión humana, no de un validador de sintaxis.
+    """
+    problems: list[str] = []
+    if "Feature:" not in text:
+        problems.append("falta 'Feature:'")
+
+    scenarios = re.findall(r"(?m)^\s*Scenario:.*$", text)
+    if not scenarios:
+        problems.append("no hay ningún 'Scenario:'")
+
+    steps = re.findall(r"(?m)^\s+(Given|When|Then|And|But)\b", text)
+    if scenarios and not steps:
+        problems.append("ningún escenario tiene pasos Given/When/Then")
+    return problems
 
 CURRENT_TEMPLATE = """# Tarea actual
 
@@ -110,6 +135,8 @@ class HarnessAgent(BaseAgent):
             "status": self.status,
             "next": self.next,
             "start": self.start,
+            "write_feature": self.write_feature,
+            "approve": self.approve,
             "finish": self.finish,
             "block": self.block,
             "record": self.record,
@@ -144,6 +171,10 @@ class HarnessAgent(BaseAgent):
     @property
     def _history_file(self) -> Path:
         return self._progress_dir / "history.md"
+
+    @property
+    def _features_dir(self) -> Path:
+        return self.ctx.root / "features"
 
     # -- backlog -------------------------------------------------------------
     def _load(self) -> tuple[dict | None, str]:
@@ -357,6 +388,129 @@ class HarnessAgent(BaseAgent):
             success=True, agent=self.name, action="start",
             message=f"{id} abierta (in_progress) y volcada en harness/progress/current.md.",
             data={"id": id, "criteria": feat.get("acceptance_criteria", [])},
+        )
+
+    # -- contrato Gherkin (flujo SDD) ----------------------------------------
+    def write_feature(self, *, id: str = "", content: str = "") -> AgentResult:
+        """
+        Escribe el contrato Gherkin de una feature en `features/<id>.feature`.
+
+        Flujo spec-driven: antes de codear, la feature pasa por `spec_ready`
+        y un humano aprueba los escenarios (`approve`). `content` es el texto
+        Gherkin; si no se pasa, se genera un borrador con un escenario por
+        criterio de aceptación. El fichero es el estado de la spec, fuera del
+        JSON — igual que `harness/progress/` lo es del progreso.
+        """
+        if not id:
+            return self._fail("write_feature", "Falta el id de la feature.",
+                              needs=["¿Qué feature documento? Usa el id de featureslist.json."])
+
+        doc, error = self._load()
+        if doc is None:
+            return self._fail("write_feature", error)
+
+        feat = self._find(doc, id)
+        if feat is None:
+            return self._fail("write_feature", f"No existe la feature '{id}' en el backlog.")
+        if feat.get("status") == "done":
+            return self._fail("write_feature", f"'{id}' ya está cerrada.")
+
+        gherkin = content.strip() if content.strip() else self._draft_feature(feat)
+        problems = validate_gherkin(gherkin)
+        if problems:
+            return self._fail("write_feature", f"El Gherkin no es válido: {'; '.join(problems)}.")
+
+        self._features_dir.mkdir(parents=True, exist_ok=True)
+        path = self._features_dir / f"{id}.feature"
+        path.write_text(gherkin.rstrip() + "\n", encoding="utf-8")
+        feat["status"] = "spec_ready"
+        self._save(doc)
+
+        return AgentResult(
+            success=True, agent=self.name, action="write_feature",
+            message=f"Contrato Gherkin escrito en features/{id}.feature "
+                    f"({feat.get('status')} → spec_ready).",
+            data={"path": str(path.relative_to(self.ctx.root)),
+                  "scenarios": gherkin.count("Scenario:"),
+                  "draft": not bool(content.strip())},
+            warnings=(
+                ["Borrador generado desde acceptance_criteria: revisa que los "
+                 "escenarios capturen los casos límite antes de aprobar."]
+                if not content.strip() else []
+            ),
+        )
+
+    def _draft_feature(self, feat: dict) -> str:
+        """Un escenario Given-When-Then por criterio de aceptación."""
+        lines = [f"Feature: {feat.get('title', feat.get('id', ''))}", ""]
+        for i, criterion in enumerate(feat.get("acceptance_criteria", []), start=1):
+            lines += [
+                f"  Scenario: S{i} — {criterion}",
+                f"    Given el sistema en su estado inicial",
+                f"    When se ejecuta el comportamiento de esta feature",
+                f"    Then {criterion}",
+                "",
+            ]
+        return "\n".join(lines)
+
+    def approve(self, *, id: str = "", owner: str = "implementer") -> AgentResult:
+        """
+        Puerta humana del flujo SDD: aprueba la spec de una feature en
+        `spec_ready` y la abre (`in_progress`). Solo un humano aprueba —
+        esto es un paso explícito, no algo que el líder decide solo.
+        """
+        if not id:
+            return self._fail("approve", "Falta el id de la feature.",
+                              needs=["¿Qué feature apruebas? Usa el id de featureslist.json."])
+
+        doc, error = self._load()
+        if doc is None:
+            return self._fail("approve", error)
+
+        feat = self._find(doc, id)
+        if feat is None:
+            return self._fail("approve", f"No existe la feature '{id}' en el backlog.")
+        if feat.get("status") != "spec_ready":
+            return self._fail(
+                "approve",
+                f"'{id}' no está en spec_ready (está en '{feat.get('status')}'). "
+                f"Escribe primero el contrato con `harness write_feature`.",
+            )
+
+        feature_file = self._features_dir / f"{id}.feature"
+        if not feature_file.exists():
+            return self._fail(
+                "approve",
+                f"No existe features/{id}.feature — ejecuta `harness write_feature` primero.",
+            )
+
+        feat["status"] = "in_progress"
+        feat["started"] = date.today().isoformat()
+        feat["review_rounds"] = 0
+        feat.pop("blocked_reason", None)
+        self._save(doc)
+
+        self._progress_dir.mkdir(parents=True, exist_ok=True)
+        criteria = "\n".join(f"- [ ] {c}" for c in feat.get("acceptance_criteria", []))
+        self._current_file.write_text(
+            CURRENT_TEMPLATE.format(
+                fid=feat["id"],
+                status="in_progress",
+                started=feat["started"],
+                owner=owner,
+                description=feat.get("description", ""),
+                criteria=criteria or "_(sin criterios definidos)_",
+                log="Spec aprobada por el humano; contrato en "
+                    f"features/{id}.feature.",
+                blockers="_(ninguno)_",
+            ),
+            encoding="utf-8",
+        )
+
+        return AgentResult(
+            success=True, agent=self.name, action="approve",
+            message=f"Spec de {id} aprobada e in_progress. Implementa contra features/{id}.feature.",
+            data={"id": id, "path": str(feature_file.relative_to(self.ctx.root))},
         )
 
     def gate(self, *, quick: bool = False) -> AgentResult:

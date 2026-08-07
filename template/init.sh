@@ -215,7 +215,31 @@ PYEOF
 else
   fail "featureslist" "no verificable (falta Python o harness/featureslist.json)"
 fi
+{% if use_sdd %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  3b. Contrato Gherkin — features/*.feature bien formados
+# ─────────────────────────────────────────────────────────────────────────────
 
+if [ -d "features" ]; then
+  FEATURE_COUNT="$(find features -name '*.feature' -type f 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$FEATURE_COUNT" -gt 0 ]; then
+    FEATURE_BROKEN=""
+    for feat in features/*.feature; do
+      grep -q '^Feature:' "$feat" || FEATURE_BROKEN="$FEATURE_BROKEN $feat"
+      grep -q 'Scenario:' "$feat" || FEATURE_BROKEN="$FEATURE_BROKEN $feat"
+    done
+    if [ -z "$FEATURE_BROKEN" ]; then
+      ok "features" "$FEATURE_COUNT contrato(s) Gherkin válido(s)"
+    else
+      fail "features" "contratos sin Feature:/Scenario:$FEATURE_BROKEN"
+    fi
+  else
+    ok "features" "directorio presente, sin contratos todavía"
+  fi
+else
+  ok "features" "sin contratos (ejecuta 'run harness write_feature --id <ID>' cuando toque)"
+fi
+{% endif %}
 # ─────────────────────────────────────────────────────────────────────────────
 #  4. Código del proyecto
 # ─────────────────────────────────────────────────────────────────────────────

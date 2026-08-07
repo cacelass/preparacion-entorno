@@ -5,6 +5,7 @@
         docs \
         profile \
         mlflow \
+{% if use_sdd %}        mutation crap {% endif %}\
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
         agents-list agents-run agents-doctor agents-memory agents-eval \
@@ -54,6 +55,9 @@ help:
 	@echo "    make typecheck      mypy --strict (tipado estático)"
 	@echo "    make security       bandit + pip-audit (vulnerabilidades)"
 	@echo "    make audit          radon cc + agents audit (complejidad + equipo)"
+{% if use_sdd %}	@echo "    make mutation       mutation testing de un módulo (spec-driven)"
+	@echo "    make crap           métrica CRAP de un módulo (complejidad × cobertura)"
+{% endif %}
 	@echo ""
 	@echo "  Jupyter"
 	@echo "    make lab            JupyterLab  (puerto 8888)"
@@ -272,6 +276,20 @@ audit:
 	@echo ""
 	uv run python -m agents audit suggest 2>/dev/null || echo "  (agente 'audit' no disponible — ejecuta make setup)"
 	@echo "  ✅ audit OK"
+
+{% if use_sdd %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  Spec-driven: mutation testing y CRAP
+#  Uso: make mutation TARGET={{ project_slug }}/features/build_features.py
+# ─────────────────────────────────────────────────────────────────────────────
+mutation:
+	@echo "▶  Mutation testing de $(TARGET) — los tests deben «morder»"
+	uv run python -m agents --json run mutation run_mutation_testing --target $(TARGET)
+
+crap:
+	@echo "▶  Métrica CRAP de $(TARGET) — riesgo de cambio"
+	uv run python -m agents --json run mutation crap_report --target $(TARGET)
+{% endif %}
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Jupyter

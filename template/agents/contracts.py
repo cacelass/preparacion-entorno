@@ -258,6 +258,23 @@ CONTRACTS: dict[str, Contract] = {
         ),
         collaborates=(),
     ),
+    "mutation": Contract(
+        role="Mutation testing y CRAP: comprueba que los tests «muerden» y mide el riesgo de cambio.",
+        can=(
+            "ejecutar tools/mutate.py sobre un módulo y resumir killed/survived/score",
+            "calcular la métrica CRAP por función (complejidad ciclomática × cobertura)",
+        ),
+        cannot=(
+            "arreglar los tests que fallan ni añadir tests él mismo → implementer/reviewer",
+            "decidir qué sobrevivientes son aceptables — presenta los números, el humano decide",
+            "tocar código fuente del paquete → refactor",
+        ),
+        needs=(
+            "la ruta del módulo a analizar (--target)",
+            "una suite de tests que ejecutar para la mutación",
+        ),
+        collaborates=("test", "review"),
+    ),
 
     # ── Datos y ML ───────────────────────────────────────────────────────
     "data": Contract(
@@ -495,7 +512,8 @@ CONTRACTS: dict[str, Contract] = {
             "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
         ),
         needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),
-        owns=("harness/featureslist.json", "harness/progress/", "harness/memory.md"),
+        owns=("harness/featureslist.json", "harness/progress/", "harness/memory.md",
+              "features/"),
         collaborates=("plan", "test", "review", "memory"),
     ),
 }

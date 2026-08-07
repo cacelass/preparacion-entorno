@@ -10,6 +10,8 @@ Ejecuta la parte mecánica del arnés. No decide nada: los agentes markdown
 | `status` | Recuento del backlog + qué está in_progress + qué es elegible |
 | `next` | La feature que toca (in_progress, o la primera con deps en done) |
 | `start --id <ID>` | Abre la feature y vuelca sus criterios en `harness/progress/current.md` |
+| `write_feature --id <ID> [--content "<gherkin>"]` | Escribe `features/<ID>.feature` y deja la feature en `spec_ready` |
+| `approve --id <ID>` | Puerta humana: aprueba la spec y abre la feature (`in_progress`) |
 | `gate [--quick true]` | Ejecuta `./init.sh` y devuelve el veredicto estructurado |
 | `finish --id <ID> --evidence "<salida real>"` | Cierra la feature y escribe el histórico |
 | `block --id <ID> --reason "<motivo>"` | Marca bloqueada |
@@ -19,9 +21,20 @@ Ejecuta la parte mecánica del arnés. No decide nada: los agentes markdown
 ```bash
 uv run python -m agents --json run harness next
 uv run python -m agents --json run harness start --id DATA-001
+uv run python -m agents --json run harness write_feature --id DATA-001
+uv run python -m agents --json run harness approve --id DATA-001
 uv run python -m agents --json run harness gate
 uv run python -m agents --json run harness finish --id DATA-001 --evidence "$(make test 2>&1 | tail -5)"
 ```
+
+## Contrato Gherkin (flujo SDD)
+
+El flujo spec-driven (extra `use_sdd`) añade una puerta humana antes de
+codear: `write_feature` escribe el contrato Gherkin en `features/<ID>.feature`
+(un escenario por criterio de aceptación, o el texto que le pases en
+`--content`) y deja la feature en `spec_ready`. Solo `approve` —un paso
+explícito del humano— la mueve a `in_progress`. La mutación de la feature se
+mide después con el agente `mutation` (`skill mutation_agent`).
 
 ## Lo que rechaza
 
@@ -31,12 +44,14 @@ uv run python -m agents --json run harness finish --id DATA-001 --evidence "$(ma
 - **`start` con otra feature abierta** → una cosa a la vez.
 - **`start` con `depends_on` sin cerrar** → primero las dependencias.
 - **`add` con `depends_on` inexistente** → el backlog no se corrompe.
+- **`approve` de algo que no está en `spec_ready`** → primero el contrato.
+- **`write_feature` con Gherkin inválido** → el contrato no pasa la puerta roto.
 
 ## Por qué existe
 
 Editar JSON a mano desde un prompt se rompe: comas, ids duplicados, estados
 inventados, un `done` que nadie verificó. Este agente hace esas operaciones
-de forma determinista y es el único dueño de `harness/featureslist.json` y `harness/progress/`.
+de forma determinista y es el único dueño de `harness/featureslist.json`, `harness/progress/` y `features/`.
 
 Ver el ciclo completo: `skill harness_workflow`.
 
@@ -49,6 +64,8 @@ Ver el ciclo completo: `skill harness_workflow`.
 | `run harness status` | — |
 | `run harness next` | — |
 | `run harness start` | `--id`, `--owner` |
+| `run harness write_feature` | `--id`, `--content` |
+| `run harness approve` | `--id`, `--owner` |
 | `run harness finish` | `--id`, `--evidence`, `--changes`, `--decisions`, `--pending` |
 | `run harness block` | `--id`, `--reason` |
 | `run harness record` | `--agent`, `--id`, `--content`, `--verdict` |
@@ -67,7 +84,7 @@ Ver el ciclo completo: `skill harness_workflow`.
 
 **Necesita que le den:** el id de la feature; la evidencia real de verificación para cerrarla
 
-**Escribe en (nadie más toca esto):** harness/featureslist.json, harness/progress/, harness/memory.md
+**Escribe en (nadie más toca esto):** harness/featureslist.json, harness/progress/, harness/memory.md, features/
 
 **Se apoya en:** plan, test, review, memory
 

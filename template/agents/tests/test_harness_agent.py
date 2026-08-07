@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from agents.agents.harness_agent import HarnessAgent
+from agents.agents.harness_agent import HarnessAgent, validate_gherkin
 
 BACKLOG = {
     "version": 1,
@@ -366,3 +366,114 @@ def test_reabrir_la_feature_reinicia_el_contador(harness):
 
     r = harness.record(agent="reviewer", id="A-001", verdict="rechazado", content="otra vez")
     assert r.success and r.data["review_rounds"] == 1
+
+
+# -- contrato Gherkin (flujo SDD) ---------------------------------------------
+def test_validate_gherkin_acepta_contrato_valido():
+    texto = """Feature: Filtrado por fecha
+
+  Scenario: S1 — fecha inclusiva
+    Given una nota creada el 2024-01-01
+    When se filtra por esa fecha
+    Then aparece en el resultado
+"""
+    assert validate_gherkin(texto) == []
+
+
+def test_validate_gherkin_rechaza_sin_feature():
+    texto = """Scenario: S1 — algo
+    Given un estado
+    When pasa algo
+    Then cambia
+"""
+    assert "Feature:" in " ".join(validate_gherkin(texto))
+
+
+def test_validate_gherkin_rechaza_sin_scenario():
+    texto = "Feature: algo\n\n  Given x\n"
+    assert any("Scenario" in p for p in validate_gherkin(texto))
+
+
+def test_validate_gherkin_rechaza_sin_pasos():
+    texto = """Feature: algo
+
+  Scenario: S1 — título
+"""
+    assert validate_gherkin(texto)  # sin Given/When/Then → no vacío
+
+
+def test_write_feature_genera_borrador_y_deja_spec_ready(harness):
+    result = harness.write_feature(id="A-001")
+    assert result.success
+    assert result.data["draft"] is True
+    assert result.data["scenarios"] == 2  # A-001 tiene c1 y c2
+
+    path = harness.ctx.root / "features" / "A-001.feature"
+    assert path.exists()
+    texto = path.read_text()
+    assert "Feature:" in texto
+    assert "Scenario:" in texto and "c1" in texto and "c2" in texto
+
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "spec_ready"
+
+
+def test_write_feature_con_content_propio_no_es_borrador(harness):
+    gherkin = """Feature: Propia
+
+  Scenario: S1 — límite
+    Given x
+    When y
+    Then z
+"""
+    result = harness.write_feature(id="A-001", content=gherkin)
+    assert result.success
+    assert result.data["draft"] is False
+    assert "Given x" in (harness.ctx.root / "features" / "A-001.feature").read_text()
+
+
+def test_write_feature_con_gherkin_invalido_falla(harness):
+    result = harness.write_feature(id="A-001", content="no es gherkin")
+    assert not result.success
+    assert "Gherkin" in result.message
+
+
+def test_write_feature_sin_id_pide_id(harness):
+    result = harness.write_feature()
+    assert not result.success
+    assert result.needs
+
+
+def test_write_feature_de_feature_inexistente_falla(harness):
+    assert not harness.write_feature(id="NO-EXISTE").success
+
+
+def test_approve_abre_feature_solo_desde_spec_ready(harness):
+    harness.write_feature(id="A-001")
+    result = harness.approve(id="A-001")
+    assert result.success
+
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "in_progress"
+    current = (harness.ctx.root / "harness" / "progress" / "current.md").read_text()
+    assert "features/A-001.feature" in current
+
+
+def test_approve_sin_spec_ready_rechaza(harness):
+    result = harness.approve(id="A-001")  # está pending, nunca tuvo spec
+    assert not result.success
+    assert "spec_ready" in result.message
+
+
+def test_approve_sin_contrato_en_disco_rechaza(harness):
+    harness.write_feature(id="A-001")
+    (harness.ctx.root / "features" / "A-001.feature").unlink()
+    result = harness.approve(id="A-001")
+    assert not result.success
+    assert "A-001.feature" in result.message
+
+
+def test_approve_sin_id_pide_id(harness):
+    result = harness.approve()
+    assert not result.success
+    assert result.needs
