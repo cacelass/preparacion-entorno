@@ -93,6 +93,8 @@ con el perfil `{{ proyecto_perfil }}`, y algunos agentes no están instalados
 | Saber si el equipo va bien | `run audit suggest` |
 | Encontrar dónde está algo | `run doc search --query "<pregunta>"` |
 {% if use_rag %}| Buscar en el histórico del arnés | `run rag search --query "<pregunta>"` |
+| Consultar el corpus de conocimiento profundo | `run rag search --query "<pregunta>" --file_type knowledge` |
+| Mantener el corpus al día | `run rag refresh` (primero `--dry-run`) |
 {% endif %}| Competir dos enfoques y quedarte con el mejor | `run supervisor compete` |
 
 ```bash
@@ -137,6 +139,25 @@ Un hallazgo duradero sobre los datos o el modelo no va en `harness/progress/`: p
 Tras cerrar una feature, `make index-rag` para que el histórico entre en el
 índice semántico y las siguientes sesiones puedan preguntarle en lenguaje
 natural ("¿por qué elegimos este modelo?") en vez de releer `harness/progress/`.
+{% endif %}
+{% if use_rag %}
+## Aconsejar desde el conocimiento, no desde el resumen
+
+Este proyecto incluye el corpus `knowledge/` (matemáticas, estadística,
+probabilidad, matrices, algoritmos y su aplicación, e ingeniería del código).
+Es teoría profunda con fórmulas, derivaciones y el "cómo se aplica y cómo se
+rompe" de cada concepto — no un glosario. Antes de aconsejar una métrica, una
+arquitectura, regularización, validación o el serving de un modelo,
+**consúltalo** en lugar de improvisar el razonamiento que ya está resuelto:
+
+```bash
+uv run python -m agents --json run rag search --query "<pregunta>" --file_type knowledge
+```
+
+El índice de conocimiento no se mantiene solo: `run rag refresh --dry-run`
+te dice qué papers hay de nuevo y qué fuentes tienen versión más reciente;
+sin el `--dry-run` descarga los nuevos a `knowledge/papers/` y reindexa. La
+feature `KNOW-001` del backlog lo formaliza.
 {% endif %}
 
 ## Prohibido
