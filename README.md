@@ -128,7 +128,7 @@ el `uv sync` automático se mantiene.
 | `use_mlflow` | Tracking de experimentos, artifacts y Model Registry | `make mlflow` |
 | `use_duckdb` | Carga CSV/Parquet/JSON con SQL directo | `make query` |
 | `use_docker` | Docker + interfaz de chat Gradio | `make docker-run` |
-| `use_rag` | RAG local (ChromaDB + BM25): indexa el código, los prompts, los docs y la memoria del arnés, y busca fundiendo vector y léxico. Sin API key, offline | `make index-rag` |
+| `use_rag` | RAG local (ChromaDB + BM25): indexa el código, los prompts, los docs, la memoria del arnés y el corpus de conocimiento profundo (`knowledge/`), y busca fundiendo vector y léxico. Incluye `rag refresh` para mantener las fuentes al día. Sin API key, offline | `make index-rag` |
 | `use_sdd` | Spec-driven (Robert C. Martin): contrato Gherkin con puerta humana antes de codear, agente de mutation testing y métrica CRAP | `make mutation` · `make crap` |
 | `use_conformal` | Conformal Prediction — sets/intervalos con garantía de cobertura, *distribution-free* | automático |
 | `use_calibration` | Temperature Scaling — calibra la confianza del modelo *(redes_neuronales)* | automático |
@@ -261,7 +261,7 @@ Copier muestra solo las preguntas relevantes según las respuestas anteriores.
 | `use_duckdb` | true/false | manual | DuckDB SQL sobre ficheros |
 | `use_api` | true/false | manual | API REST FastAPI |
 | `use_docker` | true/false | manual | Docker + chat Gradio |
-| `use_rag` | true/false | manual | RAG local híbrido (ChromaDB + BM25) — activo en `estandar`/`completo` |
+| `use_rag` | true/false | manual | RAG local híbrido (ChromaDB + BM25) + corpus de conocimiento profundo — activo en `estandar`/`completo` |
 | `use_sdd` | true/false | manual | Spec-driven: contrato Gherkin + mutation testing + CRAP — activo en `estandar`/`completo` |
 | `use_mcp` | true/false | manual | Servidores MCP para el asistente (filesystem, git, fetch...) |
 | `use_conformal` | true/false | manual + supervisado, hibrido, redes_neuronales | Conformal Prediction |
