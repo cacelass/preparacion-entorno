@@ -211,7 +211,7 @@ use_conformal:
 # --- RAG local (ChromaDB + BM25) ---
 use_rag:
   type: bool
-  help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. make index-rag para construir el indice. Sin API key, funciona offline."
+  help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. Incluye el corpus de conocimiento profundo (knowledge/): matemáticas,\n         estadística, probabilidad, matrices, algoritmos y su aplicación, con `rag refresh` para mantener las fuentes al día.\n         make index-rag para construir el indice. Sin API key, funciona offline."
   default: "{{ proyecto_perfil in ['estandar', 'completo'] }}"
   when: "{{ proyecto_perfil == 'manual' }}"
 
@@ -331,6 +331,10 @@ _message_before_copy: >-
   {% elif graphify_mode == "solo graphify" %}
     graphify activado. Ejecuta 'uv run python -m graphify build' para generar el grafo de conocimiento.
   {% endif %}
+  {% if use_rag %}
+    RAG + corpus de conocimiento profundo activos (knowledge/). Consulta con
+    'run rag search --file_type knowledge'; mantén las fuentes con 'run rag refresh'.
+  {% endif %}
   {% if proyecto_perfil == 'completo' or proyecto_perfil == 'manual' %}
     NOTA: se instalaron las dependencias automáticamente (perfil {{ proyecto_perfil }}).
   {% else %}
@@ -411,6 +415,11 @@ _exclude:
   - "{% if not use_rag %}agents/evals/rag_golden.json{% endif %}"
   - "{% if not use_rag %}agents/tests/test_rag_eval.py{% endif %}"
   - "{% if not use_rag %}agents/tests/test_rag_trust.py{% endif %}"
+  - "{% if not use_rag %}knowledge{% endif %}"
+  - "{% if not use_api %}knowledge/backend/api.md{% endif %}"
+  - "{% if not use_docker %}knowledge/backend/docker.md{% endif %}"
+  - "{% if not use_docker %}knowledge/frontend/chat.md{% endif %}"
+  - "{% if not use_mlflow %}knowledge/backend/mlflow.md{% endif %}"
   - "{% if not use_mcp %}.mcp.json{% endif %}"
   - "{% if not use_sdd %}tools/mutate.py{% endif %}"
   - "{% if not use_sdd %}agents/agents/mutation_agent.py{% endif %}"

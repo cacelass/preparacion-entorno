@@ -52,7 +52,9 @@
 │   └── utils/          paths.py
 ├── tests/
 ├── harness/progress/           ← memoria del arnés (tarea actual + histórico)
-├── AGENTS.md           ← protocolo del arnés: punto de entrada de la IA
+{% if use_rag %}├── knowledge/              ← corpus de conocimiento profundo (consulta con rag search)
+├── .rag-index/                 ← índice vectorial ChromaDB (generado, no se versiona)
+{% endif %}├── AGENTS.md           ← protocolo del arnés: punto de entrada de la IA
 ├── init.sh             ← la puerta: ¿se puede trabajar?
 ├── harness/featureslist.json   ← backlog con criterios de aceptación
 ├── main.py             ← pipeline completo
@@ -106,6 +108,21 @@ versión, actualiza el CHANGELOG y propone el commit (`--dry-run` primero, con
 confirmación tuya antes de ejecutarlo). El push siempre es decisión tuya.
 
 El protocolo completo está en [`AGENTS.md`](AGENTS.md).
+
+{% if use_rag %}## Corpus de conocimiento profundo
+
+El RAG indexa también `knowledge/`: teoría profunda de matemáticas,
+estadística, probabilidad, matrices, algoritmos y su aplicación, e ingeniería
+del código — lo que el `lider` consulta antes de aconsejar. Búscalo en
+lenguaje natural y mantenlo al día con `rag refresh`:
+
+```bash
+make index-rag                                       # construir el índice
+uv run python -m agents --json run rag search --query "regularización L1 vs L2" --file_type knowledge
+uv run python -m agents --json run rag refresh --dry-run   # papers nuevos + fuentes superadas
+uv run python -m agents --json run rag refresh             # descarga y reindexa
+```
+{% endif %}
 
 
 {% if use_docker %}

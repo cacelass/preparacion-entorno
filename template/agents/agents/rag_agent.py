@@ -17,16 +17,18 @@ from agents.tools.rest_tool import RestTool
 class RagAgent(BaseAgent):
     name = "rag"
     description = (
-        "RAG local: indexa código, prompts, docs y vault del proyecto con "
-        "ChromaDB. Busca en lenguaje natural fundiendo vector y BM25 léxico, y "
-        "también puede indexar URLs externas."
+        "RAG local: indexa código, prompts, docs, vault y el corpus de "
+        "conocimiento profundo (knowledge/) con ChromaDB. Busca en lenguaje "
+        "natural fundiendo vector y BM25 léxico, indexa URLs externas y "
+        "mantiene al día el corpus (rag refresh)."
     )
     capabilities = [
         "rag", "semantico", "semantic", "indexar", "index",
         "consulta semantic", "embedding", "chroma", "vector",
         "indice semantico", "busca en la documentacion",
         "encuentra en la documentacion",
-        "indexa",
+        "indexa", "refresca fuentes", "actualiza corpus",
+        "mantenimiento del corpus",
     ]
 
     def action_aliases(self) -> dict:
@@ -36,6 +38,10 @@ class RagAgent(BaseAgent):
             "search": ["busca", "consulta", "encuentra", "pregunta"],
             "status": ["estado del indice", "info rag"],
             "evaluate": ["evalua la busqueda", "mide la recuperacion", "eval rag"],
+            "refresh": [
+                "nuevos papers", "actualiza fuentes", "verifica fuentes",
+                "mantén el corpus", "refresh sources", "corpus al día",
+            ],
         }
 
     def actions(self) -> dict:
@@ -45,6 +51,7 @@ class RagAgent(BaseAgent):
             "search": self.search,
             "status": self.status,
             "evaluate": self.evaluate,
+            "refresh": self.refresh,
         }
 
     def index(self, *, rebuild: bool = False) -> AgentResult:
@@ -102,9 +109,9 @@ class RagAgent(BaseAgent):
                source: str | None = None, max_per_source: int = 0,
                expand: int = 0) -> AgentResult:
         """
-        `file_type` acota a code/doc/prompt/vault/harness/url, `source` a un
-        prefijo de ruta, `max_per_source` reparte el top_k entre ficheros y
-        `expand` devuelve los chunks vecinos en `context`.
+        `file_type` acota a code/doc/prompt/vault/harness/url/knowledge,
+        `source` a un prefijo de ruta, `max_per_source` reparte el top_k entre
+        ficheros y `expand` devuelve los chunks vecinos en `context`.
         """
         if not RagTool.available():
             return AgentResult(
@@ -239,4 +246,72 @@ class RagAgent(BaseAgent):
             f"Aporte léxico: {h['lexical_share']}.",
             data=informe,
             warnings=[f"sin acierto: {q}" for q in fallos] or None,
+        )
+
+    def refresh(self, *, dry_run: bool = False, months: int = 6, max_new: int = 3,
+                topics: str | list[str] | None = None) -> AgentResult:
+        """
+        Mantiene el corpus de conocimiento (knowledge/): verifica que las
+        fuentes de `sources.json` siguen vigentes en arXiv y detecta papers
+        nuevos por topic.
+
+        `dry_run=True` (recomendado primero) no escribe nada: devuelve el
+        informe con los papers nuevos y las fuentes superadas. Sin dry-run
+        descarga los nuevos a `knowledge/papers/<tema>/<id>.md` (HTML de arXiv
+        o PDF→markitdown), actualiza `sources.json` y reindexa el corpus.
+
+        `topics` filtra por nombre de topic (coma-separados desde la CLI).
+        """
+        from agents.tools.knowledge_tool import KnowledgeTool
+
+        if isinstance(topics, str):
+            topics = [t.strip() for t in topics.split(",") if t.strip()]
+        informe = KnowledgeTool.refresh(
+            self.ctx.root, dry_run=dry_run, months=months, max_new=max_new, topics=topics,
+        )
+        if "error" in informe:
+            return AgentResult(False, self.name, "refresh", informe["error"], data=informe)
+
+        nuevos = informe["new_papers"]
+        superadas = informe["updated_sources"]
+        errores = informe["errors"]
+
+        if dry_run:
+            mensaje = (
+                f"INFORME (dry-run, no se ha tocado nada): {len(nuevos)} paper(s) "
+                f"nuevo(s) en {len(informe['topics'])} topic(s), "
+                f"{len(superadas)} fuente(s) con versión más reciente."
+            )
+        else:
+            descargados = len(informe["downloads"])
+            reindex = informe.get("reindex")
+            mensaje = (
+                f"Corpus actualizado: {descargados} paper(s) descargado(s) a "
+                f"knowledge/papers/, {len(nuevos)} detectado(s), "
+                f"{len(superadas)} fuente(s) marcada(s) como superadas."
+            )
+            if reindex:
+                mensaje += (
+                    f" Reindexado: {reindex['total_chunks']} fragmentos "
+                    f"(+{reindex['new_chunks']} nuevos)."
+                )
+            elif not errores:
+                mensaje += " No se pudo reindexar (chromadb ausente): ejecuta 'make index-rag'."
+
+        avisos = []
+        if superadas:
+            avisos.append(
+                "Fuente(s) con versión más reciente en arXiv: "
+                + ", ".join(f"{s['arxiv_id']} v{s['desde']}→v{s['hasta']}" for s in superadas)
+                + ". Revisa si el cambio merece actualizar el corpus."
+            )
+        if errores:
+            avisos.append(f"{len(errores)} error(es) controlado(s) (¿sin red?): "
+                          + "; ".join(errores[:3]))
+        if not dry_run and nuevos and not informe["downloads"] and not errores:
+            avisos.append("No se descargó ningún paper nuevo (¿markitdown sin instalar?).")
+
+        return AgentResult(
+            not errores or bool(nuevos) or bool(superadas) or not dry_run,
+            self.name, "refresh", mensaje, data=informe, warnings=avisos or None,
         )

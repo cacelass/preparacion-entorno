@@ -228,6 +228,14 @@ la búsqueda encuentra lo que debería (`hit_rate`, `recall@k`, MRR) contra
 `agents/evals/rag_golden.json`: es lo que convierte «parece que ahora busca
 mejor» en un número comparable entre commits. Añade ahí las preguntas que en
 tu proyecto devuelvan basura.
+
+El índice también cubre el **corpus de conocimiento profundo** (`knowledge/`):
+matemáticas, estadística, probabilidad, matrices, algoritmos y su aplicación,
+e ingeniería del código. El `lider` lo consulta antes de aconsejar
+(`rag search --query "..." --file_type knowledge`) y se mantiene al día con
+`rag refresh` — verifica cada fuente de `knowledge/sources.json` contra arXiv
+y descarga los papers nuevos a `knowledge/papers/`. La feature `KNOW-001` del
+backlog lo formaliza.
 {% endif %}
 Detalles del formato en `harness/progress/README.md`.
 

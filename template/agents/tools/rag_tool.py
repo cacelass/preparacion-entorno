@@ -81,6 +81,8 @@ def _file_type(source: str) -> str:
         return "code"
     if "/prompts/" in source:
         return "prompt"
+    if "/knowledge/" in source or source.startswith("knowledge/"):
+        return "knowledge"
     if "/vault/" in source or source.startswith("vault/"):
         return "vault"
     if source.startswith("harness/"):
@@ -611,6 +613,11 @@ class RagTool:
         ("agents/prompts", "*.md", False, None, "md"),
         ("docs", "*.*", True, (".md", ".rst"), "md"),
         ("vault", "*.md", True, None, "md"),
+        # Corpus de conocimiento profundo (knowledge/): la base de teoria y
+        # practica que el lider consulta antes de aconsejar. Incluye los
+        # papers descargados por `rag refresh` en knowledge/papers/. No existe
+        # sin use_rag, igual que api/chat/monitoring/tuning, y se salta solo.
+        ("knowledge", "*.md", True, None, "md"),
         # Memoria del arnes: el historico de features cerradas y sus decisiones
         # es lo que un agente nuevo necesita buscar en lenguaje natural sin
         # releer todo harness/progress/.

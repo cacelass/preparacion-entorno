@@ -54,7 +54,7 @@ Carga el skill de workflow solo cuando la tarea sea de ese dominio. Cada workflo
 {% if use_monitoring %}- `skill monitoring_workflow` → monitorización{% endif %}
 {% if use_optuna %}- `skill optuna_workflow` → hiperparámetros{% endif %}
 {% if graphify_mode != "no" %}- `skill knowledge_workflow` → grafo + vault{% endif %}
-{% if use_rag %}- `skill rag_workflow` → RAG semántico (ChromaDB){% endif %}
+{% if use_rag %}- `skill rag_workflow` → RAG semántico + corpus de conocimiento profundo (ChromaDB){% endif %}
 
 ## Agentes (skills individuales)
 

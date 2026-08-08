@@ -170,6 +170,10 @@ graphify = [
 # llega a crearse. El techo evita que un major de chroma rompa el arnés solo.
 rag = [
     "chromadb>=0.5.0,<2.0",
+    # markitdown convierte PDFs de arXiv a markdown en `rag refresh` (para
+    # papers sin versión HTML). Es import opcional: si no está, refresh
+    # degrada a "solo papers con HTML" y avisa.
+    "markitdown[pdf]>=0.1",
 ]
 
 # Embeddings multilingües de verdad: all-MiniLM-L6-v2 está entrenado en inglés

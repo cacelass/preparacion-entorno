@@ -7,6 +7,33 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [No publicado]
 
+### Corpus de conocimiento profundo dentro de `use_rag`
+
+El RAG ya no indexa solo el proyecto: con `use_rag` activo el proyecto generado
+incluye `knowledge/`, un corpus de teoría profunda que el `lider` consulta
+antes de aconsejar (matemáticas, estadística, probabilidad, causalidad,
+matrices, algoritmos y su aplicación, métricas, validación, interpretabilidad,
+deuda técnica, fairness/seguridad, eficiencia y calidad de código, backend,
+frontend y datos). Templado con Jinja: se adapta a `ml_type`, `task_type`,
+`nn_model`, `use_api`, `use_docker`, `use_mlflow`, etc.
+
+- **Fuentes con papers reales.** El corpus se autorizó a partir de papers
+  canónicos (Shlens PCA, Halko randomized SVD, Adam, Transformer, ResNet,
+  XGBoost, CatBoost, von Luxburg spectral clustering, Matrix Cookbook)
+  descargados y convertidos a markdown con `markitdown`.
+- **Nueva acción `rag refresh`.** Verifica que las fuentes de
+  `knowledge/sources.json` siguen vigentes (versión más reciente en arXiv) y
+  detecta papers nuevos por topic. `--dry-run` informa sin tocar nada; sin él
+  descarga los nuevos a `knowledge/papers/` (HTML de arXiv o PDF→markitdown),
+  actualiza `sources.json` y reindexa. `markitdown[pdf]` se añadió al extra
+  `rag` como import opcional.
+- **Ticket `KNOW-001` en el backlog por defecto.** El arnés formaliza el
+  mantenimiento del corpus: descargar papers nuevos si los hay y verificar que
+  los existentes siguen siendo útiles.
+- **RAG**: `knowledge/` entra en el índice como `file_type: knowledge`; el
+  `lider`, `orquestador`, `AGENTS.md` y `rag_workflow` documentan cómo
+  consultarlo y mantenerlo.
+
 ### Spec-driven: el contrato antes del código
 
 El flujo de Robert C. Martin / BettaTech, adaptado sin tmux ni agentes LLM en

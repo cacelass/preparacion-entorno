@@ -187,24 +187,35 @@ CONTRACTS: dict[str, Contract] = {
         collaborates=("doc", "research"),
     ),
     "rag": Contract(
-        role="RAG local: indexa código, prompts, docs, vault, la memoria del arnés y URLs "
-             "externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) "
-             "con BM25 léxico.",
+        role="RAG local: indexa código, prompts, docs, vault, el corpus de conocimiento "
+             "(knowledge/) y la memoria del arnés; busca en lenguaje natural fundiendo "
+             "similitud vectorial (ChromaDB) con BM25 léxico. Mantiene el corpus al día.",
         can=(
             "indexar el proyecto (código de todos los módulos, prompts, docs, "
-            "vault, README, CHANGELOG, harness/progress/ y harness/featureslist.json) en ChromaDB",
+            "vault, knowledge/, README, CHANGELOG, harness/progress/ y "
+            "harness/featureslist.json) en ChromaDB",
             "reindexar solo lo que cambió, y purgar del índice lo que se borró",
             "indexar URLs externas (documentación de librerías, tutoriales)",
-            "buscar en el índice con consultas en lenguaje natural",
+            "buscar en el índice con consultas en lenguaje natural, incluido el corpus (--file_type knowledge)",
             "devolver fragmentos relevantes con puntuación de similitud",
+            "mantener el corpus: verificar cada fuente de knowledge/sources.json contra arXiv "
+            "y detectar papers nuevos (refrescar)",
+            "descargar papers nuevos a knowledge/papers/ y actualizar knowledge/sources.json "
+            "al refrescar sin --dry-run",
         ),
         cannot=(
             "construir o modificar el grafo graphify → knowledge",
-            "buscar papers académicos nuevos → research",
-            "ejecutar código ni modificar archivos del proyecto",
+            "buscar papers académicos nuevos para el estado del arte → research",
+            "ejecutar código arbitrario ni modificar código del proyecto",
+            "escribir fuera de knowledge/papers/, knowledge/sources.json y .rag-index/",
         ),
-        needs=("que exista un índice (ejecutar 'rag index' primero)",),
-        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored)",),
+        needs=(
+            "que exista un índice (ejecutar 'rag index' primero)",
+            "red para refresh; sin ella el mantenimiento falla de forma controlada",
+        ),
+        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored); knowledge/papers/ y "
+              "knowledge/sources.json (registro de fuentes del corpus)",
+              ),
         collaborates=("knowledge", "doc", "plan"),
     ),
     "research": Contract(

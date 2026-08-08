@@ -160,6 +160,21 @@
       ],
       "status": "pending",
       "depends_on": ["MODEL-001"]
+    }{% endif %}{% if use_rag %},
+    {
+      "id": "KNOW-001",
+      "title": "Corpus de conocimiento al día",
+      "description": "Mantener el corpus de conocimiento profundo (knowledge/) vigente: verificar que las fuentes de sources.json siguen siendo útiles y descargar los papers nuevos relevantes que aparezcan. El corpus es lo que consulta el líder para aconsejar con fundamento — si se queda viejo, el consejo se queda viejo. El agente rag lo ejecuta; el dry-run primero, la descarga después.",
+      "acceptance_criteria": [
+        "uv run python -m agents --json run rag refresh --dry-run devuelve success=true con un informe: papers nuevos detectados y estado de cada fuente",
+        "Cada fuente de knowledge/sources.json queda marcada como vigente o superada con su motivo escrito (versión más reciente en arXiv, reemplazada por un paper nuevo, o caída)",
+        "Todo paper nuevo relevante queda en knowledge/papers/ en markdown (HTML de arXiv o PDF convertido) e indexado en el RAG",
+        "uv run python -m agents --json run rag search --query \"<tema del corpus>\" --file_type knowledge encuentra contenido indexado",
+        "knowledge/sources.json tiene actualizada la fecha de última verificación",
+        "./init.sh termina con ENTORNO LISTO"
+      ],
+      "status": "pending",
+      "depends_on": []
     }{% endif %}
   ]
 }

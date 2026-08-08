@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "updated": "2026-08-08",
+  "comment": "Registro de fuentes del corpus de conocimiento (knowledge/). Lo lee 'rag refresh': por cada topic consulta arXiv con las queries y verifica que cada fuente activa no haya sido superada (versión más reciente). Solo se listan fuentes con arXiv ID verificado; el resto de temas se cubren con queries (sources vacío).",
+  "topics": [
+    {
+      "topic": "pca-svd",
+      "queries": ["singular value decomposition", "principal component analysis"],
+      "sources": [
+        {"arxiv_id": "1404.1100", "title": "A Tutorial on Principal Component Analysis", "version": 1, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "randomized-svd",
+      "queries": ["randomized singular value decomposition", "low-rank matrix approximation"],
+      "sources": [
+        {"arxiv_id": "0909.4061", "title": "Finding Structure with Randomness: Probabilistic Algorithms for Constructing Approximate Matrix Decompositions", "version": 2, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "optimizadores",
+      "queries": ["adam optimizer stochastic gradient", "adaptive learning rate optimization"],
+      "sources": [
+        {"arxiv_id": "1412.6980", "title": "Adam: A Method for Stochastic Optimization", "version": 9, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "transformers",
+      "queries": ["transformer attention", "self-attention sequence models"],
+      "sources": [
+        {"arxiv_id": "1706.03762", "title": "Attention Is All You Need", "version": 7, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "residual-networks",
+      "queries": ["deep residual learning", "residual networks image recognition"],
+      "sources": [
+        {"arxiv_id": "1512.03385", "title": "Deep Residual Learning for Image Recognition", "version": 1, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "boosting",
+      "queries": ["gradient boosting decision trees", "gradient boosting categorical features"],
+      "sources": [
+        {"arxiv_id": "1603.02754", "title": "XGBoost: A Scalable Tree Boosting System", "version": 3, "status": "activa", "last_checked": "2026-08-08"},
+        {"arxiv_id": "1706.09516", "title": "CatBoost: Unbiased Boosting with Categorical Features", "version": 5, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "clustering",
+      "queries": ["spectral clustering", "gaussian mixture model expectation maximization"],
+      "sources": [
+        {"arxiv_id": "0711.0189", "title": "A Tutorial on Spectral Clustering", "version": 1, "status": "activa", "last_checked": "2026-08-08"}
+      ]
+    },
+    {
+      "topic": "estadistica",
+      "queries": ["bootstrap confidence intervals", "multiple hypothesis testing false discovery rate"],
+      "sources": []
+    },
+    {
+      "topic": "probabilidad",
+      "queries": ["maximum likelihood estimation", "bayesian conjugate priors"],
+      "sources": []
+    },
+    {
+      "topic": "causalidad",
+      "queries": ["causal inference do-calculus", "causal discovery directed acyclic graphs"],
+      "sources": []
+    },
+    {
+      "topic": "hiperparametros",
+      "queries": ["bayesian optimization hyperparameter tuning", "random search hyperparameter optimization"],
+      "sources": []
+    },
+    {
+      "topic": "validacion",
+      "queries": ["nested cross-validation model selection", "data leakage machine learning evaluation"],
+      "sources": []
+    },
+    {
+      "topic": "metricas",
+      "queries": ["model calibration brier score", "precision recall imbalanced classification"],
+      "sources": []
+    },
+    {
+      "topic": "interpretabilidad",
+      "queries": ["shapley values feature importance", "model interpretation explainability"],
+      "sources": []
+    },
+    {
+      "topic": "ingenieria-features",
+      "queries": ["target encoding leakage", "feature selection high dimensional data"],
+      "sources": []
+    },
+    {
+      "topic": "fairness",
+      "queries": ["algorithmic fairness metrics", "fair machine learning equalized odds"],
+      "sources": []
+    },
+    {
+      "topic": "seguridad-ml",
+      "queries": ["adversarial examples deep learning", "prompt injection large language models"],
+      "sources": []
+    },
+    {
+      "topic": "serving-ml",
+      "queries": ["model serving latency batching", "mlops machine learning operations"],
+      "sources": []
+    },
+    {
+      "topic": "deuda-tecnica",
+      "queries": ["machine learning technical debt", "antipatterns ai-based systems"],
+      "sources": []
+    },
+    {
+      "topic": "calidad-datos",
+      "queries": ["data quality data contracts", "data validation machine learning pipelines"],
+      "sources": []
+    },
+    {
+      "topic": "teoria-informacion",
+      "queries": ["information theory entropy mutual information", "kl divergence cross entropy"],
+      "sources": []
+    },
+    {
+      "topic": "llms",
+      "queries": ["large language models retrieval augmented generation", "prompt engineering evaluation llm"],
+      "sources": []
+    },
+    {
+      "topic": "testing-ml",
+      "queries": ["machine learning testing ml test score", "testing machine learning pipelines"],
+      "sources": []
+    },
+    {
+      "topic": "series-temporales",
+      "queries": ["time series forecasting arima", "walk-forward validation backtesting forecasting"],
+      "sources": []
+    },
+    {
+      "topic": "ingenieria-datos",
+      "queries": ["sql duckdb data manipulation", "pandas performance memory optimization"],
+      "sources": []
+    },
+    {
+      "topic": "mlops-ciclo-vida",
+      "queries": ["mlops model lifecycle retraining", "model drift monitoring retraining policy"],
+      "sources": []
+    },
+    {
+      "topic": "diseno-experimentos",
+      "queries": ["ab testing power analysis sample size", "sequential testing alpha spending cuped"],
+      "sources": []
+    },
+    {
+      "topic": "uplift-causal",
+      "queries": ["uplift modeling heterogeneous treatment effects", "causal machine learning metalearners"],
+      "sources": []
+    },
+    {
+      "topic": "recomendacion",
+      "queries": ["collaborative filtering matrix factorization", "recommender systems two tower retrieval"],
+      "sources": []
+    },
+    {
+      "topic": "visualizacion",
+      "queries": ["data visualization honest charts perception", "chart design statistical graphics"],
+      "sources": []
+    },
+    {
+      "topic": "incertidumbre",
+      "queries": ["conformal prediction uncertainty quantification", "model calibration uncertainty deep learning"],
+      "sources": []
+    },
+    {
+      "topic": "privacidad-datos",
+      "queries": ["data privacy machine learning leakage", "differential privacy gdpr"],
+      "sources": []
+    },
+    {
+      "topic": "gestion-riesgo",
+      "queries": ["machine learning risk management framework", "ai risk assessment mitigation"],
+      "sources": []
+    },
+    {
+      "topic": "modelos-bayesianos",
+      "queries": ["bayesian modeling mcmc hamiltionian", "hierarchical bayesian models glms"],
+      "sources": []
+    },
+    {
+      "topic": "deteccion-anomalias",
+      "queries": ["anomaly detection isolation forest", "novelty detection outlier machine learning"],
+      "sources": []
+    },
+    {
+      "topic": "compresion-modelos",
+      "queries": ["model quantization int8 post training", "knowledge distillation pruning neural networks"],
+      "sources": []
+    },
+    {
+      "topic": "ci-cd",
+      "queries": ["machine learning ci cd pipeline", "github actions mlops workflow"],
+      "sources": []
+    }
+  ]
+}
