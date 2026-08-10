@@ -50,6 +50,7 @@ class GitAgent(BaseAgent):
             "commit_with_changelog": ["commit", "confirma", "guarda los cambios", "haz commit"],
             "suggest_commit_message": ["sugiere", "sugerir", "mensaje", "propon un mensaje"],
             "commit_feature": ["cierra la feature", "cerrar feature", "commit de la feature", "feature lista"],
+            "commit_atomic": ["separa", "dividir", "commits atomicos", "split", "separar en commits"],
             "tag_release": ["tag", "etiqueta", "version", "versión", "release", "publica", "lanzamiento"],
         }
 
@@ -63,6 +64,7 @@ class GitAgent(BaseAgent):
             "detect_breaking_changes": self.detect_breaking_changes,
             "prepare_pr_summary": self.prepare_pr_summary,
             "commit_with_changelog": self.commit_with_changelog,
+            "commit_atomic": self.commit_atomic,
             "commit_feature": self.commit_feature,
             "tag_release": self.tag_release,
             "create_branch": self.create_branch,
@@ -322,6 +324,97 @@ class GitAgent(BaseAgent):
             True, self.name, "commit_with_changelog",
             f"Commit creado: '{message}'{extras_str}",
             data={"stdout": commit_result.stdout, "changelog_updated": bool(changelog_result.success and changelog_result.data)},
+            warnings=warnings,
+        )
+
+    def commit_atomic(self, *, dry_run: bool = False, subjects: str | None = None) -> AgentResult:
+        """
+        Divide los cambios sin commitear en commits atómicos por área.
+
+        Los lock files (`uv.lock`, `package-lock.json`...) no entran en ningún
+        commit — se reportan aparte. El plan se ordena por dependencias (código
+        antes que tests, tests antes que docs). Si un área temprana depende de
+        una tardía (ciclo), el plan se RECHAZA antes de escribir nada y se
+        sugiere commitear a mano.
+
+        Con `dry_run=True` solo propone el plan (y nunca pide permiso, como
+        toda propuesta). Sin dry-run commitea cada grupo en orden — la puerta
+        de permisos pide confirmación porque escribe en el historial git.
+
+        `subjects` es opcional: mensajes Conventional separados por `;`, uno
+        por grupo, en orden. Sin él se generan mensajes placeholder (`feat:
+        actualiza ...`) que hay que revisar.
+        """
+        guard = self._guard_repo("commit_atomic")
+        if guard:
+            return guard
+
+        changed = [path for _, path in self.git.status_porcelain()]
+        if not changed:
+            return AgentResult(True, self.name, "commit_atomic", "No hay cambios que commitear.", data={"groups": []})
+
+        plan = GitTool.plan_atomic(changed, self.ctx.root)
+        if plan["cycle"]:
+            return AgentResult(
+                False, self.name, "commit_atomic",
+                f"Plan rechazado antes de escribir nada: {plan['cycle']}",
+                data={"plan": plan},
+            )
+
+        groups = plan["groups"]
+        if not groups:
+            return AgentResult(
+                True, self.name, "commit_atomic",
+                "Solo hay lock files — no se genera ningún commit atómico.",
+                data={"groups": [], "excluded": plan["excluded"]},
+            )
+
+        subs = [s.strip() for s in subjects.split(";")] if subjects else []
+        for i, group in enumerate(groups):
+            provided = subs[i] if i < len(subs) and subs[i] else None
+            if provided:
+                if not GitTool.parse_conventional_commit(provided):
+                    return AgentResult(
+                        False, self.name, "commit_atomic",
+                        f"El mensaje {i + 1} '{provided}' no es Conventional Commits.",
+                        needs=[f"Proporciona un mensaje Conventional para el grupo '{group['area']}' (--subjects)."],
+                    )
+                group["message"] = provided
+            else:
+                preview = ", ".join(group["files"][:2]) + (f" y {len(group['files']) - 2} más" if len(group["files"]) > 2 else "")
+                group["message"] = f"{group['type']}: actualiza {preview}"
+
+        if dry_run:
+            return AgentResult(
+                True, self.name, "commit_atomic",
+                f"{len(groups)} commit(s) atómico(s) propuesto(s) — nada escrito.",
+                data={"groups": groups, "excluded": plan["excluded"]},
+                warnings=[
+                    "Los subjects por defecto son placeholders — pasa --subjects "
+                    "'feat: ...; test: ...; docs: ...' (uno por grupo, en orden) para controlarlos.",
+                ],
+            )
+
+        warnings: list[str] = []
+        if plan["excluded"]:
+            warnings.append(f"Lock files fuera del plan: {', '.join(plan['excluded'])}")
+
+        created: list[dict] = []
+        for group in groups:
+            add = self.git.add(*group["files"])
+            if not add.ok:
+                warnings.append(f"'git add' falló para {group['files']}: {add.stderr.strip()}")
+                continue
+            commit_result = self.git.commit_paths(group["message"], group["files"])
+            if not commit_result.ok:
+                warnings.append(f"'git commit' falló: {commit_result.stderr.strip()}")
+                continue
+            created.append({"area": group["area"], "message": group["message"]})
+
+        return AgentResult(
+            True, self.name, "commit_atomic",
+            f"{len(created)}/{len(groups)} commit(s) atómico(s) creado(s).",
+            data={"created": created, "excluded": plan["excluded"]},
             warnings=warnings,
         )
 

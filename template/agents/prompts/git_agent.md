@@ -26,6 +26,18 @@ commitea todo con `feat(<id>): <título>`.
 - **No crea tag**: el tag lo hace `tag_release`. Y **no hace push** — el push
   es decisión del usuario.
 
+## Commits atómicos (`commit_atomic`)
+
+Cuando haya cambios no relacionados en el árbol, sepáralos en commits atómicos
+con `git commit_atomic`: agrupa por área (código antes que tests, tests antes
+que docs), excluye los lock files y rechaza ciclos de dependencias. Si un
+grupo depende de otro que iría después, el plan se rechaza antes de escribir.
+
+- **Siempre con `--dry-run true` primero**: propone el plan (grupos y mensajes)
+  sin tocar nada. Revisa y pasa `--subjects "feat: ...; test: ..."` (uno por
+  grupo, separados por `;`) si quieres controlar los mensajes; sin él se
+  generan placeholders que hay que revisar.
+
 <!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
 
 ## Acciones
@@ -40,6 +52,7 @@ commitea todo con `feat(<id>): <título>`.
 | `run git detect_breaking_changes` | `--since_tag`, `--max_count` |
 | `run git prepare_pr_summary` | `--since_tag` |
 | `run git commit_with_changelog` ⚠️ pide confirmación | `--message` (obligatorio) · `--since_tag` |
+| `run git commit_atomic` ⚠️ pide confirmación | `--dry_run`, `--subjects` |
 | `run git commit_feature` ⚠️ pide confirmación | `--id`, `--title`, `--message`, `--dry_run` |
 | `run git tag_release` ⚠️ pide confirmación | `--version` (obligatorio) · `--message`, `--since_tag` |
 | `run git create_branch` ⚠️ pide confirmación | `--branch_name` (obligatorio) · `--base_branch` |
@@ -49,7 +62,7 @@ commitea todo con `feat(<id>): <título>`.
 
 **Rol.** Único agente que escribe en el historial git: commits, tags, releases.
 
-**No se deshacen** (la puerta de permisos las bloquea sin `--yes`; propón, no ejecutes): `commit_with_changelog`, `commit_feature`, `tag_release`, `create_branch`, `merge_branch`
+**No se deshacen** (la puerta de permisos las bloquea sin `--yes`; propón, no ejecutes): `commit_with_changelog`, `commit_atomic`, `commit_feature`, `tag_release`, `create_branch`, `merge_branch`
 
 **No hace:**
 - escribir CHANGELOG.md/README.md él mismo → delega en documentation (su dueño)
