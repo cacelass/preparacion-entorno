@@ -202,6 +202,26 @@
       "topic": "ci-cd",
       "queries": ["machine learning ci cd pipeline", "github actions mlops workflow"],
       "sources": []
+    },
+    {
+      "topic": "reinforcement-learning",
+      "queries": ["reinforcement learning policy gradient ppo", "deep q-network double dqn", "reward shaping sparse rewards"],
+      "sources": []
+    },
+    {
+      "topic": "metaheuristica",
+      "queries": ["genetic algorithm combinatorial optimization", "simulated annealing local search", "evolutionary algorithms black-box optimization"],
+      "sources": []
+    },
+    {
+      "topic": "modelos-fundacionales",
+      "queries": ["foundation models pretraining scaling", "lora parameter efficient fine-tuning", "llm evaluation benchmarks contamination"],
+      "sources": []
+    },
+    {
+      "topic": "guardarrailes",
+      "queries": ["guardrails large language models safety", "llm red teaming jailbreak", "prompt injection defense"],
+      "sources": []
     }
   ]
 }

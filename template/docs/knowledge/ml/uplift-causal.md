@@ -15,7 +15,7 @@ quién mando la campaña, a quién le subo el precio, a qué paciente trato. Un
 modelo predictivo de respuesta contesta otra cosa (¿quién compra?), no la
 decisión de tratar.
 
-## Recapitulación: contrafactuales (ver `causalidad.md`)
+## Recapitulación: contrafactuales (ver `matematicas/causalidad.md`)
 
 El problema fundamental de la inferencia causal: para cada unidad solo
 observamos uno de los dos mundos posibles, $Y_i(1)$ (tratada) o $Y_i(0)$

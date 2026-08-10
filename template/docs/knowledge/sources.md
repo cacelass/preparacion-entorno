@@ -25,9 +25,10 @@ y se convirtieron con `markitdown` para extraer fórmulas exactas). La fecha de
 ## Temas cubiertos por queries (sin fuente fija)
 
 Estadística, probabilidad, causalidad, hiperparámetros, validación, métricas,
-interpretabilidad, features, fairness, seguridad, serving, deuda técnica y
-calidad de datos se mantienen consultando arXiv con las queries de
-`sources.json` — la literatura cambia y es mejor verificar por tema que
+interpretabilidad, features, fairness, seguridad, serving, deuda técnica,
+calidad de datos, aprendizaje por refuerzo, metaheurísticas, modelos
+fundacionales y guardarraíles se mantienen consultando arXiv con las queries
+de `sources.json` — la literatura cambia y es mejor verificar por tema que
 clavar una fuente.
 
 ## Cómo mantenerlo

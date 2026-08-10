@@ -13,7 +13,7 @@ Cadena de pasos, en orden:
 1. **Hipótesis** — efecto esperado, dirección y magnitud, población objetivo.
    Sin hipótesis el experimento no tiene respuesta de "sí/no".
 2. **Métrica primaria** — una sola métrica preespecificada que decide. Las
-   demás van como guardrails o secundarias.
+   demás van como guardarraíles o secundarias.
 3. **Power analysis** — fijar $\alpha$, $\beta$ (potencia $1-\beta$) y el
    efecto mínimo detectable.
 4. **Tamaño de muestra** — $n$ por brazo calculado con la unidad de
@@ -21,7 +21,7 @@ Cadena de pasos, en orden:
 5. **Unidad de aleatorización** — usuario, sesión, dispositivo o clúster.
 6. **Análisis** — preespecificado: estimador, corrección de multiplicidad,
    regla de parada.
-7. **Decisión** — lanzar / rechazar / iterar, según primaria y guardrails.
+7. **Decisión** — lanzar / rechazar / iterar, según primaria y guardarraíles.
 
 Qué falla cuando se salta un paso:
 
@@ -149,13 +149,13 @@ Implicaciones:
 
 - Calcular $n$ en clústeres, no en usuarios, o el diseño sale subpotenciado.
 - La rampa de despliegue se hace por oleadas de clústeres o de porcentaje de
-  usuarios, monitoreando guardrails antes de escalar. Cada escalón es una
+  usuarios, monitoreando guardarraíles antes de escalar. Cada escalón es una
   decisión y debe estar planificada: rampar sin regla es peeking a escala de
   despliegue.
 
 ## Múltiples métricas y multiplicidad
 
-- **Guardrails**: métricas que no deben degradarse (latencia, churn,
+- **Guardarraíles**: métricas que no deben degradarse (latencia, churn,
   ingresos). No deciden el lanzamiento, lo bloquean.
 - **Primaria**: la que decide. **Secundarias**: hipótesis para el siguiente
   experimento, exploración declarada como tal.
@@ -164,7 +164,7 @@ Cada métrica adicional infla el error tipo I conjunto. Con $m$ métricas
 independientes, la probabilidad de al menos un falso positivo es
 $1 - (1-\alpha)^m$: con 10 métricas y $\alpha = 0.05$, ~40 % de "significativo"
 falso. Corrección: controlar el FDR con Benjamini–Hochberg (ver
-`estadistica.md`), declarando $m$ de antemano.
+`matematicas/estadistica.md`), declarando $m$ de antemano.
 
 El peligro de "hacer 100 métricas y quedarse con las 3 que dieron" no es
 descubrimiento, es selección de ruido: esas 3 son, con alta probabilidad,
@@ -184,7 +184,7 @@ de negocio es de largo (retención, LTV). Un proxy imperfecto:
   primera respuesta.
 
 El experimento es la **única vía causal limpia** para estimar el efecto de una
-intervención (ver `causalidad.md`): la aleatorización rompe los confusores. Sin
+intervención (ver `matematicas/causalidad.md`): la aleatorización rompe los confusores. Sin
 aleatorización, las comparaciones pre/post o tratado/control observacionales
 están contaminadas por selección y tendencia temporal.
 
@@ -201,7 +201,7 @@ están contaminadas por selección y tendencia temporal.
 Alternativas observacionales (con limitaciones severas): diferencias en
 diferencias, regression discontinuity, variables instrumentales, matching y
 ponderación por propensión. Todas dependen de supuestos de identificación que
-no se pueden verificar en los datos — ver `causalidad.md`. Sirven como
+no se pueden verificar en los datos — ver `matematicas/causalidad.md`. Sirven como
 evidencia para una decisión, no como estimación de un efecto con el estatus de
 un experimento.
 

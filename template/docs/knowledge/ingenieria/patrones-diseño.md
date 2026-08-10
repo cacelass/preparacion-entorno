@@ -415,7 +415,7 @@ queda huérfana.
 
 | Anti-patrón | Síntoma | Contramedida |
 |-------------|---------|--------------|
-| Glue code | Scripts que solo encadenan llamadas | Encapsular cada etapa (ver `deuda-tecnica.md`) |
+| Glue code | Scripts que solo encadenan llamadas | Encapsular cada etapa (ver `ml/deuda-tecnica.md`) |
 | Pipeline jungle | DAG de transformaciones disperso | Etapas deterministas con fronteras explícitas |
 | God object | Un `config.py` o `utils.py` que lo sabe todo | Una responsabilidad por módulo |
 | Config drift | El código dice una cosa y la config otra | Config como dato + validación en arranque |

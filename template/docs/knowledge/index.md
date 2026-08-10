@@ -62,6 +62,10 @@ regularización, arquitectura de red, serving, exprimir el modelo...), el
 | `ml/modelos-bayesianos.md` | Siempre — modelado bayesiano aplicado: MCMC/HMC, GLMs, jerárquicos |
 | `ml/deteccion-anomalias.md` | Siempre — outlier vs novelty, Isolation Forest, LOF, evaluación |
 | `ml/compresion-modelos.md` | Siempre — cuantización, destilación, pruning (bloque `redes_neuronales`) |
+| `ml/reinforcement-learning.md` | Problema secuencial con recompensa — MDP, DQN/PPO/SAC, reward design, evaluación |
+| `ml/metaheuristica.md` | Optimización no diferenciable o combinatoria — GA, recocido simulado, búsqueda |
+| `ml/modelos-fundacionales.md` | Siempre (bloque LLM/FM) — pre-training, adaptación (LoRA), evaluación, coste |
+| `ml/guardarraíles.md` | FM/LLM expuestos — capas de contención: entrada, filtros, acciones, red teaming |
 
 ## Ingeniería
 

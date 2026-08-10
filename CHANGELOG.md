@@ -7,6 +7,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [No publicado]
 
+### OMP-006: corpus de conocimiento ampliado
+
+Nuevos ficheros de teoría profunda en `docs/knowledge/ml/`:
+- `reinforcement-learning.md` — MDP, value/policy iteration, DQN/PPO/SAC,
+  off/on-policy, reward design, sample efficiency y evaluación.
+- `metaheuristica.md` — algoritmos genéticos, recocido simulado, búsqueda
+  local/global; cuándo frente a gradiente y Bayesian optimization.
+- `modelos-fundacionales.md` — pre-training, adaptación (prompt→RAG→LoRA→full
+  FT), scaling laws, evaluación y coste de FMs.
+- `guardarraíles.md` — capas de contención para modelos generativos expuestos
+  (entrada, filtros, acciones limitadas, red teaming, monitoreo).
+
+`fairness-y-seguridad.md` y `diseno-experimentos.md` quedan con la ortografía
+corregida ("guardarraíles") y `fairness-y-seguridad.md` referencia al fichero
+nuevo en lugar de duplicar la sección. `index.md`, `sources.md` y
+`sources.json` registran los nuevos ficheros y topics (41 topics), y se
+corrigieron referencias cruzadas rotas entre ficheros del corpus.
+
 ### Documentación unificada bajo `docs/`
 
 `vault/` (bóveda Obsidian) y `knowledge/` (corpus de conocimiento profundo) se

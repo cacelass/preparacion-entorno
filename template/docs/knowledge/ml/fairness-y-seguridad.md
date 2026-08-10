@@ -143,6 +143,14 @@ La defensa de fondo no es detectar la inyección (las listas de patrones se
 esquivan): es que las acciones irreversibles pidan confirmación de todos
 modos, con la puerta de permisos en código (ver `AGENTS.md`).
 
+## Guardarraíles para modelos generativos
+
+Las capas que contienen el daño cuando un modelo generativo está expuesto
+(entrada hostil, filtros de salida, acciones limitadas, red teaming y
+monitoreo) están en `guardarraíles.md`. El principio que las sostiene: **el
+modelo propone, el sistema decide** — la defensa es la puerta de permisos en
+código, no un prompt que "lo hace seguro".
+
 ## Secretos
 
 Nunca loguear secretos: los logs son texto plano y viajan. No commitear

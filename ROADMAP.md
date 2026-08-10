@@ -6,6 +6,27 @@ del `lider`: primero al backlog, después se implementa con TDD y evidencia.
 
 ## Pendientes
 
+### OMP-006 — Corpus: RL, metaheurísticas, modelos fundacionales y guardarraíles
+
+Ampliar `docs/knowledge/` con los huecos de teoría profunda que el `lider` no
+puede improvisar: aprendizaje por refuerzo, algoritmos genéticos / metaheurísticas
+/ búsqueda, y modelos fundacionales (más allá de `llms-aplicados.md`). Añadir
+nuevo fichero `ml/guardarraíles.md`.
+
+**Criterios**
+- `ml/reinforcement-learning.md`: MDP, value/policy iteration, DQN/PPO/SAC,
+  off/on-policy, reward shaping, evaluación y su "cómo se rompe"
+- `ml/metaheuristica.md`: algoritmos genéticos, recocido simulado, búsqueda
+  local/global; cuándo usar frente a optimización basada en gradiente
+- `ml/modelos-fundacionales.md`: pre-training, adapters, destilación,
+  evaluación y coste de FMs — complementa, no duplica, a `llms-aplicados.md`
+- `ml/guardarraíles.md`: capas de contención (frontera de entrada, filtros de
+  salida, acciones limitadas, red teaming, monitoreo) — y referencia desde
+  `fairness-y-seguridad.md`
+- `docs/knowledge/index.md`, `sources.md` y `sources.json` registran los nuevos
+  ficheros y sus topics/queries
+- El RAG indexa los ficheros nuevos como `file_type: knowledge`
+
 ### OMP-001 — Git: split atómico de commits
 
 `git` agent separa cambios no relacionados en commits atómicos ordenados
@@ -101,3 +122,4 @@ descartan y por qué.
 | OMP-004 | Review: severidad y confianza | ✅ 6 tests |
 | OMP-005 | RAG: extractores site-aware | ✅ 14 tests |
 | DOC-002 | Lecciones de los videos y de omp.sh en memory.md | ✅ memory.md |
+| OMP-006 | Corpus: RL, metaheurísticas, modelos fundacionales y guardarraíles | ✅ 4 ficheros + refs corregidas + sources.json |

@@ -2,7 +2,7 @@
 
 Qué hace un modelo y por qué, con métodos específicos, agnósticos, globales y
 locales; qué puede y qué no puede afirmar cada uno, y qué reportar. Complementa
-a `causalidad.md`: aquí la pregunta es sobre el modelo, allá sobre el mecanismo
+a `matematicas/causalidad.md`: aquí la pregunta es sobre el modelo, allá sobre el mecanismo
 que genera los datos.
 
 ## Por qué interpretar
@@ -20,7 +20,7 @@ que genera los datos.
   ganancia— mide contribución a la predicción *dentro del modelo* bajo la
   distribución de entrenamiento. Con correlaciones, el crédito se reparte de
   forma arbitraria y sensible al método; no mide efectos causales. Ver
-  `causalidad.md`: explicar el modelo no identifica intervenciones.
+  `matematicas/causalidad.md`: explicar el modelo no identifica intervenciones.
 
 ## Específicos del modelo
 
@@ -296,7 +296,7 @@ clase positiva; en multiclase, los valores se promedian en valor absoluto.
 Reglas de lectura: interpreta el *conjunto* de features (con correlaciones, el
 reparto individual es inestable); la dirección importa (una feature con $\phi_j$
 medios ~0 no mueve la predicción aunque la barra la muestre); y nunca leas
-causalidad de estos plots — véase `causalidad.md`.
+causalidad de estos plots — véase `matematicas/causalidad.md`.
 {% endif %}
 
 ## Fuentes
