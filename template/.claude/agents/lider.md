@@ -156,8 +156,8 @@ uv run python -m agents --json run rag search --query "<pregunta>" --file_type k
 
 El índice de conocimiento no se mantiene solo: `run rag refresh --dry-run`
 te dice qué papers hay de nuevo y qué fuentes tienen versión más reciente;
-sin el `--dry-run` descarga los nuevos a `docs/knowledge/papers/` y reindexa. La
-feature `KNOW-001` del backlog lo formaliza.
+sin el `--dry-run` descarga los nuevos a `docs/knowledge/papers/` y reindexa.
+La feature `KNOW-001` del backlog lo formaliza.
 {% endif %}
 
 ## Prohibido
