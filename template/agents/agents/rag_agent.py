@@ -17,10 +17,10 @@ from agents.tools.rest_tool import RestTool
 class RagAgent(BaseAgent):
     name = "rag"
     description = (
-        "RAG local: indexa código, prompts, docs, vault y el corpus de "
-        "conocimiento profundo (knowledge/) con ChromaDB. Busca en lenguaje "
-        "natural fundiendo vector y BM25 léxico, indexa URLs externas y "
-        "mantiene al día el corpus (rag refresh)."
+        "RAG local: indexa código, prompts, docs/ (incl. vault y corpus) y el "
+        "corpus de conocimiento profundo (docs/knowledge/) con ChromaDB. Busca "
+        "en lenguaje natural fundiendo vector y BM25 léxico, indexa URLs "
+        "externas y mantiene al día el corpus (rag refresh)."
     )
     capabilities = [
         "rag", "semantico", "semantic", "indexar", "index",
@@ -86,8 +86,15 @@ class RagAgent(BaseAgent):
         errors = []
         for url in urls:
             try:
+                from agents.tools.site_extractors import extract, site_kind
+
                 resp = RestTool.get(url, timeout=30)
-                result = RagTool.index_url(self.ctx.root, url, resp.text)
+                contenido = resp.text
+                if site_kind(url):
+                    extraido = extract(url, contenido)
+                    if extraido and extraido.strip():
+                        contenido = extraido
+                result = RagTool.index_url(self.ctx.root, url, contenido)
                 if "error" in result:
                     errors.append({"url": url, "error": result["error"]})
                 else:
@@ -249,18 +256,23 @@ class RagAgent(BaseAgent):
         )
 
     def refresh(self, *, dry_run: bool = False, months: int = 6, max_new: int = 3,
-                topics: str | list[str] | None = None) -> AgentResult:
+                topics: str | list[str] | None = None,
+                from_objective: bool = False) -> AgentResult:
         """
-        Mantiene el corpus de conocimiento (knowledge/): verifica que las
+        Mantiene el corpus de conocimiento (docs/knowledge/): verifica que las
         fuentes de `sources.json` siguen vigentes en arXiv y detecta papers
         nuevos por topic.
 
         `dry_run=True` (recomendado primero) no escribe nada: devuelve el
         informe con los papers nuevos y las fuentes superadas. Sin dry-run
-        descarga los nuevos a `knowledge/papers/<tema>/<id>.md` (HTML de arXiv
-        o PDF→markitdown), actualiza `sources.json` y reindexa el corpus.
+        descarga los nuevos a `docs/knowledge/papers/<tema>/<id>.md` (HTML de
+        arXiv o PDF→markitdown), actualiza `sources.json` y reindexa el corpus.
 
         `topics` filtra por nombre de topic (coma-separados desde la CLI).
+        `from_objective` lee `references/00-objetivo.md` (SCOPE-001) e incluye
+        su pregunta como contexto en el informe para que el `lider` derive
+        topics desde el objetivo del proyecto; si el fichero no existe, avisa
+        y sigue con los topics del registro. No deriva topics por su cuenta.
         """
         from agents.tools.knowledge_tool import KnowledgeTool
 
@@ -287,7 +299,7 @@ class RagAgent(BaseAgent):
             reindex = informe.get("reindex")
             mensaje = (
                 f"Corpus actualizado: {descargados} paper(s) descargado(s) a "
-                f"knowledge/papers/, {len(nuevos)} detectado(s), "
+                f"docs/knowledge/papers/, {len(nuevos)} detectado(s), "
                 f"{len(superadas)} fuente(s) marcada(s) como superadas."
             )
             if reindex:
@@ -299,6 +311,25 @@ class RagAgent(BaseAgent):
                 mensaje += " No se pudo reindexar (chromadb ausente): ejecuta 'make index-rag'."
 
         avisos = []
+        if from_objective:
+            objetivo = self.ctx.root / "references" / "00-objetivo.md"
+            texto = ""
+            if objetivo.exists():
+                try:
+                    texto = objetivo.read_text(encoding="utf-8", errors="replace")[:1200]
+                except OSError:
+                    texto = ""
+            if texto.strip():
+                informe["objective"] = texto
+                avisos.append(
+                    "Objetivo (SCOPE-001) incluido como contexto del refresh. "
+                    "Deriva topics de él y repite con --topics \"t1,t2\" para acotar."
+                )
+            else:
+                avisos.append(
+                    "No existe references/00-objetivo.md con contenido (SCOPE-001 sin "
+                    "cerrar): el refresh usa solo los topics de sources.json."
+                )
         if superadas:
             avisos.append(
                 "Fuente(s) con versión más reciente en arXiv: "

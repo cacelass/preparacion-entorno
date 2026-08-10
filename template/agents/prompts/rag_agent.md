@@ -13,8 +13,9 @@ solo no la ve.
 
 ### `index` — Construye/actualiza el índice
 Escanea el paquete principal, `api/`, `chat/`, `monitoring/`, `tuning/`,
-`agents/`, los prompts, `docs/`, `vault/`, `harness/progress/`, `harness/featureslist.json`,
-README, AGENTS.md y CHANGELOG.md.
+`agents/`, los prompts, `docs/` (fichas raíz, `docs/source/` de Sphinx, el
+vault `docs/vault/` y el corpus `docs/knowledge/`), `harness/progress/`,
+`harness/featureslist.json`, README, AGENTS.md y CHANGELOG.md.
 
 Incremental **por fichero y por huella de contenido**: lo que no ha cambiado no
 se vuelve a embeber, lo que cambió se reemplaza y lo que se borró desaparece del
@@ -39,9 +40,15 @@ según qué rama lo encontró).
 
 ### `index_urls` — Indexa documentación externa
 El HTML se convierte a texto antes de indexar, y reindexar una URL **reemplaza**
-su contenido anterior en vez de duplicarlo.
+su contenido anterior en vez de duplicarlo. Para GitHub, Stack Overflow y arXiv
+se usa un extractor específico que devuelve markdown estructurado (título,
+secciones, bloques de código, enlaces) en vez de HTML plano — lo que el RAG
+puede citar sin perder la fuente.
 ```bash
 uv run python -m agents run rag index_urls --urls '["https://docs.pola.rs/api/python/stable/"]'
+uv run python -m agents run rag index_urls --urls '["https://github.com/cacelass/dskit"]'
+uv run python -m agents run rag index_urls --urls '["https://stackoverflow.com/questions/..."]'
+uv run python -m agents run rag index_urls --urls '["https://arxiv.org/abs/1412.6980"]'
 ```
 
 ### `status` — Estado del índice
@@ -87,7 +94,7 @@ buscar si detecta el desajuste.
 
 ## Límites
 
-**Rol.** RAG local: indexa código, prompts, docs, vault, la memoria del arnés y URLs externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) con BM25 léxico.
+**Rol.** RAG local: indexa código, prompts, docs/ (incl. vault y corpus de conocimiento), la memoria del arnés y URLs externas; busca en lenguaje natural fundiendo similitud vectorial (ChromaDB) con BM25 léxico.
 
 **No hace:**
 - construir o modificar el grafo graphify → knowledge

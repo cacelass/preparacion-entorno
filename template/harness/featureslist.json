@@ -164,13 +164,14 @@
     {
       "id": "KNOW-001",
       "title": "Corpus de conocimiento al día",
-      "description": "Mantener el corpus de conocimiento profundo (knowledge/) vigente: verificar que las fuentes de sources.json siguen siendo útiles y descargar los papers nuevos relevantes que aparezcan. El corpus es lo que consulta el líder para aconsejar con fundamento — si se queda viejo, el consejo se queda viejo. El agente rag lo ejecuta; el dry-run primero, la descarga después.",
+      "description": "Mantener el corpus de conocimiento profundo (docs/knowledge/) vigente: verificar que las fuentes de sources.json siguen siendo útiles y descargar los papers nuevos relevantes que aparezcan. El corpus es lo que consulta el líder para aconsejar con fundamento — si se queda viejo, el consejo se queda viejo. El agente rag lo ejecuta; el dry-run primero, la descarga después. El corpus debe crecer hacia la pregunta del proyecto: los topics derivados de references/00-objetivo.md (SCOPE-001) tienen prioridad sobre los genéricos del registro.",
       "acceptance_criteria": [
         "uv run python -m agents --json run rag refresh --dry-run devuelve success=true con un informe: papers nuevos detectados y estado de cada fuente",
-        "Cada fuente de knowledge/sources.json queda marcada como vigente o superada con su motivo escrito (versión más reciente en arXiv, reemplazada por un paper nuevo, o caída)",
-        "Todo paper nuevo relevante queda en knowledge/papers/ en markdown (HTML de arXiv o PDF convertido) e indexado en el RAG",
+        "Cada fuente de docs/knowledge/sources.json queda marcada como vigente o superada con su motivo escrito (versión más reciente en arXiv, reemplazada por un paper nuevo, o caída)",
+        "Todo paper nuevo relevante queda en docs/knowledge/papers/ en markdown (HTML de arXiv o PDF convertido) e indexado en el RAG",
         "uv run python -m agents --json run rag search --query \"<tema del corpus>\" --file_type knowledge encuentra contenido indexado",
-        "knowledge/sources.json tiene actualizada la fecha de última verificación",
+        "Los topics derivados de references/00-objetivo.md quedan reflejados en sources.json (o se documenta por escrito por qué no)",
+        "docs/knowledge/sources.json tiene actualizada la fecha de última verificación",
         "./init.sh termina con ENTORNO LISTO"
       ],
       "status": "pending",
