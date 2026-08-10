@@ -7,6 +7,61 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [No publicado]
 
+### Documentación unificada bajo `docs/`
+
+`vault/` (bóveda Obsidian) y `knowledge/` (corpus de conocimiento profundo) se
+mueven bajo `docs/`: `docs/vault/` y `docs/knowledge/`, junto a `docs/source/`
+(Sphinx) y `docs/prd.md`. Todos los agentes, el RAG, los prompts, `copier.yml`
+y la documentación apuntan a las rutas nuevas. El RAG indexa `docs/source`,
+`docs/vault` y `docs/knowledge` sin duplicarlos.
+
+- `knowledge_agent.setup_vault` crea ahora la bóveda en `docs/vault` por
+  defecto (antes `knowledge/` — un solo vault, no dos).
+- `rag refresh` gana `--from-objective`: si existe `references/00-objetivo.md`
+  (SCOPE-001), incluye su pregunta como contexto del informe para que el
+  `lider` derive topics desde el objetivo del proyecto. El patrón "el corpus
+  sigue al objetivo" queda documentado y `KNOW-001` lo formaliza.
+
+### OMP-001: commits atómicos en `git`
+
+Nueva acción `git commit_atomic`: divide los cambios sin commitear en commits
+atómicos por área (código antes que tests, tests antes que docs), excluye los
+lock files, valida mensajes Conventional y rechaza ciclos de dependencias antes
+de escribir. `--dry-run` propone el plan; sin él escribe en el historial y
+pide confirmación (puerta de permisos). Inspirado en `omp commit`.
+
+### OMP-002: edición y scoping de memoria
+
+`memory` gana `memory_edit` (update/forget/invalidate por id) y cada entrada
+lleva scope `global`/`per-proyecto` (por defecto per-proyecto; el banco es
+compartido, así que los subagentes heredan la memoria del padre). `note`,
+`search` y `status` soportan scope. Inspirado en mnemopi.
+
+### OMP-003: reglas derivadas de un fallo
+
+Patrón ttsr documentado en `AGENTS.md`: una regla derivada de un incidente solo
+se registra si se valida que habría disparado contra el historial — una regla
+que no habría saltado es ruido.
+
+### OMP-004: severidad y veredicto en `review`
+
+Cada hallazgo de `review_package`/`review_file` lleva `severity` (P0-P3) y
+`confidence` (high/medium/low), ordenados por severidad, con veredicto
+`correct`/`review`/`incorrect` (P0 bloquea). Inspirado en `/review` de omp.
+
+### OMP-005: extractores site-aware en `rag index_urls`
+
+GitHub (README raw), Stack Overflow (título + preguntas/respuestas con código
+y enlaces) y arXiv (reutiliza `knowledge_tool`) se indexan con markdown
+estructurado en vez de HTML plano. Sin dependencias nuevas (stdlib). El resto
+de URLs siguen por el convertidor genérico.
+
+### ROADMAP propio de dskit
+
+Nuevo `ROADMAP.md` en la raíz: backlog del template con el formato del arnés
+(IDs + criterios), donde se registran las mejoras y las lecciones de los videos
+y de omp.sh (qué adoptar y qué rechazar y por qué).
+
 ### Corpus de conocimiento profundo dentro de `use_rag`
 
 El RAG ya no indexa solo el proyecto: con `use_rag` activo el proyecto generado
