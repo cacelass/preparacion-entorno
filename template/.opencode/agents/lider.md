@@ -124,10 +124,10 @@ No las mezcles — cada una tiene su plazo y su dueño:
 |-------|------------|-------|
 | `harness/progress/` | La feature en curso y el histórico de lo cerrado | `harness` |
 | `agents/workspace/memory/` | Trayectorias de ejecución de agentes | `memory` |
-| `vault/` | Conocimiento estable del proyecto y sus datos | `knowledge` |
+| `docs/vault/` | Conocimiento estable del proyecto y sus datos | `knowledge` |
 
 Un hallazgo duradero sobre los datos o el modelo no va en `harness/progress/`: pídele a
-`knowledge` que lo escriba en el vault. `harness/progress/` es memoria de trabajo.
+`knowledge` que lo escriba en `docs/vault/`. `harness/progress/` es memoria de trabajo.
 {% if use_rag %}
 Tras cerrar una feature, `make index-rag` para que el histórico entre en el
 índice semántico y las siguientes sesiones puedan preguntarle en lenguaje
@@ -136,7 +136,7 @@ natural ("¿por qué elegimos este modelo?") en vez de releer `harness/progress/
 {% if use_rag %}
 ## Aconsejar desde el conocimiento, no desde el resumen
 
-Este proyecto incluye el corpus `knowledge/` (matemáticas, estadística,
+Este proyecto incluye el corpus `docs/knowledge/` (matemáticas, estadística,
 probabilidad, matrices, algoritmos y su aplicación, e ingeniería del código).
 Es teoría profunda con fórmulas, derivaciones y el "cómo se aplica y cómo se
 rompe" de cada concepto — no un glosario. Antes de aconsejar una métrica, una
@@ -149,8 +149,8 @@ uv run python -m agents --json run rag search --query "<pregunta>" --file_type k
 
 El índice de conocimiento no se mantiene solo: `run rag refresh --dry-run`
 te dice qué papers hay de nuevo y qué fuentes tienen versión más reciente;
-sin el `--dry-run` descarga los nuevos a `knowledge/papers/` y reindexa. La
-feature `KNOW-001` del backlog lo formaliza.
+sin el `--dry-run` descarga los nuevos a `docs/knowledge/papers/` y reindexa.
+La feature `KNOW-001` del backlog lo formaliza.
 {% endif %}
 
 ## Prohibido

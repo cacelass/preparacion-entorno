@@ -209,7 +209,7 @@ Las tres memorias del proyecto no se pisan:
 |-------|-------|-------|
 | `harness/progress/` | `harness` | La feature en curso y el histórico de features |
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
-| `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
+| `docs/vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 {% if use_rag %}
 Y las tres son buscables: `harness/progress/` y `harness/featureslist.json` entran en el índice,
 así que tras cerrar una feature basta con `make index-rag` para poder
@@ -229,13 +229,16 @@ la búsqueda encuentra lo que debería (`hit_rate`, `recall@k`, MRR) contra
 mejor» en un número comparable entre commits. Añade ahí las preguntas que en
 tu proyecto devuelvan basura.
 
-El índice también cubre el **corpus de conocimiento profundo** (`knowledge/`):
-matemáticas, estadística, probabilidad, matrices, algoritmos y su aplicación,
-e ingeniería del código. El `lider` lo consulta antes de aconsejar
-(`rag search --query "..." --file_type knowledge`) y se mantiene al día con
-`rag refresh` — verifica cada fuente de `knowledge/sources.json` contra arXiv
-y descarga los papers nuevos a `knowledge/papers/`. La feature `KNOW-001` del
-backlog lo formaliza.
+El índice también cubre el **corpus de conocimiento profundo**
+(`docs/knowledge/`): matemáticas, estadística, probabilidad, matrices,
+algoritmos y su aplicación, e ingeniería del código. El `lider` lo consulta
+antes de aconsejar (`rag search --query "..." --file_type knowledge`) y se
+mantiene al día con `rag refresh` — verifica cada fuente de
+`docs/knowledge/sources.json` contra arXiv y descarga los papers nuevos a
+`docs/knowledge/papers/`. El corpus crece hacia la pregunta del proyecto:
+tras `SCOPE-001`, el `lider` deriva topics desde `references/00-objetivo.md`
+(`rag refresh --topics "..."`, primero en `--dry-run`). La feature `KNOW-001`
+del backlog lo formaliza.
 {% endif %}
 Detalles del formato en `harness/progress/README.md`.
 
@@ -334,6 +337,18 @@ otro código. Si un fallo se cuela dos veces:
 - ¿Es un criterio de revisión? → a `.opencode/agents/reviewer.md`.
 
 Deja constancia del cambio en `harness/progress/history.md`.
+
+### Reglas derivadas de un fallo (patrón ttsr)
+
+Cuando algo salga mal, convierte el incidente en una **regla que solo cuesta
+cuando se viola**, y **valídala contra el historial**: si el fallo hubiera
+disparado esa regla, pasa al sitio correcto (init.sh / AGENTS.md / reviewer);
+si no, la regla no lo habría evitado y hay que refinarla. No se registra una
+regla que no habría saltado — eso es ruido que se aprende a ignorar.
+
+Es el mismo principio que `policy_guard` aplica a las herramientas: la
+restricción vive en código o en un prompt cargado al dispararse, no pagando
+contexto en cada turno.
 
 ## Arranque
 

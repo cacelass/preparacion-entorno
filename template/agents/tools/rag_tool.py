@@ -1,9 +1,10 @@
 """
 agents.tools.rag_tool — RAG local con ChromaDB: búsqueda híbrida sin API key.
 
-Indexa documentación del proyecto (código, prompts, docs, vault, README, y la
-memoria del arnés: harness/progress/ y harness/featureslist.json) y permite buscar en lenguaje
-natural. Sin GPU, sin API key, funciona offline.
+Indexa documentación del proyecto (código, prompts, docs/ incl. vault y corpus
+de conocimiento, README, y la memoria del arnés: harness/progress/ y
+harness/featureslist.json) y permite buscar en lenguaje natural. Sin GPU, sin
+API key, funciona offline.
 
 La búsqueda es **híbrida**: funde el ranking vectorial de ChromaDB con un BM25
 léxico en stdlib. No es un adorno — el embedder por defecto está entrenado en
@@ -81,9 +82,9 @@ def _file_type(source: str) -> str:
         return "code"
     if "/prompts/" in source:
         return "prompt"
-    if "/knowledge/" in source or source.startswith("knowledge/"):
+    if "/docs/knowledge/" in source or source.startswith("docs/knowledge/"):
         return "knowledge"
-    if "/vault/" in source or source.startswith("vault/"):
+    if "/docs/vault/" in source or source.startswith("docs/vault/"):
         return "vault"
     if source.startswith("harness/"):
         return "harness"
@@ -611,13 +612,16 @@ class RagTool:
         ("tuning", "*.py", True, None, "py"),
         ("agents", "*.py", True, None, "py"),
         ("agents/prompts", "*.md", False, None, "md"),
-        ("docs", "*.*", True, (".md", ".rst"), "md"),
-        ("vault", "*.md", True, None, "md"),
-        # Corpus de conocimiento profundo (knowledge/): la base de teoria y
+        # docs/ NO es recursivo a proposito: si lo fuera absorberia docs/vault y
+        # docs/knowledge (que ya tienen su propia fila) y los indexaria dos veces.
+        ("docs", "*.*", False, (".md", ".rst"), "md"),
+        ("docs/source", "*.rst", True, None, "md"),
+        ("docs/vault", "*.md", True, None, "md"),
+        # Corpus de conocimiento profundo (docs/knowledge/): la base de teoria y
         # practica que el lider consulta antes de aconsejar. Incluye los
-        # papers descargados por `rag refresh` en knowledge/papers/. No existe
-        # sin use_rag, igual que api/chat/monitoring/tuning, y se salta solo.
-        ("knowledge", "*.md", True, None, "md"),
+        # papers descargados por `rag refresh` en docs/knowledge/papers/. No
+        # existe sin use_rag, igual que api/chat/monitoring/tuning, y se salta.
+        ("docs/knowledge", "*.md", True, None, "md"),
         # Memoria del arnes: el historico de features cerradas y sus decisiones
         # es lo que un agente nuevo necesita buscar en lenguaje natural sin
         # releer todo harness/progress/.

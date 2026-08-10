@@ -1,16 +1,16 @@
 """
 agents.tools.knowledge_tool — Mantenimiento del corpus de conocimiento
-(`knowledge/`): verifica que las fuentes siguen vigentes y detecta papers
+(`docs/knowledge/`): verifica que las fuentes siguen vigentes y detecta papers
 nuevos relevantes.
 
-`rag refresh` es quien lo usa: lee `knowledge/sources.json` (el registro
+`rag refresh` es quien lo usa: lee `docs/knowledge/sources.json` (el registro
 máquina), consulta la API de arXiv por cada topic del corpus y:
 
 - **Verifica** cada fuente activa: si arXiv tiene una versión más reciente,
   la marca como superada en el informe.
 - **Detecta** papers nuevos: busca cada topic con sus queries y filtra por
   publicación reciente.
-- **Descarga** los nuevos a `knowledge/papers/<tema>/<id>.md` — el HTML de
+- **Descarga** los nuevos a `docs/knowledge/papers/<tema>/<id>.md` — el HTML de
   arXiv cuando existe (sin dependencias); si no, el PDF convertido con
   `markitdown` (opcional). Actualiza `sources.json` y reindexa el corpus.
 
@@ -54,7 +54,7 @@ class KnowledgeTool:
 
     @staticmethod
     def _sources_path(root: Path) -> Path:
-        return root / "knowledge" / "sources.json"
+        return root / "docs" / "knowledge" / "sources.json"
 
     @staticmethod
     def load_sources(root: Path) -> dict[str, Any] | None:
@@ -195,13 +195,13 @@ class KnowledgeTool:
         Verifica las fuentes del corpus y detecta/descarga papers nuevos.
 
         `dry_run=True` no escribe nada: devuelve el informe (papers nuevos,
-        fuentes superadas, errores). Sin dry-run descarga a `knowledge/papers/`,
+        fuentes superadas, errores). Sin dry-run descarga a `docs/knowledge/papers/`,
         actualiza `sources.json` y reindexa el RAG si chromadb está disponible.
         """
         data = KnowledgeTool.load_sources(root)
         if data is None:
             return {
-                "error": "No existe knowledge/sources.json (¿se generó el proyecto con use_rag?).",
+                "error": "No existe docs/knowledge/sources.json (¿se generó el proyecto con use_rag?).",
             }
 
         hoy = _dt.date.today()
@@ -288,7 +288,7 @@ class KnowledgeTool:
             informe["topics"].append(bloque)
 
         if not dry_run:
-            destino = root / "knowledge" / "papers"
+            destino = root / "docs" / "knowledge" / "papers"
             for tema in informe["topics"]:
                 entradas = next(
                     (t for t in data.get("topics", []) if t.get("topic") == tema["topic"]), None

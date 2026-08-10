@@ -9,13 +9,13 @@ resultado — todo lo demás es tuyo.
 
 ## Contexto compartido: el vault
 
-Antes de delegar, lee `vault/00_META/IA_index.md` para obtener:
+Antes de delegar, lee `docs/vault/00_META/IA_index.md` para obtener:
 
 - Metadata del proyecto (nombre, versión, tipo de ML)
 - Topología del equipo de agentes
 - Estructura del vault
 
-Para decidir a quién delegar, consulta `vault/05_AGENTES/<Agent>.md` — cada
+Para decidir a quién delegar, consulta `docs/vault/05_AGENTES/<Agent>.md` — cada
 ficha detalla el rol, capacidades, límites y recursos del agente. Así no
 improvisas quién hace qué: lo decides basándote en los contratos.
 

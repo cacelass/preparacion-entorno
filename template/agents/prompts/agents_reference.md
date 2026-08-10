@@ -303,12 +303,12 @@ uv run python -m agents.evals.runner --smoke  # solo smoke
 
 ## Vault Obsidian — memoria compartida del equipo
 
-El directorio `vault/` contiene una bóveda Obsidian que funciona como memoria
-compartida del equipo de agentes. Cualquier agente puede leerla, pero solo
-`knowledge` la escribe.
+El directorio `docs/vault/` contiene una bóveda Obsidian que funciona como
+memoria compartida del equipo de agentes. Cualquier agente puede leerla, pero
+solo `knowledge` la escribe.
 
 ```
-vault/
+docs/vault/
 ├── 00_META/IA_index.md         ← Punto de entrada: metadata + topología del equipo
 ├── 01_PROYECTO/                ← Documentación del proyecto (arquitectura, modelos, roadmap)
 ├── 02_DATOS/                   ← Documentación de datos (features, fuentes)

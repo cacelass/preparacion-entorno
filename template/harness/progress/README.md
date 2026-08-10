@@ -58,11 +58,11 @@ La cabecera (fecha y veredicto) la pone `harness record`; tú aportas el cuerpo:
 |-------|-------|-------|
 | `harness/progress/` | `harness` | La feature en curso y el histórico de features |
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
-| `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
+| `docs/vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 
 Un hallazgo duradero (por qué se eligió un modelo, qué significa una columna)
-no vive aquí: pídele a `knowledge` que lo escriba en el vault. Esto es memoria
-de trabajo, no de archivo.
+no vive aquí: pídele a `knowledge` que lo escriba en `docs/vault/`. Esto es
+memoria de trabajo, no de archivo.
 
 ## Buscable, no solo legible
 

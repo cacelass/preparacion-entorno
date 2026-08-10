@@ -1,11 +1,11 @@
 """
 Tests del mantenimiento del corpus de conocimiento (`knowledge_tool` + `rag refresh`).
 
-Cierran el contrato de `rag refresh`: leer `knowledge/sources.json`, verificar
-cada fuente contra arXiv (¿versión más reciente?), detectar papers nuevos y —
-solo sin `--dry-run` — descargarlos a `knowledge/papers/`, actualizar el
-registro y reindexar. La red y el descargador se simulan: lo que se testea es
-la lógica, no arXiv.
+Cierran el contrato de `rag refresh`: leer `docs/knowledge/sources.json`,
+verificar cada fuente contra arXiv (¿versión más reciente?), detectar papers
+nuevos y — solo sin `--dry-run` — descargarlos a `docs/knowledge/papers/`,
+actualizar el registro y reindexar. La red y el descargador se simulan: lo que
+se testea es la lógica, no arXiv.
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ def _fuentes(tmp_path: Path, version: int = 3) -> dict:
             }
         ],
     }
-    (tmp_path / "knowledge").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "knowledge" / "sources.json").write_text(
+    (tmp_path / "docs" / "knowledge").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "knowledge" / "sources.json").write_text(
         json.dumps(data, ensure_ascii=False), encoding="utf-8"
     )
     return data
@@ -90,8 +90,8 @@ def test_carga_y_guarda_el_registro(tmp_path):
 
 def test_registro_ausente_o_corrupto_devuelve_none(tmp_path):
     assert KnowledgeTool.load_sources(tmp_path) is None
-    (tmp_path / "knowledge").mkdir()
-    (tmp_path / "knowledge" / "sources.json").write_text("{no json", encoding="utf-8")
+    (tmp_path / "docs" / "knowledge").mkdir(parents=True)
+    (tmp_path / "docs" / "knowledge" / "sources.json").write_text("{no json", encoding="utf-8")
     assert KnowledgeTool.load_sources(tmp_path) is None
 
 
@@ -156,8 +156,8 @@ def test_dry_run_informa_sin_tocar_nada(tmp_path, monkeypatch):
     assert informe["new_papers"][0]["arxiv_id"] == "9999.0001"
     assert informe["errors"] == []
     # no se ha escrito nada
-    assert not (tmp_path / "knowledge" / "papers").exists()
-    guardado = json.loads((tmp_path / "knowledge" / "sources.json").read_text(encoding="utf-8"))
+    assert not (tmp_path / "docs" / "knowledge" / "papers").exists()
+    guardado = json.loads((tmp_path / "docs" / "knowledge" / "sources.json").read_text(encoding="utf-8"))
     assert guardado["topics"][0]["sources"][0]["version"] == 3
 
 
@@ -195,13 +195,13 @@ def test_refresh_descarga_actualiza_y_reindexa(tmp_path, monkeypatch):
 
     informe = KnowledgeTool.refresh(tmp_path, dry_run=False)
 
-    ruta = tmp_path / "knowledge" / "papers" / "optimizadores" / "9999.0001.md"
-    assert ruta.exists(), "el paper nuevo se descarga a knowledge/papers/"
+    ruta = tmp_path / "docs" / "knowledge" / "papers" / "optimizadores" / "9999.0001.md"
+    assert ruta.exists(), "el paper nuevo se descarga a docs/knowledge/papers/"
     assert "contenido" in ruta.read_text(encoding="utf-8")
     assert len(informe["downloads"]) == 1
     assert informe["reindex"]["total_chunks"] == 5
 
-    guardado = json.loads((tmp_path / "knowledge" / "sources.json").read_text(encoding="utf-8"))
+    guardado = json.loads((tmp_path / "docs" / "knowledge" / "sources.json").read_text(encoding="utf-8"))
     ids = [s["arxiv_id"] for s in guardado["topics"][0]["sources"]]
     assert "9999.0001" in ids, "el nuevo paper entra en el registro"
     assert guardado["topics"][0]["sources"][0]["last_checked"].startswith("2026")
@@ -218,8 +218,8 @@ def test_refresh_sin_red_falla_de_forma_controlada(tmp_path, monkeypatch):
 
 # -- el corpus se etiqueta como knowledge en el RAG ----------------------------
 def test_el_corpus_se_clasifica_como_knowledge():
-    assert _file_type("knowledge/matematicas/probabilidad.md") == "knowledge"
-    assert _file_type("knowledge/papers/optimizadores/1412.6980.md") == "knowledge"
+    assert _file_type("docs/knowledge/matematicas/probabilidad.md") == "knowledge"
+    assert _file_type("docs/knowledge/papers/optimizadores/1412.6980.md") == "knowledge"
     assert _file_type("README.md") == "doc"
 
 
@@ -238,3 +238,41 @@ def test_la_accion_refresh_del_agente_expone_dry_run(context):
     agente = RagAgent(context=context)
     assert "refresh" in agente.actions()
     assert any("papers" in a for a in agente.action_aliases()["refresh"])
+
+
+def _registro_sin_fuentes(tmp_path: Path) -> None:
+    (tmp_path / "docs" / "knowledge").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "knowledge" / "sources.json").write_text(
+        json.dumps({
+            "version": 1, "updated": "2026-01-01",
+            "topics": [{"topic": "optimizadores", "queries": ["adam optimizer"], "sources": []}],
+        }),
+        encoding="utf-8",
+    )
+
+
+# -- refresh --from-objective (el corpus sigue al objetivo de SCOPE-001) ------
+def test_refresh_from_objective_incluye_el_objetivo(context, monkeypatch):
+    _registro_sin_fuentes(context.root)
+    (context.root / "references").mkdir(exist_ok=True)
+    (context.root / "references" / "00-objetivo.md").write_text(
+        "# Objetivo\n\nPregunta: ¿qué tratamiento reduce el churn?\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(KnowledgeTool, "arxiv_search", lambda *a, **kw: [])
+
+    from agents.agents.rag_agent import RagAgent
+
+    resultado = RagAgent(context=context).refresh(dry_run=True, from_objective=True)
+    assert resultado.data.get("objective")
+    assert "Pregunta: ¿qué tratamiento" in resultado.data["objective"]
+    assert any("Objetivo" in w for w in resultado.warnings)
+
+
+def test_refresh_from_objective_sin_objetivo_avisa(context, monkeypatch):
+    _registro_sin_fuentes(context.root)
+    monkeypatch.setattr(KnowledgeTool, "arxiv_search", lambda *a, **kw: [])
+
+    from agents.agents.rag_agent import RagAgent
+
+    resultado = RagAgent(context=context).refresh(dry_run=True, from_objective=True)
+    assert any("SCOPE-001" in w for w in resultado.warnings)

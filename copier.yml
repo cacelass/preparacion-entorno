@@ -211,7 +211,7 @@ use_conformal:
 # --- RAG local (ChromaDB + BM25) ---
 use_rag:
   type: bool
-  help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. Incluye el corpus de conocimiento profundo (knowledge/): matemáticas,\n         estadística, probabilidad, matrices, algoritmos y su aplicación, con `rag refresh` para mantener las fuentes al día.\n         make index-rag para construir el indice. Sin API key, funciona offline."
+  help: "Añadir RAG local? (chromadb) Busca en código, prompts, docs, la memoria del arnés y URLs externas en lenguaje natural,\n         fundiendo similitud vectorial con BM25 léxico. Incluye el corpus de conocimiento profundo (docs/knowledge/): matemáticas,\n         estadística, probabilidad, matrices, algoritmos y su aplicación, con `rag refresh` para mantener las fuentes al día.\n         make index-rag para construir el indice. Sin API key, funciona offline."
   default: "{{ proyecto_perfil in ['estandar', 'completo'] }}"
   when: "{{ proyecto_perfil == 'manual' }}"
 
@@ -311,7 +311,7 @@ python_version:
 
 dskit_version:
   type: str
-  default: "1.15.1"
+  default: "1.16.0"
   help: "Versión de dskit que generó el proyecto (no cambiar)"
 
 project_version:
@@ -327,12 +327,12 @@ _message_before_copy: >-
   devuelve cluster asignado. Asegúrate de que predict_model.py tiene el método predict().
   {% endif %}
   {% if graphify_mode == "graphify + obsidian vault" %}
-    graphify + Obsidian vault generados. Abre vault/ en Obsidian para explorar el grafo de conocimiento.
+    graphify + Obsidian vault generados. Abre docs/vault/ en Obsidian para explorar el grafo de conocimiento.
   {% elif graphify_mode == "solo graphify" %}
     graphify activado. Ejecuta 'uv run python -m graphify build' para generar el grafo de conocimiento.
   {% endif %}
   {% if use_rag %}
-    RAG + corpus de conocimiento profundo activos (knowledge/). Consulta con
+    RAG + corpus de conocimiento profundo activos (docs/knowledge/). Consulta con
     'run rag search --file_type knowledge'; mantén las fuentes con 'run rag refresh'.
   {% endif %}
   {% if proyecto_perfil == 'completo' or proyecto_perfil == 'manual' %}
@@ -405,7 +405,7 @@ _exclude:
   - "{% if not use_monitoring %}agents/prompts/monitoring_workflow.md{% endif %}"
   - "{% if not use_optuna %}agents/prompts/optuna_workflow.md{% endif %}"
   - "{% if graphify_mode == 'no' %}agents/prompts/knowledge_workflow.md{% endif %}"
-  - "{% if graphify_mode != 'graphify + obsidian vault' %}vault{% endif %}"
+  - "{% if graphify_mode != 'graphify + obsidian vault' %}docs/vault{% endif %}"
   - "{% if not use_rag %}agents/prompts/rag_workflow.md{% endif %}"
   - "{% if not use_rag %}agents/agents/rag_agent.py{% endif %}"
   - "{% if not use_rag %}agents/tools/rag_tool.py{% endif %}"
@@ -415,11 +415,11 @@ _exclude:
   - "{% if not use_rag %}agents/evals/rag_golden.json{% endif %}"
   - "{% if not use_rag %}agents/tests/test_rag_eval.py{% endif %}"
   - "{% if not use_rag %}agents/tests/test_rag_trust.py{% endif %}"
-  - "{% if not use_rag %}knowledge{% endif %}"
-  - "{% if not use_api %}knowledge/backend/api.md{% endif %}"
-  - "{% if not use_docker %}knowledge/backend/docker.md{% endif %}"
-  - "{% if not use_docker %}knowledge/frontend/chat.md{% endif %}"
-  - "{% if not use_mlflow %}knowledge/backend/mlflow.md{% endif %}"
+  - "{% if not use_rag %}docs/knowledge{% endif %}"
+  - "{% if not use_api %}docs/knowledge/backend/api.md{% endif %}"
+  - "{% if not use_docker %}docs/knowledge/backend/docker.md{% endif %}"
+  - "{% if not use_docker %}docs/knowledge/frontend/chat.md{% endif %}"
+  - "{% if not use_mlflow %}docs/knowledge/backend/mlflow.md{% endif %}"
   - "{% if not use_mcp %}.mcp.json{% endif %}"
   - "{% if not use_sdd %}tools/mutate.py{% endif %}"
   - "{% if not use_sdd %}agents/agents/mutation_agent.py{% endif %}"

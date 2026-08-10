@@ -33,7 +33,7 @@ Además, cada agente posee implícitamente `agents/workspace/<su_nombre>/`.
 
 El vault Obsidian como contexto compartido
 ------------------------------------------
-El vault (`vault/`) es la memoria compartida del equipo. Cualquier agente
+El vault (`docs/vault/`) es la memoria compartida del equipo. Cualquier agente
 puede LEERLO, pero solo `knowledge` lo ESCRIBE. El vault contiene:
 
 - `00_META/IA_index.md` — punto de entrada: metadata del proyecto, estructura
@@ -47,8 +47,8 @@ puede LEERLO, pero solo `knowledge` lo ESCRIBE. El vault contiene:
   agente tiene su ficha aquí, actualizada por `knowledge`.
 
 Regla: si un agente necesita contexto sobre el proyecto, primero lee
-`vault/00_META/IA_index.md`. Si necesita contexto sobre otro agente, lee
-`vault/05_AGENTES/<Agent>.md`.
+`docs/vault/00_META/IA_index.md`. Si necesita contexto sobre otro agente, lee
+`docs/vault/05_AGENTES/<Agent>.md`.
 
 El arnés: quién razona y quién ejecuta
 --------------------------------------
@@ -79,7 +79,7 @@ Las tres memorias del proyecto no se solapan, cada una tiene su plazo:
 |---------|-------|---------|
 | `harness/progress/` | `harness` | La feature en curso y el histórico de features |
 | `agents/workspace/memory/` | `memory` | Trayectorias de ejecución de agentes |
-| `vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
+| `docs/vault/` | `knowledge` | Conocimiento estable del proyecto y sus datos |
 
 Si un agente Python necesita saber en qué se está trabajando, LEE
 `harness/progress/current.md` — no lo escribe.
@@ -126,8 +126,8 @@ CONTRACTS: dict[str, Contract] = {
             "descomponer un encargo en pasos y asignar cada paso al agente responsable",
             "detectar qué información falta y devolver las preguntas ANTES de ejecutar nada",
             "ejecutar la orden de trabajo aprobada (via GStack) y resumir qué debe verificar el humano",
-            "leer vault/00_META/IA_index.md para obtener contexto del proyecto y la topología de agentes",
-            "consultar vault/05_AGENTES/<Agent>.md para decidir a quién delegar cada paso",
+            "leer docs/vault/00_META/IA_index.md para obtener contexto del proyecto y la topología de agentes",
+            "consultar docs/vault/05_AGENTES/<Agent>.md para decidir a quién delegar cada paso",
         ),
         cannot=(
             "ejecutar ninguna acción de dominio él mismo → siempre delega en el agente dueño",
@@ -173,8 +173,8 @@ CONTRACTS: dict[str, Contract] = {
         role="Dueño del grafo de conocimiento y la bóveda Obsidian: los construye y mantiene al día.",
         can=(
             "construir/reconstruir el grafo (graphify), crear la bóveda, resumir nodos padre, sync",
-            "poblar vault/05_AGENTES/ con fichas individuales de cada agente desde contracts.py",
-            "actualizar vault/04_VISUALIZACIONES/grafo_conocimiento.md tras cada build del grafo",
+            "poblar docs/vault/05_AGENTES/ con fichas individuales de cada agente desde contracts.py",
+            "actualizar docs/vault/04_VISUALIZACIONES/grafo_conocimiento.md tras cada build del grafo",
         ),
         cannot=(
             "buscar o navegar por el grafo → doc (absorbió docsearch)",
@@ -182,39 +182,39 @@ CONTRACTS: dict[str, Contract] = {
         ),
         owns=(
             "graphify-out/",
-            "vault/ (bóveda Obsidian del proyecto — todo vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)",
+            "docs/vault/ (bóveda Obsidian del proyecto — todo docs/vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)",
         ),
         collaborates=("doc", "research"),
     ),
     "rag": Contract(
-        role="RAG local: indexa código, prompts, docs, vault, el corpus de conocimiento "
-             "(knowledge/) y la memoria del arnés; busca en lenguaje natural fundiendo "
-             "similitud vectorial (ChromaDB) con BM25 léxico. Mantiene el corpus al día.",
+        role="RAG local: indexa código, prompts, docs/ (incl. vault y corpus), el corpus de "
+             "conocimiento (docs/knowledge/) y la memoria del arnés; busca en lenguaje natural "
+             "fundiendo similitud vectorial (ChromaDB) con BM25 léxico. Mantiene el corpus al día.",
         can=(
             "indexar el proyecto (código de todos los módulos, prompts, docs, "
-            "vault, knowledge/, README, CHANGELOG, harness/progress/ y "
+            "docs/vault, docs/knowledge/, README, CHANGELOG, harness/progress/ y "
             "harness/featureslist.json) en ChromaDB",
             "reindexar solo lo que cambió, y purgar del índice lo que se borró",
             "indexar URLs externas (documentación de librerías, tutoriales)",
             "buscar en el índice con consultas en lenguaje natural, incluido el corpus (--file_type knowledge)",
             "devolver fragmentos relevantes con puntuación de similitud",
-            "mantener el corpus: verificar cada fuente de knowledge/sources.json contra arXiv "
+            "mantener el corpus: verificar cada fuente de docs/knowledge/sources.json contra arXiv "
             "y detectar papers nuevos (refrescar)",
-            "descargar papers nuevos a knowledge/papers/ y actualizar knowledge/sources.json "
-            "al refrescar sin --dry-run",
+            "descargar papers nuevos a docs/knowledge/papers/ y actualizar "
+            "docs/knowledge/sources.json al refrescar sin --dry-run",
         ),
         cannot=(
             "construir o modificar el grafo graphify → knowledge",
             "buscar papers académicos nuevos para el estado del arte → research",
             "ejecutar código arbitrario ni modificar código del proyecto",
-            "escribir fuera de knowledge/papers/, knowledge/sources.json y .rag-index/",
+            "escribir fuera de docs/knowledge/papers/, docs/knowledge/sources.json y .rag-index/",
         ),
         needs=(
             "que exista un índice (ejecutar 'rag index' primero)",
             "red para refresh; sin ella el mantenimiento falla de forma controlada",
         ),
-        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored); knowledge/papers/ y "
-              "knowledge/sources.json (registro de fuentes del corpus)",
+        owns=(".rag-index/ (índice vectorial ChromaDB, gitignored); docs/knowledge/papers/ y "
+              "docs/knowledge/sources.json (registro de fuentes del corpus)",
               ),
         collaborates=("knowledge", "doc", "plan"),
     ),
@@ -292,7 +292,7 @@ CONTRACTS: dict[str, Contract] = {
         role="Analista de datos: EDA y calidad de datasets. Lee data/, escribe solo en su workspace.",
         can=(
             "EDA: constantes, cardinalidad, missing, outliers, correlaciones, fuga de información",
-            "documentar hallazgos en vault/02_DATOS/ (features.md, fuentes.md) via knowledge",
+            "documentar hallazgos en docs/vault/02_DATOS/ (features.md, fuentes.md) via knowledge",
         ),
         cannot=(
             "modificar los datasets de data/ — los informes van a su workspace o al vault via knowledge",
@@ -306,7 +306,7 @@ CONTRACTS: dict[str, Contract] = {
         role="Analista de modelos entrenados: inspecciona .joblib, importancias, overfitting.",
         can=(
             "inspeccionar modelos guardados, comparar modelos, analizar estudios de Optuna",
-            "documentar resultados en vault/01_PROYECTO/modelos.md via knowledge",
+            "documentar resultados en docs/vault/01_PROYECTO/modelos.md via knowledge",
         ),
         cannot=(
             "entrenar modelos — eso es del pipeline (make train), no de un agente",
@@ -363,7 +363,7 @@ CONTRACTS: dict[str, Contract] = {
         owns=("historial git (commits, tags, ramas)",),
         collaborates=("documentation", "cicd"),
         destructive=(
-            "commit_with_changelog", "commit_feature", "tag_release",
+            "commit_with_changelog", "commit_atomic", "commit_feature", "tag_release",
             "create_branch", "merge_branch",
         ),
     ),
@@ -476,11 +476,12 @@ CONTRACTS: dict[str, Contract] = {
         role="Memoria proactiva: observa trayectorias de agentes y mantiene un banco de memoria estructurado contra el decaimiento del estado en tareas largas.",
         can=(
             "observar el log de auditoría y extraer hechos, estado y trazas",
-            "buscar recuerdos por texto o tipo (facts/state/traces)",
+            "buscar recuerdos por texto, tipo (facts/state/traces) o scope (global/per-proyecto)",
             "inyectar recordatorios relevantes en el contexto del agente activo",
             "tomar una instantánea del estado actual del proyecto",
-            "almacenar una nota arbitraria en la memoria",
+            "almacenar una nota arbitraria en la memoria (con scope)",
             "olvidar entradas específicas del banco de memoria",
+            "editar memoria por id: memory_edit update/forget/invalidate",
         ),
         cannot=(
             "modificar el workspace de otros agentes — solo escribe en agents/workspace/memory/",

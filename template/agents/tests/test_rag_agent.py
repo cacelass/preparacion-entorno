@@ -468,7 +468,7 @@ class TestHarnessMemoryIsIndexed:
         from agents.tools.rag_tool import _file_type
 
         assert _file_type("README.md") == "doc"
-        assert _file_type("vault/00_META/IA_index.md") == "vault"
+        assert _file_type("docs/vault/00_META/IA_index.md") == "vault"
         assert _file_type("agents/prompts/git_agent.md") == "prompt"
         assert _file_type("mi_paquete/data/loader.py") == "code"
 

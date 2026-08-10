@@ -30,7 +30,7 @@ agents/                — Sistema multi-agente (dskit)
 ├── prompts/           — Prompts de agentes
 ├── workspace/         — Workspace de agentes
 │
-vault/                 — Bóveda Obsidian del proyecto
+docs/vault/            — Bóveda Obsidian del proyecto
 ├── 00_META/           — Metadatos e índice para IA
 ├── 01_PROYECTO/       — Documentación del proyecto
 ├── 02_DATOS/          — Documentación de datos

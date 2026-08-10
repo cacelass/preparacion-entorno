@@ -144,8 +144,8 @@ def test_prune_isolated_only_keeps_connected(tmp_path: Path):
 
 
 def test_detect_obsidian_vaults(tmp_path: Path):
-    (tmp_path / "knowledge" / ".obsidian").mkdir(parents=True)
+    (tmp_path / "docs" / "vault" / ".obsidian").mkdir(parents=True)
     (tmp_path / ".venv" / "junk" / ".obsidian").mkdir(parents=True)  # debe ignorarse
     vaults = GraphifyTool.detect_obsidian_vaults(tmp_path)
-    assert tmp_path / "knowledge" in vaults
+    assert tmp_path / "docs" / "vault" in vaults
     assert all(".venv" not in str(v) for v in vaults)

@@ -245,7 +245,7 @@ lo necesitaba aún — pero es una extensión directa de `StackStep` con un camp
 | `plan` | **Jefe de proyecto**: convierte un encargo en lenguaje natural en una orden de trabajo, devuelve TODAS las preguntas que le falten antes de ejecutar nada, y delega cada paso al agente dueño | `sqlite_tool` |
 | `audit` | **Auditor del equipo**: mide uso, tasa de éxito y duración por agente/acción sobre el log de ejecuciones, y propone mejoras con datos en vez de impresiones | `sqlite_tool` |
 | `supervisor` | Lanza varios workers en competición sobre la misma tarea y arbitra cuál es la mejor propuesta | `parallel_tool` |
-| `knowledge` | Construye y mantiene el grafo de conocimiento y la bóveda Obsidian. Único dueño de `vault/` | `graphify_tool` |
+| `knowledge` | Construye y mantiene el grafo de conocimiento y la bóveda Obsidian. Único dueño de `docs/vault/` | `graphify_tool` |
 | `research` | Busca papers en arXiv/OpenAlex relacionados con el proyecto | `research_tool` |
 | `memory` | **Memoria proactiva**: observa las trayectorias de los agentes y mantiene un banco estructurado (facts/state/traces) para combatir el decaimiento de estado en tareas largas | `memory_tool` |
 | `doc` | **Documentación unificada**: responde dónde está algo consultando a la vez el grafo, el índice semántico y el vault | `graphify_tool`, `rag_tool` |

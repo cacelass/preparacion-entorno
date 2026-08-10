@@ -113,7 +113,7 @@ class DocAgent(BaseAgent):
 
     def _buscar_vault(self, query: str, avisos: list) -> list[dict]:
         """Grep literal sobre las notas del vault."""
-        vault = self.ctx.root / "vault"
+        vault = self.ctx.root / "docs" / "vault"
         if not vault.exists():
             return []
         q = query.lower()
@@ -326,11 +326,11 @@ class DocAgent(BaseAgent):
 
     def vault_grep(self, *, pattern: str) -> AgentResult:
         """Busca texto directamente en el vault Obsidian."""
-        vault_path = self.ctx.root / "vault"
+        vault_path = self.ctx.root / "docs" / "vault"
         if not vault_path.exists():
             return AgentResult(
                 False, self.name, "vault_grep",
-                "No hay directorio vault/ en el proyecto.",
+                "No hay directorio docs/vault/ en el proyecto.",
             )
         matches = []
         for md_file in vault_path.rglob("*.md"):
@@ -348,13 +348,13 @@ class DocAgent(BaseAgent):
         if not matches:
             return AgentResult(
                 True, self.name, "vault_grep",
-                f"No se encontró '{pattern}' en vault/.",
+                f"No se encontró '{pattern}' en docs/vault/.",
                 data=[],
             )
         lines = [f"  {m['file']}:{m['line']} — {m['text']}" for m in matches[:20]]
         return AgentResult(
             True, self.name, "vault_grep",
-            f"{len(matches)} coincidencia(s) en vault/:\n" + "\n".join(lines),
+            f"{len(matches)} coincidencia(s) en docs/vault/:\n" + "\n".join(lines),
             data=matches[:20],
         )
 
@@ -431,7 +431,7 @@ class DocAgent(BaseAgent):
         return datos, True, f"{datos['chunks']} fragmentos"
 
     def _estado_vault(self) -> tuple[dict, bool, str]:
-        ruta = self.ctx.root / "vault"
+        ruta = self.ctx.root / "docs" / "vault"
         existe = ruta.exists()
         datos = {
             "exists": existe,

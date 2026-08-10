@@ -37,7 +37,7 @@ def test_setup_vault_creates_tree(know_context):
     result = agent.setup_vault()
     assert result.success
     assert result.data["created"] is True
-    vault_path = know_context.root / "knowledge"
+    vault_path = know_context.root / "docs" / "vault"
     assert vault_path.exists()
     assert (vault_path / ".obsidian").exists()
     assert (vault_path / "00-index" / "MOC.md").exists()

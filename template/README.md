@@ -52,7 +52,9 @@
 │   └── utils/          paths.py
 ├── tests/
 ├── harness/progress/           ← memoria del arnés (tarea actual + histórico)
-{% if use_rag %}├── knowledge/              ← corpus de conocimiento profundo (consulta con rag search)
+├── docs/                       ← documentación unificada (source/ de Sphinx{% if use_rag %}, vault y corpus{% endif %})
+{% if use_rag %}│   ├── knowledge/              ← corpus de conocimiento profundo (consulta con rag search)
+│   └── vault/                  ← bóveda Obsidian del proyecto{% if graphify_mode != "graphify + obsidian vault" %} (opcional){% endif %}
 ├── .rag-index/                 ← índice vectorial ChromaDB (generado, no se versiona)
 {% endif %}├── AGENTS.md           ← protocolo del arnés: punto de entrada de la IA
 ├── init.sh             ← la puerta: ¿se puede trabajar?
@@ -111,10 +113,11 @@ El protocolo completo está en [`AGENTS.md`](AGENTS.md).
 
 {% if use_rag %}## Corpus de conocimiento profundo
 
-El RAG indexa también `knowledge/`: teoría profunda de matemáticas,
+El RAG indexa también `docs/knowledge/`: teoría profunda de matemáticas,
 estadística, probabilidad, matrices, algoritmos y su aplicación, e ingeniería
 del código — lo que el `lider` consulta antes de aconsejar. Búscalo en
-lenguaje natural y mantenlo al día con `rag refresh`:
+lenguaje natural y mantenlo al día con `rag refresh` (puedes acotar los temas
+a la pregunta del proyecto con `--topics` o `--from-objective`):
 
 ```bash
 make index-rag                                       # construir el índice
@@ -213,7 +216,7 @@ Ver `AGENTS.md` para la documentación completa del sistema.
 
 ## Obsidian Vault
 
-El proyecto incluye un vault de Obsidian en `vault/` con estructura por dominios:
+El proyecto incluye un vault de Obsidian en `docs/vault/` con estructura por dominios:
 
 | Carpeta | Propósito |
 |---------|-----------|
@@ -226,7 +229,7 @@ El proyecto incluye un vault de Obsidian en `vault/` con estructura por dominios
 | `06_OBSERVACIONES/` | Hallazgos y notas diarias |
 | `07_REFERENCIAS/` | Papers y documentación externa |
 
-Abre `vault/` como carpeta en Obsidian para explorar y documentar el proyecto.
+Abre `docs/vault/` como carpeta en Obsidian para explorar y documentar el proyecto.
 
 {% endif %}
 

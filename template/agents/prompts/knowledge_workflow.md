@@ -2,7 +2,7 @@
 
 ## Pipeline
 ```
-knowledge build  →  knowledge sync  →  vault/ actualizado
+knowledge build  →  knowledge sync  →  docs/vault/ actualizado
 ```
 
 ## Pasos
@@ -18,7 +18,7 @@ knowledge build  →  knowledge sync  →  vault/ actualizado
 {% endif %}
 
 ## Paths
-- `vault/` — bóveda Obsidian completa
+- `docs/vault/` — bóveda Obsidian completa
   - `00_META/IA_index.md` — punto de entrada
   - `01_PROYECTO/` — arquitectura, modelos, roadmap
   - `02_DATOS/` — features, fuentes
@@ -49,8 +49,8 @@ Sin vault Obsidian. El grafo se almacena en `graphify-out/`.
 - `setup_vault` — crea bóveda si no existe (solo con vault)
 
 ## Agentes que escriben en vault (vía `knowledge`)
-- `data` → `vault/02_DATOS/features.md`, fuentes.md
-- `ml` → `vault/01_PROYECTO/modelos.md`
+- `data` → `docs/vault/02_DATOS/features.md`, fuentes.md
+- `ml` → `docs/vault/01_PROYECTO/modelos.md`
 - `knowledge` → todo lo demás
 
 ## Notas

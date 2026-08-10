@@ -141,7 +141,7 @@ class KnowledgeAgent(BaseAgent):
         """
         Detecta la bóveda de Obsidian del proyecto. Si no hay ninguna y
         ``create_if_missing`` es True, crea una en ``vault_dir`` (por defecto
-        ``knowledge/``) con la estructura de árbol adaptada al grafo.
+        ``docs/vault/``) con la estructura de árbol adaptada al grafo.
 
         Es la respuesta determinista a "¿existe alguna carpeta de obsidian?":
         si existe, la reutiliza; si no, la construye.
@@ -157,7 +157,7 @@ class KnowledgeAgent(BaseAgent):
                 data={"vaults": [str(v) for v in existing], "created": False},
             )
 
-        target = (root / (vault_dir or "knowledge")).resolve()
+        target = (root / (vault_dir or "docs/vault")).resolve()
         if not create_if_missing and not (target / ".obsidian").exists():
             return AgentResult(
                 False, self.name, "setup_vault",

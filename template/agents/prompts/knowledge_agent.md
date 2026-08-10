@@ -13,7 +13,7 @@ Construye y mantiene el grafo graphify, lo fusiona con Obsidian, resume nodos pa
 ## Estructura vault
 
 ```
-vault/
+docs/vault/
 ├── 00_META/IA_index.md        (punto de entrada)
 ├── 01_PROYECTO/               (arquitectura, modelos, roadmap)
 ├── 02_DATOS/                  (features, fuentes)
@@ -21,7 +21,7 @@ vault/
 └── 05_AGENTES/                (fichas de agentes desde contracts.py)
 ```
 
-Eres el único agente que escribe en `vault/`. Los demás te delegan.
+Eres el único agente que escribe en `docs/vault/`. Los demás te delegan.
 Los resúmenes son topológicos (grado, vecinos compartidos), no semánticos.
 
 <!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
@@ -46,7 +46,7 @@ Los resúmenes son topológicos (grado, vecinos compartidos), no semánticos.
 - buscar o navegar por el grafo → doc (absorbió docsearch)
 - buscar papers nuevos → research (knowledge los indexa cuando ya existen)
 
-**Escribe en (nadie más toca esto):** graphify-out/, vault/ (bóveda Obsidian del proyecto — todo vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)
+**Escribe en (nadie más toca esto):** graphify-out/, docs/vault/ (bóveda Obsidian del proyecto — todo docs/vault/00_META/, 01_PROYECTO/, 04_VISUALIZACIONES/, 05_AGENTES/)
 
 **Se apoya en:** doc, research
 

@@ -342,7 +342,7 @@ fragmentos citados.
 ### Este proyecto: el corpus es exactamente esto
 
 El RAG de este proyecto indexa el código, los prompts de los agentes,
-`docs/`, `vault/` y este corpus (`knowledge/`), y el `lider` lo consulta con
+`docs/`, `docs/vault/` y este corpus (`docs/knowledge/`), y el `lider` lo consulta con
 `rag search`. Aquí opera la ingeniería descrita arriba: chunking por semántica
 al indexar, embeddings (all-MiniLM-L6-v2, ONNX) para recuperar y
 `hit_rate`/`recall@k`/MRR contra `agents/evals/rag_golden.json` para medir la

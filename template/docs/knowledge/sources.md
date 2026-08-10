@@ -1,6 +1,6 @@
 # Fuentes del corpus de conocimiento
 
-Registro humano de las fuentes que respaldan `knowledge/`. La versión
+Registro humano de las fuentes que respaldan `docs/knowledge/`. La versión
 **máquina** es `sources.json` — es la que lee `rag refresh` para verificar
 vigencia y detectar papers nuevos. Este fichero es la lectura cómoda.
 
@@ -36,7 +36,7 @@ clavar una fuente.
 uv run python -m agents --json run rag refresh --dry-run
 # revisa el informe: papers nuevos relevantes + fuentes superadas
 uv run python -m agents --json run rag refresh
-# descarga los nuevos a knowledge/papers/<tema>/<id>.md, actualiza
+# descarga los nuevos a docs/knowledge/papers/<tema>/<id>.md, actualiza
 # sources.json y reindexa el corpus
 ```
 

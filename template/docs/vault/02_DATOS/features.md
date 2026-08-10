@@ -18,5 +18,3 @@
 - **Pipeline:** `{{ project_slug }}/features/`
 
 ## Notas
-
-

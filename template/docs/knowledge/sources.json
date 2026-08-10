@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updated": "2026-08-08",
-  "comment": "Registro de fuentes del corpus de conocimiento (knowledge/). Lo lee 'rag refresh': por cada topic consulta arXiv con las queries y verifica que cada fuente activa no haya sido superada (versión más reciente). Solo se listan fuentes con arXiv ID verificado; el resto de temas se cubren con queries (sources vacío).",
+  "comment": "Registro de fuentes del corpus de conocimiento (docs/knowledge/). Lo lee 'rag refresh': por cada topic consulta arXiv con las queries y verifica que cada fuente activa no haya sido superada (versión más reciente). Solo se listan fuentes con arXiv ID verificado; el resto de temas se cubren con queries (sources vacío).",
   "topics": [
     {
       "topic": "pca-svd",
