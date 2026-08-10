@@ -18,6 +18,37 @@ from agents.core.registry import register_agent
 from agents.tools.code_analysis_tool import CodeAnalysisTool
 
 
+#: Severidad por tipo de hallazgo (P0 bloquea, P1 hay que arreglar, P2 a
+#: mejorar, P3 cosmético). P0 y P1 son deterministas; el resto heurístico.
+_SEVERITY: dict[str, str] = {
+    "weights_only_false": "P0",   # pickle arbitrario = riesgo de ejecución de código
+    "mutable_default": "P1",      # bug real en casi todos los casos
+    "bare_except": "P1",          # captura KeyboardInterrupt/SystemExit
+    "long_function": "P2",
+    "too_many_args": "P2",
+    "high_complexity": "P2",
+    "duplicated_code": "P2",
+    "missing_return_type": "P3",
+    "todo_comment": "P3",
+}
+
+#: Confianza por tipo: los deterministas (AST) son high; los heurísticos
+#: (umbrales, estructura) medium/low porque pueden ser falsos positivos.
+_CONFIDENCE: dict[str, str] = {
+    "weights_only_false": "high",
+    "mutable_default": "high",
+    "bare_except": "high",
+    "missing_return_type": "high",
+    "long_function": "medium",
+    "too_many_args": "medium",
+    "high_complexity": "medium",
+    "duplicated_code": "medium",
+    "todo_comment": "low",
+}
+
+_SEVERITY_ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+
+
 @register_agent
 class ReviewAgent(BaseAgent):
     name = "review"
@@ -128,6 +159,30 @@ class ReviewAgent(BaseAgent):
 
         return findings
 
+    @classmethod
+    def _annotate_findings(cls, raw: list[dict]) -> list[dict]:
+        """Añade severity (P0-P3) y confidence a cada hallazgo y ordena por severidad."""
+        annotated = []
+        for finding in raw:
+            kind = finding.get("kind", "")
+            annotated.append({
+                **finding,
+                "severity": _SEVERITY.get(kind, "P3"),
+                "confidence": _CONFIDENCE.get(kind, "medium"),
+            })
+        annotated.sort(key=lambda f: _SEVERITY_ORDER.get(f.get("severity", "P3"), 4))
+        return annotated
+
+    @staticmethod
+    def _verdict(findings: list[dict]) -> str:
+        """correct = sin P0/P1; review = hay P1; incorrect = hay P0 (bloquea)."""
+        severities = {f.get("severity") for f in findings}
+        if "P0" in severities:
+            return "incorrect"
+        if "P1" in severities:
+            return "review"
+        return "correct"
+
     def review_file(self, *, relative_path: str) -> AgentResult:
         path = self.ctx.root / relative_path
         if not path.exists() or path.suffix != ".py":
@@ -135,10 +190,11 @@ class ReviewAgent(BaseAgent):
 
         smells, _functions = CodeAnalysisTool.analyze_file(path)
         deep = self._deep_scan_file(path)
-        all_findings = [s.__dict__ for s in smells] + deep
+        findings = self._annotate_findings([s.__dict__ for s in smells] + deep)
         return AgentResult(
-            True, self.name, "review_file", f"{len(all_findings)} hallazgo(s) en '{relative_path}'.",
-            data=all_findings,
+            True, self.name, "review_file",
+            f"{len(findings)} hallazgo(s) en '{relative_path}' — veredicto: {self._verdict(findings)}.",
+            data={"findings": findings, "verdict": self._verdict(findings), "n_findings": len(findings)},
         )
 
     def review_package(self, *, within: str | None = None) -> AgentResult:
@@ -199,11 +255,23 @@ class ReviewAgent(BaseAgent):
         for kind, items in deep_by_kind.items():
             warnings.append(f"{len(items)} caso(s) de '{kind}'.")
 
-        total = len(all_smells) + len(all_deep)
+        raw: list[dict] = [s.__dict__ for s in all_smells] + all_deep
+        for group in duplicate_groups:
+            raw.append({
+                "file": group[0].file, "line": group[0].line,
+                "kind": "duplicated_code",
+                "message": f"{len(group)} función(es) con estructura AST idéntica: "
+                           + ", ".join(f"{f.name} ({f.file}:{f.line})" for f in group[:3]),
+            })
+        findings = self._annotate_findings(raw)
+        verdict = self._verdict(findings)
+        report["findings"] = findings
+        report["verdict"] = verdict
+        total = len(findings)
         return AgentResult(
             True, self.name, "review_package",
             f"{len(py_files)} archivo(s) analizados, {total} hallazgo(s) "
             f"({len(all_smells)} estructurales + {len(all_deep)} de escaneo profundo), "
-            f"{len(duplicate_groups)} grupo(s) de posible duplicación.",
+            f"{len(duplicate_groups)} grupo(s) de posible duplicación — veredicto: {verdict}.",
             data=report, warnings=warnings,
         )

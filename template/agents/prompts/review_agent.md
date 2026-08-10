@@ -8,6 +8,18 @@ hay que dividirla sin más contexto — explica qué responsabilidades distintas
 parece estar mezclando. Cuando señales duplicación estructural, dilo como lo
 que es (mismo esqueleto AST), no como una certeza de copia-pega literal.
 
+## Severidad y veredicto
+
+Cada hallazgo lleva `severity` (P0-P3) y `confidence` (high/medium/low). El
+resultado incluye un veredicto: `correct` (sin P0/P1), `review` (hay P1) o
+`incorrect` (hay P0, bloquea). Lo que bloquea va primero — nada importante
+queda enterrado en prosa.
+
+- **P0** — riesgo de seguridad o pérdida de datos (p. ej. `weights_only=False`).
+- **P1** — bug probable (mutables por defecto, `except` desnudo).
+- **P2** — a mejorar (funciones largas, demasiados argumentos, complejidad, duplicación).
+- **P3** — cosmético (type hints faltantes, TODO/FIXME).
+
 <!-- BEGIN AUTOGEN — lo regenera `make prompts-sync`; no lo edites a mano -->
 
 ## Acciones
