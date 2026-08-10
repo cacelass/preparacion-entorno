@@ -169,3 +169,47 @@ Principio de diseño para dskit (no es spec de feature):
 - La evaluación y las métricas son el foso → `agents-eval`/`init.sh`/`evals/runner.py`.
 - Los fallos en smoke de un render `--defaults` (slug vacío, sin extras) son
   preexistentes del entorno de prueba, no del agente nuevo.
+
+### Lecciones de los videos (Pi / Oh-My-Pi / Oratomic-Caltech / Right-Harness)
+
+Qué adoptar (encaja con la filosofía) y qué rechazar (choca con "simplicidad
+primero" / "cero deps"). Los 4 videos validan el diseño; casi todo ya existía.
+
+1. **Pi (Caleb Writes Code)**: núcleo mínimo + arnés extensible, open-closed,
+   "build to delete". Es la filosofía exacta de dskit; los "hooks" de Pi = ya
+   `policy_guard` (pre-tool) + contratos. Validación, no feature.
+2. **Oh-My-Pi (Better Stack)**: model-agnostic, subagentes, review ya existen.
+   **Rechazar LSP/DAP nativo y hashline edits** por ahora: dependencias pesadas,
+   y dskit no edita diffs contra un LLM. El browser-tool tampoco (research ya
+   fetchea).
+3. **Hsin-Yuan Huang (Oratomic/Caltech)**: "filosofía → máquina de acumulación
+   continua de conocimiento" es la visión ya construida (SCOPE-001, corpus
+   knowledge, memory_agent/MemGPT, skills, graphify, RAG, verifiers). Lo único
+   nuevo implementado: **el corpus sigue al objetivo** (`rag refresh --topics`
+   derivado de `references/00-objetivo.md` + `--from-objective`). El daemon
+   continuo autónomo NO: choca con las puertas humanas.
+4. **Right Harness (sentdex)**: el arnés es el foso (mismo modelo, mejor arnés →
+   mucho mejor). Valida `init.sh`/`agents-eval` como "harness mínimo" que dice
+   la verdad frente a benchmarks de proveedor.
+
+### Lecciones de omp.sh (Oh-My-Pi, la web)
+
+Implementado (ROADMAP OMP-001..005):
+- `commit_atomic`: split por área, lock files fuera, mensajes Conventional,
+  rechazo de ciclos, dry-run primero.
+- `memory_edit` + scoping (global/per-proyecto) en el banco de memoria.
+- Patrón ttsr: reglas derivadas de un fallo, validadas (habría disparado o no).
+- `review` con severidad P0-P3 + confidence + veredicto.
+- Extractores site-aware en `rag index_urls` (GitHub/SO/arXiv → markdown).
+
+Rechazado: motor nativo en Rust, snapcompact PNG, collab relay, ACP, github-fs
+URLs, browser/imagen/tts, Redis/SQL session stores — son features de un TUI,
+no de un template de agentes, o violan "cero deps".
+
+### Nota copier + git (verificación de renders)
+
+Al renderizar el template con copier desde el repo local, si `.git` tiene el
+remoto `cacelass/dskit`, copier usa el **mirror cacheado** (`~/.cache/copier/git/`)
+con la estructura PUSHEADA — no el árbol local con cambios sin pushear. Un
+cambio de rutas local parece "no aplicar" hasta el push. Para verificar renders
+con cambios locales: copiar template+copier.yml a /tmp SIN `.git`.
