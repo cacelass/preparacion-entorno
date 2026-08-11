@@ -125,6 +125,87 @@ suele sobreajustar; LoRA o RAG/prompting rinden más.
 La combinación es la normal en producción: **RAG para conocimiento + LoRA para
 comportamiento** (formato, tono, esquema). No es "o uno o el otro".
 
+### QLoRA: LoRA sobre un modelo cuantizado
+
+**QLoRA** (Dettmers et al., 2023) afina el mismo LoRA pero sobre un base
+cuantizado a **4 bits**: el adapter vive en bf16 y solo se actualiza él; los
+pesos del base se descuantizan on-the-fly al hacer el forward. Un modelo de
+65B cabe en una sola GPU (~24-48GB) y el coste de memoria baja a ~3-4 bits por
+parámetro frente a los 16 de LoRA, con calidad cercana al fine-tune completo en
+los benchmarks del paper. Tres piezas:
+
+- **NF4 (Normal Float 4)**: cuantización por **bloques de 64 pesos** con un
+  factor de escala por bloque. Aprovecha que los pesos entrenados se
+  distribuyen ~$\mathcal{N}(0, \sigma)$: asigna los 4 bits para maximizar
+  precisión donde hay más densidad de masa, no de forma uniforme como INT4.
+  El escalado por bloque (en vez de por tensor) reduce el error cuando una
+  columna tiene outliers.
+- **Double quantization**: los factores de escala NF4 (FP32) se cuantizan a su
+  vez a FP8, ahorrando ~0.37 bits/param adicionales. Pequeño, pero de gratis.
+- **Paged optimizers**: el estado del optimizador (Adam) se pagina a la CPU
+  cuando la VRAM se llena, como hace un sistema operativo con la RAM —
+  permite batch sizes que de otro modo harían OOM.
+
+**Cómo se rompe**:
+
+- **No es para modelos pequeños**: la pérdida de la cuantización puede pesar
+  más que el ahorro; el beneficio escala con el tamaño del base.
+- **No acelera, solo ahorra memoria**: la descuantización on-the-fly añade
+  cómputo. Si la VRAM sobra, LoRA en bf16 directo puede ser más rápido.
+- **Medir en la tarea, no en perplexity**: NF4 degrada distinto según capas y
+  pesos grandes; la perplexity del corpus no dice cómo responde a tu tarea.
+- La cuantización para **inferencia** (AWQ/GPTQ, PTQ/QAT) es otro mundo y vive
+  en `compresion-modelos.md`; QLoRA es cuantización para **entrenamiento**.
+- La matemática de rango bajo común a LoRA/QLoRA está en
+  `matematicas/matrices-app.md`.
+
+### aLoRA: activación por tokens de invocación
+
+LoRA aplica el adapter a **todos** los tokens. Eso significa que al cambiar de
+adapter hay que rehacer el prefill del contexto entero — con un RAG de 50k
+tokens, cada cambio de especialista recuenta el coste. **aLoRA** (Activated
+LoRA, Greenewald et al., IBM, 2025) modifica el marco para que el adapter solo
+se aplique a los tokens **en y después** de una *secuencia de invocación*
+(fuera de los límites del modelo), dejando intactos los Q, K, V del contexto
+anterior:
+
+$$Q = \begin{bmatrix} X_{1:t_{inv}-1} W_Q \\ X_{t_{inv}:t}\,(W_Q + \Delta Q) \end{bmatrix},
+\quad K = \begin{bmatrix} X_{1:t_{inv}-1} W_K \\ X_{t_{inv}:t}\,(W_K + \Delta K) \end{bmatrix},
+\quad V = \begin{bmatrix} X_{1:t_{inv}-1} W_V \\ X_{t_{inv}:t}\,(W_V + \Delta V) \end{bmatrix}$$
+
+Como antes de la invocación los pesos son los del base, las keys y values del
+contexto previo son idénticas entre base y adapter ($K^{adapter}_{1:t_{inv}-1} =
+K^{base}_{1:t_{inv}-1}$ y lo mismo para $V$, proposición formal del paper). El
+adapter **acepta el KV cache del base** para todo lo anterior a la
+invocación: cambiar de especialista no re-prefillea el contexto, solo el
+fragmento nuevo. Esto habilita los *intrinsics*: especialistas invocados bajo
+demanda para una operación bien definida sobre un trozo del hilo
+(verificar un formato, puntuar confianza, detectar alucinación), mientras el
+resto del hilo lo genera el base.
+
+- **Implementación**: está en HF PEFT (`alora_invocation_tokens`); la
+  reutilización real del prefijo en un servidor de inferencia exige alinear el
+  *prefix caching* entre base y adapters (vLLM, arXiv:2512.17910) — no sale
+  gratis de activar el flag.
+- **Tokenización**: la secuencia de invocación debe ser delimitada por tokens
+  especiales, o la tokenización la "absorbe" dentro de un token mayor y la
+  invocación falla silenciosamente.
+- **Costo en calidad**: aLoRA suele necesitar rango $r$ mayor que LoRA (hasta
+  32) para rendir igual; en los benchmarks del paper la precisión es
+  estadísticamente equivalente a LoRA.
+
+**Cómo se rompe** (y cuándo NO hace falta):
+
+- **No es "infinitos adapters gratis"**: requiere entrenar cada adapter con su
+  secuencia de invocación, respetar las condiciones de cache (la invocación
+  presente en todo input que lo use) y un servidor que soporte el prefix
+  reuse entre modelos. Sin eso, es un LoRA normal con más pasos.
+- **Para un sistema sencillo** (chatbot + RAG + un solo especialista) LoRA o
+  QLoRA bastan; aLoRA paga cuando hay **varios adapters alternándose sobre el
+  mismo contexto** (agentes, multi-especialidad).
+- La reutilización del KV cache **solo vale antes de la invocación**: después
+  de activarse, el adapter tiene su propio cache, como cualquier modelo.
+
 ## Evaluación: el problema sin resolver
 
 La evaluación de FMs es donde más se miente y más cuesta ser honesto:
@@ -197,7 +278,8 @@ La evaluación de FMs es donde más se miente y más cuesta ser honesto:
 ## Dónde encaja en dskit
 
 dskit no entrena FMs por defecto; los usa vía API o self-hosted. Este fichero da
-al `lider` el criterio para decidir adaptación (prompt → RAG → LoRA → full FT),
-evaluación honesta y coste, y se mantiene con `rag refresh` (topics de
+al `lider` el criterio para decidir adaptación (prompt → RAG → LoRA → full FT,
+con QLoRA para ajustar con poca VRAM y aLoRA para especialistas activables bajo
+demanda), evaluación honesta y coste, y se mantiene con `rag refresh` (topics de
 `sources.json`). Cruza con `llms-aplicados.md`, `backend/servir-modelos.md`,
 `fairness-y-seguridad.md` y `guardarraíles.md`.

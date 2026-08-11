@@ -116,6 +116,11 @@ estimator** (el gradiente atraviesa el redondeo como identidad). El modelo
 | Pérdida típica INT8 | 0-2%, más si hay outliers | ~0% recuperable |
 | Cuándo | primer intento, modelos grandes | PTQ no llega al umbral |
 
+Nota: QLoRA es el pariente de QAT para fine-tuning — cuantizar el base a 4 bits
+(NF4) y entrenar solo los adapters LoRA encima, en vez de cuantizar un modelo ya
+entrenado. Es cuantización para **entrenamiento**, no para inferencia; detalle
+en `modelos-fundacionales.md`.
+
 ### El patrón de degradación
 
 La degradación no es uniforme ni en magnitud ni en dónde aparece:

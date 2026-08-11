@@ -21,6 +21,9 @@ y se convirtieron con `markitdown` para extraer fórmulas exactas). La fecha de
 | Boosting | CatBoost: Unbiased Boosting with Categorical Features | [1706.09516](https://arxiv.org/abs/1706.09516) | v5 | activa |
 | Clustering | A Tutorial on Spectral Clustering (von Luxburg) | [0711.0189](https://arxiv.org/abs/0711.0189) | v1 | activa |
 | Álgebra lineal | The Matrix Cookbook (Petersen, Pedersen) | [web](https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf) | — | activa |
+| Series temporales | Skillful joint probabilistic weather forecasting from marginals (Alet et al., Google DeepMind) | [2506.10772](https://arxiv.org/abs/2506.10772) | v1 | activa |
+| Modelos fundacionales | QLoRA: Efficient Finetuning of Quantized LLMs (Dettmers et al.) | [2305.14314](https://arxiv.org/abs/2305.14314) | v1 | activa |
+| Modelos fundacionales | Activated LoRA: Fine-tuned LLMs for Intrinsics (Greenewald et al., IBM) | [2504.12397](https://arxiv.org/abs/2504.12397) | v5 | activa |
 
 ## Temas cubiertos por queries (sin fuente fija)
 

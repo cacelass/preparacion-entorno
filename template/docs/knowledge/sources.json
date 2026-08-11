@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-08",
+  "updated": "2026-08-11",
   "comment": "Registro de fuentes del corpus de conocimiento (docs/knowledge/). Lo lee 'rag refresh': por cada topic consulta arXiv con las queries y verifica que cada fuente activa no haya sido superada (versión más reciente). Solo se listan fuentes con arXiv ID verificado; el resto de temas se cubren con queries (sources vacío).",
   "topics": [
     {
@@ -136,7 +136,9 @@
     {
       "topic": "series-temporales",
       "queries": ["time series forecasting arima", "walk-forward validation backtesting forecasting"],
-      "sources": []
+      "sources": [
+        {"arxiv_id": "2506.10772", "title": "Skillful joint probabilistic weather forecasting from marginals", "version": 1, "status": "activa", "last_checked": "2026-08-11"}
+      ]
     },
     {
       "topic": "ingenieria-datos",
@@ -216,7 +218,10 @@
     {
       "topic": "modelos-fundacionales",
       "queries": ["foundation models pretraining scaling", "lora parameter efficient fine-tuning", "llm evaluation benchmarks contamination"],
-      "sources": []
+      "sources": [
+        {"arxiv_id": "2305.14314", "title": "QLoRA: Efficient Finetuning of Quantized LLMs", "version": 1, "status": "activa", "last_checked": "2026-08-11"},
+        {"arxiv_id": "2504.12397", "title": "Activated LoRA: Fine-tuned LLMs for Intrinsics", "version": 5, "status": "activa", "last_checked": "2026-08-11"}
+      ]
     },
     {
       "topic": "guardarrailes",

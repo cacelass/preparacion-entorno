@@ -455,6 +455,79 @@ df = pd.read_parquet(
 )
 ```
 
+## ACID y transacciones
+
+Cuando una escritura toca más de un recurso —varias filas, una tabla y un
+índice, un archivo y su manifest— "escribir y rezar" no basta. Una
+**transacción** agrupa esas operaciones y garantiza cuatro propiedades,
+conocidas como ACID (Haerder & Reuter, 1983):
+
+- **Atomicidad (A)**: todo o nada. Si una operación del grupo falla, ninguna
+  deja efecto. Se implementa con un *write-ahead log* (WAL): se registra el
+  cambio antes de aplicarlo y, ante un crash o error, se hace *rollback* a
+  partir del log. Distíngela de la consistencia: la atomicidad es sobre
+  *fallos*, no sobre *datos*.
+- **Consistencia (C)**: la transacción lleva la base de un estado válido a
+  otro válido — donde "válido" significa los invariantes **declarados**
+  (PRIMARY KEY, FOREIGN KEY, CHECK, NOT NULL). La base no sabe nada de tu
+  lógica de negocio: si el invariante no está declarado, la "consistencia"
+  que esperas no existe. C de ACID no tiene relación con la *eventual
+  consistency* de los sistemas distribuidos — homónimos, no parientes.
+- **Aislamiento (I)**: las transacciones concurrentes no se ven entre sí. El
+  grado se controla con el *isolation level*:
+
+  | Nivel | Evita | Anomalía que queda |
+  |-------|-------|--------------------|
+  | Read uncommitted | nada | dirty reads (leer datos no commiteados) |
+  | Read committed | dirty reads | non-repeatable reads (la misma fila cambia en la transacción) |
+  | Repeatable read | + non-repeatable | phantom reads (filas nuevas aparecen en medio) |
+  | Serializable | todo | — (equivale a ejecutar las transacciones en serie) |
+
+  El aislamiento se paga: con *locks* en rendimiento (y *deadlocks* cuando dos
+  transacciones se bloquean mutuamente), con *MVCC* (multiversion concurrency
+  control) en memoria y complejidad. Nivel por defecto de los motores
+  modernos: Read committed (Postgres, SQLite) o Repeatable read (MySQL).
+
+- **Durabilidad (D)**: lo commiteado sobrevive a un crash. Requiere escribir
+  el WAL a disco (fsync) antes de confirmar; la opción de "durabilidad
+  relajada" de algunos motores (`synchronous = OFF` en SQLite, group commit)
+  sacrifica la D a cambio de velocidad — válida solo donde la pérdida de los
+  últimos segundos no importa.
+
+### ACID en un proyecto de DS
+
+- **DuckDB y SQLite dan ACID real sobre un solo archivo** (MVCC + WAL). Pero
+  son in-process: no hay concurrencia de escritura entre procesos (ver
+  "Cuándo NO usar DuckDB" más arriba). ACID de un solo nodo, no de servicio.
+- El patrón **`tmp` + rename** (idempotencia, arriba) es atomicidad de **un**
+  archivo: o existe el nuevo o existe el viejo. No cubre dos escrituras que
+  deben commiteverse juntas. Cuando el pipeline necesita eso, usa una
+  transacción real (SQLite/DuckDB en modo transaccional) en vez de emularla.
+- **Parquet/CSV no son transaccionales**: una escritura a mitad muere con el
+  archivo a medias. La mitigación es siempre escribir a un archivo temporal y
+  renombrar — y asumir que "media escritura visible" es imposible solo si el
+  rename es atómico (lo es dentro de un mismo filesystem).
+- No confundas **idempotencia** con transaccionalidad: idempotente = se puede
+  re-ejecutar sin duplicar; transaccional = las operaciones de un paso se
+  commitean o se revierten juntas. Un pipeline necesita ambas, y son
+  ortogonales.
+
+### Cómo se rompe
+
+- **Asumir ACID donde no lo hay**: escrituras directas a Parquet, `to_csv`
+  sobre un archivo en uso, `INSERT` a medio de un batch. La base no te
+  salva; la transacción o el tmp+rename sí.
+- **Isolation mal elegido**: demasiado bajo → lecturas inconsistentes en
+  procesos concurrentes (dirty reads); demasiado alto → deadlocks y lentitud
+  inesperados. El nivel por defecto no es "el correcto", es "el razonable".
+- **Durabilidad sin fsync**: el commit "confirma" pero un corte de luz lo
+  pierde. Durability relajada solo donde sea aceptable perder el último
+  tramo.
+- **ACID distribuido**: la transacción entre dos bases no escala como la de
+  una; exige *two-phase commit* o consenso, y el coste y los modos de fallo
+  crecen. Kleppmann lo resume: los sistemas distribuidos son el último
+  recurso, no el primero.
+
 ## Escala: cuándo es cuándo
 
 "El dataset no cabe en memoria" tiene tres respuestas en orden de coste
@@ -609,6 +682,9 @@ al motor es lo que hace que el pipeline de mañana no se reescriba.
 - "Designing Data-Intensive Applications" (Martin Kleppmann, O'Reilly 2017) —
   replicación, particionado, formatos de almacenamiento, transacciones y
   por qué los sistemas distribuidos son el último recurso.
+- Haerder, T. y Reuter, A., *Principles of Transaction-Oriented Database
+  Recovery*, ACM Computing Surveys 15(4), 1983 — el paper que acuñó el
+  término ACID. https://doi.org/10.1145/289.291
 - Documentación de pandas (guía de estilo, merges, dtypes, rendimiento) —
   https://pandas.pydata.org/docs/
 - "Enhancing Performance" y "Essential Basic Functionality" de pandas

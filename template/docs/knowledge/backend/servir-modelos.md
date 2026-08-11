@@ -131,6 +131,13 @@ para decidir en producción.
 features extremas (las importantes en anomalías) y el modelo falla justo en
 los casos raros que importan.
 
+**Multi-adapter y KV-cache**: si sirves varios adapters LoRA alternándose sobre
+el mismo contexto (agentes, multi-especialidad), cada switch re-prefillea el
+historial. Con **aLoRA** (adapters activados por tokens de invocación) el
+prefijo anterior al trigger es reutilizable entre base y adapters, pero la
+reutilización real exige alinear el prefix caching del servidor con esa
+semántica (vLLM lo soporta). Detalle en `modelos-fundacionales.md`.
+
 ## Versionado y rollout
 
 El model registry es la fuente de verdad: cada versión con parámetros, métricas

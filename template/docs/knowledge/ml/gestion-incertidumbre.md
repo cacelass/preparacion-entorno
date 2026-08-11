@@ -47,6 +47,29 @@ dispersión entre modelos o entre muestras de la posterior.
   Detectar drift de covariables (regiones nuevas) es un problema de
   incertidumbre epistémica.
 
+### Separarlas en la práctica (a escala)
+
+Sin inferencia bayesiana exacta, las dos fuentes se modelan con mecanismos
+distintos y complementarios:
+
+- **Epistémica → deep ensemble**: entrenar $J$ seeds independientes y usar la
+  dispersión entre sus predicciones (Lakshminarayanan et al.). Es un baseline
+  fuerte de calibración y escala a modelos grandes sin tocar el entrenamiento.
+- **Aleatoria → perturbación funcional**: en vez de añadir ruido en la salida
+  (que rompe la coherencia espacial), muestrear una **función**: un vector de
+  ruido gaussiano de baja dimensión entra en capas de normalización compartidas
+  y reparametriza el paso. Cada muestra es una alternativa dinámicamente
+  coherente, no ruido punto a punto.
+
+FGN (arXiv:2506.10772, WeatherNext 2) es el caso canónico a escala: 4 seeds
+para la epistémica y un vector de 32 dimensiones perturbando las capas de
+normalización para la aleatoria, sobre un campo global de ~$10^8$ variables. La
+lección no es la arquitectura: es que **la fuente de la aleatoriedad y la
+dimensionalidad del ruido determinan si el ensemble es un conjunto de
+alternativas plausibles o un saco de ruido independiente.** (El CRPS como
+función de pérdida y la evaluación de la estructura conjunta están en
+`series-temporales.md`, sección "Forecasting probabilístico".)
+
 ## Calibración vs cobertura
 
 Dos propiedades distintas que se confunden porque ambas cuantifican "qué tan
@@ -324,6 +347,14 @@ incertidumbre alta no lleva a ningún sitio.
   Evaluar a un $\alpha$ de negocio fijo y reportar ambos números juntos:
   cobertura sin sharpness no discrimina modelos, sharpness sin cobertura no es
   fiable.
+- **CRPS como scoring rule propia**: para una distribución predictiva $F$ y un
+  valor observado $y$,
+  $\operatorname{CRPS}(F,y) = \int (F(z)-\mathbf{1}[y \le z])^2\, dz$ combina
+  calibración y sharpness en una cifra; es **propia** (se minimiza con la
+  distribución verdadera) y **diferenciable**, así que sirve como pérdida de
+  entrenamiento (FGN, WeatherNext 2). Sobre muestra finita se usa el estimador
+  fair, que penaliza ensembles demasiado estrechos. Detalle y estructura
+  conjunta en `series-temporales.md`.
 
 ## Trampas
 
@@ -364,3 +395,7 @@ incertidumbre alta no lleva a ningún sitio.
 - Lakshminarayanan, B., Pritzel, A., Blundell, C., *Simple and Scalable
   Predictive Uncertainty Estimation using Deep Ensembles*, 2017.
   arXiv:1612.01474 — https://arxiv.org/abs/1612.01474
+- Alet, F., Price, I., El-Kadi, A., Masters, D., Markou, S., Andersson, T. R.,
+  Stott, J., Lam, R., Willson, M., Sanchez-Gonzalez, A., Battaglia, P.,
+  *Skillful joint probabilistic weather forecasting from marginals* (FGN),
+  2025. arXiv:2506.10772 — https://arxiv.org/abs/2506.10772

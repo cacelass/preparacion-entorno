@@ -363,6 +363,83 @@ usar residuos normalizados por la volatilidad de la ventana.
   importa más que el error del método). Un intervalo para un horizonte largo
   que no crece con $h$ está mintiendo.
 
+## Forecasting probabilístico
+
+Predecir un valor puntual $\hat{y}_{t+h}$ oculta que el futuro es una
+distribución. El objetivo probabilístico es la **distribución sobre la
+trayectoria futura** $p(X^{1:T} \mid X^0, X^{-1})$ y su salida natural es un
+**ensemble de trayectorias**: muestrear $M$ caminos completos, cada uno
+coherente —no ruido independiente punto a punto—, de modo que la dispersión
+del ensemble a horizonte $h$ sea la incertidumbre del modelo sobre ese
+horizonte.
+
+### Por qué un ensemble, no un intervalo por paso
+
+Un intervalo por paso predice cada $X^t$ con su banda pero ignora que los
+pasos están correlacionados: la trayectoria es un objeto, no $T$ objetos
+independientes. Un ensemble de trayectorias conserva esa estructura conjunta —
+preguntas como "¿probabilidad de que el agregado del horizonte supere un
+umbral?" solo se responden sobre caminos completos, no sobre marginales por
+paso. La dispersión debe crecer con $h$: un ensemble cuyos miembros convergen
+a largo plazo miente, igual que el intervalo plano del apartado anterior.
+
+### CRPS: la métrica de una predicción probabilística
+
+Para una distribución predictiva $F$ y un valor observado $y$, el **CRPS**
+(Continuous Ranked Probability Score) mide a la vez calibración y sharpness:
+
+$$\operatorname{CRPS}(F, y) = \int_{-\infty}^{\infty}
+\bigl(F(z) - \mathbf{1}[y \le z]\bigr)^2 \, dz.$$
+
+Es una **scoring rule propia**: su valor esperado se minimiza cuando $F$ es la
+distribución verdadera, así que optimizarla no recompensa mentir. Frente al
+log-score es más robusta a colas y outliers (castigo cuadrático, no
+logarítmico) y se computa y compara punto a punto. La estructura conjunta se
+evalúa aparte — CRPS sobre agregados espaciales o temporales, o sobre
+magnitudes derivadas.
+
+Sobre una muestra finita de $M$ miembros se estima con el **estimador fair**:
+
+$$\widehat{\operatorname{CRPS}}(F_M, y) = \frac{1}{M}\sum_{m=1}^{M}|y-x_m|
+- \frac{1}{2M^2}\sum_{m=1}^{M}\sum_{k=1}^{M}|x_m-x_k|,$$
+
+que penaliza un ensemble demasiado estrecho (miembros casi iguales) frente a
+uno que de verdad cubre el rango. Es el análogo a cobertura+sharpness de
+`gestion-incertidumbre.md`, en una sola cifra y —clave para ML—
+**diferenciable**: se puede usar como función de pérdida de entrenamiento.
+
+### FGN (Functional Generative Networks): un ejemplo a escala
+
+FGN (Alet et al., Google DeepMind, arXiv:2506.10772) es la arquitectura de
+WeatherNext 2 y la traducción directa de la descomposición aleatoria/epistémica
+al espacio de funciones:
+
+- **Epistémica**: un deep ensemble de $J$ seeds entrenadas independientemente.
+- **Aleatoria**: por paso, un vector de ruido gaussiano $\epsilon_t \in
+  \mathbb{R}^{32}$ entra en las capas de normalización compartidas y
+  reparametriza el paso — se muestrea una **función**, no se añade ruido a la
+  salida. Los miembros del ensemble son alternativas dinámicamente coherentes.
+
+Entrenado solo sobre **marginales** (CRPS por ubicación, variable y nivel),
+captura estructura conjunta espacial: como un único vector de 32 dimensiones
+influencia el campo entero, la única manera de bajar el CRPS en todas partes es
+codificar correlaciones físicas reales a lo largo de ese subespacio. La lección
+es portátil a cualquier forecasting multivariado: **la baja dimensionalidad del
+ruido compartido fuerza a aprender la estructura conjunta sin supervisión
+explícita sobre ella.**
+
+### Cómo se rompe
+
+- **Rollouts inestables a lead largo.** Entrenar solo el paso 1 produce
+  trayectorias que degeneran a estados no físicos en horizontes largos; FGN lo
+  corrige con un rollout autoregresivo corto (~8 pasos) con backprop a través
+  del rollout. Lección: al evaluar un modelo de trayectorias se valida la
+  **estabilidad del rollout**, no solo el error del paso 1 — el error corto
+  puede estar bien mientras la trayectoria ya no es plausible.
+- **CRPS solo mide marginales.** Ganar en CRPS no garantiza estructura
+  conjunta correcta; hay que evaluarla aparte con agregados y magnitudes
+  derivadas (en el paper, ciclones tropicales).
+
 ## Práctica
 
 ### El pipeline correcto
@@ -441,3 +518,7 @@ producción como hiperparámetros, no como parte de la búsqueda por trial
   Shift*. arXiv:2108.09717. https://arxiv.org/abs/2108.09717
 - Prophet: Taylor, S. J. y Letham, B., *Forecasting at Scale* (AAAI 2018).
   https://doi.org/10.1609/aaai.v32i1.11654
+- Alet, F., Price, I., El-Kadi, A., Masters, D., Markou, S., Andersson, T. R.,
+  Stott, J., Lam, R., Willson, M., Sanchez-Gonzalez, A., Battaglia, P.,
+  *Skillful joint probabilistic weather forecasting from marginals* (FGN),
+  2025. arXiv:2506.10772 — https://arxiv.org/abs/2506.10772
