@@ -105,6 +105,36 @@ def test_next_respeta_dependencias(harness):
     assert result.data["id"] == "A-001"
 
 
+def test_next_propone_plan_scope_en_proyecto_sin_spec(harness):
+    """Primera vez en un proyecto recién generado: `next` propone `plan scope`
+    (la entrevista que construye el spec) en vez de dejar rellenar a mano."""
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"].insert(0, {
+        "id": "SCOPE-001", "title": "Definir qué se quiere resolver",
+        "description": "d", "acceptance_criteria": ["a"], "status": "pending",
+        "depends_on": [],
+    })
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    assert not (harness.ctx.root / "references" / "00-objetivo.md").exists()
+
+    result = harness.next()
+    assert result.success
+    assert result.data["id"] == "SCOPE-001"
+    assert result.data.get("sugerencia") == "plan scope"
+    assert "plan scope" in result.message
+
+
+def test_next_con_spec_no_sugiere_scope(harness):
+    """Si el spec ya existe, `next` se comporta normal (no propone la entrevista)."""
+    (harness.ctx.root / "references").mkdir(exist_ok=True)
+    (harness.ctx.root / "references" / "00-objetivo.md").write_text(
+        "# Objetivo\n\n## Pregunta\n¿Q?\n", encoding="utf-8"
+    )
+    result = harness.next()
+    assert result.success
+    assert result.data.get("sugerencia") != "plan scope"
+
+
 def test_next_retoma_lo_abierto(harness):
     harness.start(id="A-001")
     result = harness.next()
@@ -497,3 +527,136 @@ def test_approve_sin_id_pide_id(harness):
     result = harness.approve()
     assert not result.success
     assert result.needs
+
+
+# -- F1: certeza (μ.cert) como puerta de cierre ---------------------------------
+def test_finish_rechaza_certeza_baja_explicita(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    result = harness.finish(
+        id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s", certainty=0.4
+    )
+    assert not result.success
+    assert result.needs, "una feature con dudas no se cierra: escala, no falla en seco"
+    assert "certeza" in result.message.lower()
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "in_progress"  # NO se tocó
+
+
+def test_finish_acepta_certeza_suficiente(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    result = harness.finish(
+        id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s", certainty=0.9
+    )
+    assert result.success
+
+
+def test_finish_hereda_la_certeza_baja_del_reviewer(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.record(agent="reviewer", id="A-001", verdict="aprobado",
+                   content="## Criterios\ncumplidos", certainty=0.5)
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    assert not result.success, "si el reviewer dudó, el done hereda la duda"
+    assert "certeza" in result.message.lower()
+
+
+def test_finish_sin_reviewer_ni_certeza_cierra(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    assert result.success, "sin señal de duda, confianza plena — como siempre fue"
+
+
+def test_record_guarda_la_certeza_en_la_cabecera(harness):
+    harness.record(agent="reviewer", id="A-001", verdict="aprobado",
+                   content="## Criterios\ncumplidos", certainty=0.42)
+    path = harness.ctx.root / "harness" / "progress" / "reviewer-A-001.md"
+    assert "**Certeza:** 0.42" in path.read_text()
+
+
+def test_record_clampa_la_certeza_a_01(harness):
+    harness.record(agent="reviewer", id="A-001", verdict="aprobado",
+                   content="ok", certainty=7.0)
+    path = harness.ctx.root / "harness" / "progress" / "reviewer-A-001.md"
+    assert "**Certeza:** 1.00" in path.read_text()
+
+
+# -- F2: protocolo §1 (packet compacto de subagente) -----------------------------
+PACKET_OK = json.dumps({
+    "§": 1,
+    "E": {"X": ["src/model.py", "feature"]},
+    "S": {"X.tests": 14},
+    "R": [],
+    "Δ": ["X.nuevo→implementado@FEAT-007"],
+    "μ": {"rol": "implementer", "cert": 0.95, "evidencia": "pytest: 14 passed"},
+}, ensure_ascii=False)
+
+
+def test_record_con_packet_escribe_frontmatter(harness):
+    result = harness.record(agent="implementer", id="A-001",
+                            content="## Qué hice\nsrc/model.py", packet=PACKET_OK)
+    assert result.success
+    path = harness.ctx.root / "harness" / "progress" / "implementer-A-001.md"
+    text = path.read_text()
+    assert "<!-- §1:" in text
+    assert "implementado@FEAT-007" in text
+    assert "Qué hice" in text, "la prosa convive con el packet"
+
+
+def test_record_con_packet_hereda_la_certeza_del_packet(harness):
+    harness.record(agent="implementer", id="A-001",
+                   content="## Qué hice\nx", packet=PACKET_OK)
+    path = harness.ctx.root / "harness" / "progress" / "implementer-A-001.md"
+    assert "**Certeza:** 0.95" in path.read_text()
+
+
+def test_record_rechaza_packet_no_json(harness):
+    result = harness.record(agent="explorer", id="A-001", content="hola", packet="{roto")
+    assert not result.success
+    assert "packet" in result.message.lower()
+
+
+def test_record_rechaza_packet_con_ejes_desconocidos(harness):
+    result = harness.record(agent="explorer", id="A-001", content="hola",
+                            packet='{"E":{},"μ":{"rol":"explorer"},"Zeta":1}')
+    assert not result.success
+    assert "desconocidos" in result.message
+
+
+def test_record_rechaza_packet_sin_mu_rol(harness):
+    result = harness.record(agent="explorer", id="A-001", content="hola",
+                            packet='{"E":{},"S":{}}')
+    assert not result.success
+    assert "μ" in result.message
+
+
+def test_record_rechaza_cert_fuera_de_rango(harness):
+    result = harness.record(agent="explorer", id="A-001", content="hola",
+                            packet='{"E":{},"μ":{"rol":"explorer","cert":1.7}}')
+    assert not result.success
+    assert "0 y 1" in result.message
+
+
+def test_packet_sin_content_sigue_exigiendo_contenido(harness):
+    result = harness.record(agent="explorer", id="A-001", packet=PACKET_OK)
+    assert not result.success
+    assert result.needs, "el packet resume, pero la prosa/evidencia sigue siendo obligatoria"
+
+
+def test_antecedentes_devuelve_el_resumen_del_packet(harness):
+    """`next` resume el precedente con su packet Δ/μ.cert, no con el extracto crudo."""
+    from agents.agents.harness_agent import _leer_packet, _packet_resumen
+
+    (harness.ctx.root / "harness" / "progress" / "implementer-B-001.md").write_text(
+        "# implementer · B-001\n\n"
+        "- **Fecha:** 2026-01-01\n- **Veredicto:** ok\n- **Certeza:** 0.95\n\n"
+        f"<!-- §1: {PACKET_OK} -->\n\n## Qué hice\nx\n",
+        encoding="utf-8",
+    )
+    packet = _leer_packet(harness.ctx.root / "harness" / "progress" / "implementer-B-001.md")
+    assert packet is not None
+    resumen = _packet_resumen(packet)
+    assert "implementado@FEAT-007" in resumen
+    assert "0.95" in resumen

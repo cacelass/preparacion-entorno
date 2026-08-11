@@ -66,6 +66,9 @@ regularización, arquitectura de red, serving, exprimir el modelo...), el
 | `ml/metaheuristica.md` | Optimización no diferenciable o combinatoria — GA, recocido simulado, búsqueda |
 | `ml/modelos-fundacionales.md` | Siempre (bloque LLM/FM) — pre-training, adaptación (LoRA/QLoRA/aLoRA), evaluación, coste |
 | `ml/guardarraíles.md` | FM/LLM expuestos — capas de contención: entrada, filtros, acciones, red teaming |
+| `ml/evals-de-sistemas.md` | Sistemas con LLM — golden sets, evals-as-code, evaluar trayectorias de agentes, cuándo el eval miente |
+| `ml/contexto-y-memoria.md` | Agentes — la ventana como recurso, memoria externa, handoff sin heredar, compresión |
+| `ml/neurodifuso.md` | "Un modelo diferente" — ANFIS: el nicho y la explosión combinatoria de reglas |
 
 ## Ingeniería
 

@@ -25,15 +25,23 @@ from agents.orchestrator import Orchestrator, RoutingDecision
 
 def _print_result(result: AgentResult, *, json_mode: bool = False) -> None:
     if json_mode:
-        print(json.dumps({
+        payload = {
             "success": result.success,
             "agent": result.agent,
             "action": result.action,
-            "message": result.message,
-            "data": result.data,
             "warnings": result.warnings,
             "needs": result.needs,
-        }, indent=2, ensure_ascii=False, default=str))
+            "certainty": round(result.certainty, 3),
+        }
+        # La prosa solo viaja cuando no hay estructura que la sustituya: si
+        # `data` codifica el resultado, `message` lo duplica (el consumidor
+        # es una herramienta/agente, y pagar tokens dos veces por lo mismo
+        # es tirar contexto — ver protocolo §1 en prompts/harness_workflow.md).
+        if result.data is None:
+            payload["message"] = result.message
+        else:
+            payload["data"] = result.data
+        print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
         return
     status = "✔" if result.success else "✘"
     print(f"{status} [{result.agent}.{result.action}] {result.message}")

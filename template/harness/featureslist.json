@@ -4,18 +4,20 @@
   "project": "{{ project_name }}",
   "features": [
     {
-      "id": "SCOPE-001",
-      "title": "Definir qué se quiere resolver",
-      "description": "Antes de tocar un dato: escribir qué pregunta responde este proyecto, cómo se mide que la respuesta es buena, con qué datos se cuenta y cuándo se da por terminado. Es la feature que da rumbo a todas las demás — sin un criterio de éxito numérico, ninguna decisión posterior (qué modelo, qué features, cuándo parar) se toma sobre otra cosa que no sea intuición.",
-      "acceptance_criteria": [
-        "Existe references/00-objetivo.md con cuatro apartados: pregunta a responder, métrica de éxito, datos de partida y criterio de parada",
-        "La métrica de éxito es un número con umbral (p. ej. 'F1 macro >= 0.80 en validación'), no 'que funcione bien'",
-        "El criterio de parada dice explícitamente qué resultado haría replantear o abandonar el proyecto",
-        "El README describe el objetivo en una frase propia, no con el texto de la plantilla",
-        "./init.sh termina con ENTORNO LISTO"
-      ],
-      "status": "pending",
-      "depends_on": []
+  "id": "SCOPE-001",
+  "title": "Definir qué se quiere resolver",
+  "description": "Antes de tocar un dato: escribir qué pregunta responde este proyecto, cómo se mide que la respuesta es buena, con qué datos se cuenta y cuándo se da por terminado. Es la feature que da rumbo a todas las demás — sin un criterio de éxito numérico, ninguna decisión posterior (qué modelo, qué features, cuándo parar) se toma sobre otra cosa que no sea intuición. Al arrancar un proyecto recién generado, `harness next` propone `plan scope`: la entrevista de arranque que construye el spec y siembra el backlog en orden lógico.",
+  "acceptance_criteria": [
+    "references/00-objetivo.md existe y se construyó con `plan scope` (entrevista: pregunta, métrica, datos, parada, usuarios, alcance, riesgos)",
+    "Existe references/00-objetivo.md con cuatro apartados: pregunta a responder, métrica de éxito, datos de partida y criterio de parada",
+    "La métrica de éxito es un número con umbral (p. ej. 'F1 macro >= 0.80 en validación'), no 'que funcione bien'",
+    "El criterio de parada dice explícitamente qué resultado haría replantear o abandonar el proyecto",
+    "El backlog queda sembrado en orden lógico (SCOPE-001 → RESEARCH-001 → EDA-001 → DATA-001 → FEAT-001 → MODEL-001 y las propuestas)",
+    "El README describe el objetivo en una frase propia, no con el texto de la plantilla",
+    "./init.sh termina con ENTORNO LISTO"
+  ],
+  "status": "pending",
+  "depends_on": []
     },
     {
       "id": "RESEARCH-001",

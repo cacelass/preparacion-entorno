@@ -72,3 +72,174 @@ def test_plan_routes_via_orchestrator(context):
     orchestrator = Orchestrator(context=context)
     decision = orchestrator.select_agent("planifica este encargo")
     assert decision.agent_name == "plan"
+
+
+def test_scope_routes_via_orchestrator(context):
+    """'scope' / 'objetivo' / 'empezar el proyecto' rutean al agente plan."""
+    orchestrator = Orchestrator(context=context)
+    assert orchestrator.select_agent("scope del proyecto").agent_name == "plan"
+    assert orchestrator.select_agent("empezar el proyecto").agent_name == "plan"
+
+
+def test_scope_pregunta_todo_lo_necesario(context):
+    plan = PlanAgent(context=context)
+    result = plan.scope(reset=True)
+    assert result.success
+    # 4 obligatorias (pregunta, metrica, datos, parada) + 3 opcionales
+    assert len(result.needs) == 7
+    claves = {n.split(":")[0] for n in result.needs}
+    assert {"pregunta", "metrica", "datos", "parada", "usuarios", "alcance", "riesgos"} == claves
+
+
+def test_scope_rechaza_metrica_sin_umbral(context):
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    result = plan.scope_answer(metrica="que funcione bien")
+    assert not result.success
+    assert "umbral" in result.message or "número" in result.message
+
+
+def test_scope_commit_rehusa_sin_obligatorias(context):
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    plan.scope_answer(pregunta="¿Q?", metrica="AUC >= 0.85")
+    # faltan datos y parada (obligatorias) → el commit se niega, no siembra a medias
+    result = plan.scope_commit()
+    assert not result.success
+    assert result.needs
+
+
+def test_scope_commit_escribe_spec_y_siembra_backlog(context, project_root):
+    (context.root / "harness").mkdir(exist_ok=True)
+    (context.root / "harness" / "featureslist.json").write_text(
+        '{"version": 1, "project": "T", "features": []}', encoding="utf-8"
+    )
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    answered = plan.scope_answer(
+        pregunta="¿Podemos predecir churn?",
+        metrica="AUC >= 0.85 en validación",
+        datos="clientes.csv con 100k filas",
+        parada="Si AUC no supera 0.60 tras el baseline",
+        features="API-001",
+    )
+    assert answered.success, answered.message
+
+    result = plan.scope_commit()
+    assert result.success, result.message
+    sembradas = result.data["sembradas"]
+    assert "SCOPE-001" in sembradas and "MODEL-001" in sembradas
+    assert "API-001" in sembradas
+
+    # El spec queda escrito con los apartados y la métrica numérica
+    objetivo = (context.root / "references" / "00-objetivo.md").read_text()
+    assert "AUC >= 0.85" in objetivo
+    assert "Podemos predecir churn" in objetivo
+
+    # El orden lógico: la dirección antes que las features propuestas
+    import json
+    doc = json.loads((context.root / "harness" / "featureslist.json").read_text())
+    ids = [f["id"] for f in doc["features"]]
+    assert ids.index("SCOPE-001") < ids.index("MODEL-001") < ids.index("API-001")
+
+
+def test_scope_sembrado_idempotente_no_duplica(context):
+    """Volver a sembrar no duplica: las features ya existentes se saltan."""
+    (context.root / "harness").mkdir(exist_ok=True)
+    (context.root / "harness" / "featureslist.json").write_text(
+        '{"version": 1, "project": "T", "features": []}', encoding="utf-8"
+    )
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    plan.scope_answer(pregunta="Q", metrica="F1 >= 0.8", datos="d", parada="p")
+
+    r1 = plan.scope_commit()
+    r2 = plan.scope_commit()
+    assert r1.success and r2.success
+    assert "SCOPE-001" not in r2.data["sembradas"], "las ya existentes no se re-añaden"
+
+
+def test_scope_features_se_deduprican(context):
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    plan.scope_answer(pregunta="Q", metrica="F1 >= 0.8", datos="d", parada="p",
+                      features="API-001; MON-001")
+    plan.scope_answer(features="API-001; OTRA")
+    scope = plan._load_scope()
+    assert scope["features"] == ["API-001", "MON-001", "OTRA"]
+
+
+def test_detectar_riesgos_reconoce_login(context):
+    """La heurística identifica los riesgos de un login sin que el usuario los declare."""
+    from agents.agents.plan_agent import _detectar_riesgos
+
+    riesgos = _detectar_riesgos("hacer un login que distinga por usuario con contraseña")
+    assert "sql injection" in riesgos
+    assert "fuga de credenciales" in riesgos
+
+
+def test_detectar_riesgos_no_alarma_texto_inocuo(context):
+    from agents.agents.plan_agent import _detectar_riesgos
+
+    assert _detectar_riesgos("predecir la temperatura media anual") == []
+
+
+def test_scope_commit_rehusa_si_riesgos_detectados_sin_decidir(context):
+    """El gate: si la heurística detecta riesgos y no se han decidido, NO siembra."""
+    (context.root / "harness").mkdir(exist_ok=True)
+    (context.root / "harness" / "featureslist.json").write_text(
+        '{"version": 1, "project": "T", "features": []}', encoding="utf-8"
+    )
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    plan.scope_answer(pregunta="¿Cómo autenticar usuarios en el login?",
+                      metrica="tasa >= 0.99", datos="tabla de usuarios", parada="p")
+
+    result = plan.scope_commit()
+    assert not result.success, "no puede sembrar con riesgos sin decidir"
+    assert result.needs, "debe pedir decisión por cada riesgo detectado"
+    assert any("sql injection" in n for n in result.needs)
+
+    # Nada se sembró
+    import json
+    doc = json.loads((context.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"] == []
+
+
+def test_scope_commit_siembra_solo_riesgos_aceptados(context):
+    """Tras decidir, se siembran los aceptados como RISK y los descartados no."""
+    (context.root / "harness").mkdir(exist_ok=True)
+    (context.root / "harness" / "featureslist.json").write_text(
+        '{"version": 1, "project": "T", "features": []}', encoding="utf-8"
+    )
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    plan.scope_answer(pregunta="¿Cómo autenticar usuarios en el login?",
+                      metrica="tasa >= 0.99", datos="tabla de usuarios", parada="p")
+
+    plan.scope_answer(aceptar_riesgos="sql injection")
+    plan.scope_answer(descartar_riesgos="enumeración de usuarios")
+    # fuga de credenciales también quedó detectada → hay que decidirla también
+    result = plan.scope_commit()
+    assert not result.success, "fuga de credenciales sigue sin decidir"
+    plan.scope_answer(aceptar_riesgos="fuga de credenciales")
+
+    result = plan.scope_commit()
+    assert result.success, result.message
+    import json
+    doc = json.loads((context.root / "harness" / "featureslist.json").read_text())
+    titulos = [f["title"] for f in doc["features"] if f["id"].startswith("RISK")]
+    assert any("sql injection" in t for t in titulos)
+    assert any("fuga de credenciales" in t for t in titulos)
+    assert not any("enumeración" in t for t in titulos), "el descartado NO se siembra"
+
+
+def test_scope_riesgos_declarados_no_se_preguntan_de_nuevo(context):
+    """Si el usuario ya declaró un riesgo, la heurística no lo vuelve a pedir."""
+    plan = PlanAgent(context=context)
+    plan.scope(reset=True)
+    plan.scope_answer(pregunta="login con contraseña",
+                      metrica="tasa >= 0.99", datos="d", parada="p",
+                      riesgos="sql injection")
+    pendientes = plan._pendientes_riesgo(plan._load_scope())
+    assert "sql injection" not in pendientes, "ya declarado, no se vuelve a preguntar"

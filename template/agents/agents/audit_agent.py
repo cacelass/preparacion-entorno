@@ -33,6 +33,7 @@ MIN_RUNS_TO_JUDGE = 3        # menos ejecuciones que esto = no hay datos para ju
 FAILURE_RATE_THRESHOLD = 0.5
 SLOW_ACTION_MS = 30_000
 NOISY_WARNINGS_RATIO = 0.5
+LOW_CERTAINTY = 0.6          # éxito con certeza menor que esto = "dejó pasar una duda"
 
 
 @register_agent
@@ -60,7 +61,10 @@ class AuditAgent(BaseAgent):
     def _aggregate(self, last: int) -> dict[str, dict]:
         """Agrega el log por 'agente.acción' → runs/ok/fail/avg_ms/warnings."""
         stats: dict[str, dict] = defaultdict(
-            lambda: {"runs": 0, "ok": 0, "fail": 0, "total_ms": 0.0, "with_warnings": 0}
+            lambda: {
+                "runs": 0, "ok": 0, "fail": 0, "total_ms": 0.0,
+                "with_warnings": 0, "low_cert_ok": 0, "low_cert_samples": [],
+            }
         )
         for entry in audit.read_entries(self.ctx, last=last):
             key = f"{entry.get('agent', '?')}.{entry.get('action', '?')}"
@@ -70,6 +74,13 @@ class AuditAgent(BaseAgent):
             s["total_ms"] += float(entry.get("duration_ms", 0))
             if entry.get("warnings", 0):
                 s["with_warnings"] += 1
+            cert = entry.get("certainty")
+            if cert is not None and entry.get("success") and cert < LOW_CERTAINTY:
+                s["low_cert_ok"] += 1
+                if len(s["low_cert_samples"]) < 3:
+                    s["low_cert_samples"].append(
+                        f"{entry.get('timestamp', '?')} (μ.cert {cert:.2f})"
+                    )
         return stats
 
     # ── acciones ──────────────────────────────────────────────────────────
@@ -150,6 +161,13 @@ class AuditAgent(BaseAgent):
                     f"'{key}' devuelve warnings en el {s['with_warnings'] / s['runs']:.0%} de sus runs — "
                     f"o el aviso es esperado (súbelo a la documentación) o hay un límite del agente "
                     f"que conviene arreglar."
+                )
+            if s["low_cert_ok"]:
+                suggestions.append(
+                    f"'{key}' devolvió éxito con certeza baja ({s['low_cert_ok']}/{s['runs']} runs "
+                    "bajo μ.cert 0.6) — " + "; ".join(s["low_cert_samples"])
+                    + ". Un 'éxito' que nadie avala con seguridad es una ronda que pudo fallar: "
+                    "revisa si el ruteo lo manda al agente correcto o si la acción necesita confirmación."
                 )
 
         agent_registry.discover()

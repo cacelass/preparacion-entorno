@@ -125,3 +125,30 @@ def test_update_prd_con_backlog_ilegible_avisa(doc_context):
     result = agent.update_prd(dry_run=True)
     assert result.warnings
     assert "ilegible" in result.warnings[0]
+
+
+def test_update_prd_incluye_riesgos_del_backlog(doc_context):
+    """El PRD lista los tickets RISK-* con su estado — vista del riesgo, no fuente."""
+    _proyecto_con_prd(doc_context.root)
+    # Añadir un riesgo al backlog (como haría `plan scope_commit` con un aceptado)
+    path = doc_context.root / "harness" / "featureslist.json"
+    doc = json.loads(path.read_text())
+    doc["features"].append({
+        "id": "RISK-001", "title": "Mitigar: sql injection", "status": "pending",
+        "description": "d", "acceptance_criteria": ["c1"],
+    })
+    path.write_text(json.dumps(doc), encoding="utf-8")
+
+    agent = DocumentationAgent(context=doc_context)
+    result = agent.update_prd(dry_run=True)
+    md = result.data["markdown"]
+    assert "## Riesgos y mitigaciones" in md
+    assert "RISK-001" in md
+    assert "sql injection" in md
+
+
+def test_update_prd_sin_riesgos_no_anade_seccion(doc_context):
+    _proyecto_con_prd(doc_context.root)
+    agent = DocumentationAgent(context=doc_context)
+    result = agent.update_prd(dry_run=True)
+    assert "## Riesgos y mitigaciones" not in result.data["markdown"]

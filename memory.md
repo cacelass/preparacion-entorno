@@ -213,3 +213,32 @@ remoto `cacelass/dskit`, copier usa el **mirror cacheado** (`~/.cache/copier/git
 con la estructura PUSHEADA — no el árbol local con cambios sin pushear. Un
 cambio de rutas local parece "no aplicar" hasta el push. Para verificar renders
 con cambios locales: copiar template+copier.yml a /tmp SIN `.git`.
+
+### Lecciones de trasgo (jesusvilela/trasgo, OMP-010)
+
+Qué adoptar y qué descartar del codec de compresión de contexto de trasgo
+("enseña a cualquier LLM un lenguaje JSON compacto en 3 ejemplos, 0 training"):
+
+- **Adoptado (F1) — certeza como señal de primera clase (`μ.cert`).**
+  `AgentResult.certainty` (0..1, default 1.0). `dispatch` propaga la confianza
+  del ruteo heurístico; `harness finish` rechaza cerrar con certeza < 0.6
+  (explícita o heredada del último informe del reviewer). Cierra el hueco de
+  "enforcement theater" de la revisión dura: la evidencia ya no es solo un
+  string, tiene un número que la avala. `audit` la guarda y `suggest` flagea
+  "éxito con certeza baja".
+- **Adoptado (F2) — packet §1 para el handoff de subagentes.** `harness record
+  --packet` valida un JSON E/S/R/Δ/μ (ejes fijos, `μ.rol` obligatorio, `μ.cert`
+  0..1, `§` como versión) y lo guarda como frontmatter del informe; la prosa
+  sigue siendo `--content`. `next` resume el precedente con el packet (Δ +
+  μ.cert) en vez del extracto crudo. Boot seed de 3 ejemplos en
+  `harness_workflow.md`. Es un convenio de prompt + validador Python, no un
+  esquema nuevo: no hay que entrenar nada.
+- **Adoptado (F4) — `--json` sin prosa duplicada.** Si `data` codifica el
+  resultado, `message` no viaja: el consumidor es una herramienta/agente y
+  pagar dos veces por lo mismo es tirar contexto.
+- **Rechazado:** el codec §1 como lenguaje de contexto general (exige modelos
+  frontier — la propia tabla de trasgo muestra que 4B/7B fallan — y contradice
+  "no es un chatbot" y "provider-agnostic"), la máquina T8/lambda (humo de
+  README), y el CLI `trasgo pack/boot` (deps y superficie nueva).
+- **Restricción del usuario: el RAG NO se toca.** Ya descarga papers e
+  información a propósito para ahorrar tokens; no se le aplica compresión.

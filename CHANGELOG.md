@@ -7,6 +7,56 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [No publicado]
 
+### OMP-011: plan `scope` — la entrevista que construye el spec y siembra el backlog
+
+Al empezar un proyecto, `plan scope` es la mega entrevista: pregunta lo
+necesario (pregunta, métrica con umbral, datos, parada — obligatorias;
+usuarios, alcance, riesgos — opcionales), valida la métrica numérica,
+`scope_commit` escribe `references/00-objetivo.md` con el spec enriquecido y
+siembra el backlog en orden lógico (SCOPE-001 → RESEARCH-001 → EDA-001 →
+DATA-001 → FEAT-001 → MODEL-001, después las propuestas) delegando en
+`harness add` (idempotente). El PRD no se entrevista: `documentation
+update_prd` lo deriva del spec + backlog.
+
+**Se propone solo**: la primera vez que se ejecuta `harness next` en un
+proyecto recién generado (sin `references/00-objetivo.md`), el agente propone
+`run plan scope` en vez de dejar rellenar el spec a mano. El ticket SCOPE-001
+del backlog lo formaliza (criterio: spec construido con `plan scope`).
+
+**Detección de riesgos (heurística del agente)**: al responder la entrevista,
+el agente identifica riesgos del dominio (login → SQL injection, fuga de
+credenciales; pago → fraude; datos personales → GDPR; upload → path
+traversal; API → rate-limit...). `scope_commit` REHÚSA sembrar hasta que el
+usuario decide cada riesgo con `aceptar_riesgos`/`descartar_riesgos`; los
+aceptados se siembran como `RISK-NNN` "Mitigar: X" con `depends_on` en
+SCOPE-001, los descartados no. `documentation update_prd` ahora incluye la
+sección "Riesgos y mitigaciones" (vista del backlog, nunca fuente).
+13 tests nuevos.
+
+### OMP-010: certeza como señal (μ.cert) y codec §1 (trasgo) + corpus ampliado
+
+**Agentes — certeza y ahorro de tokens (idea `μ.cert` de trasgo):**
+- `AgentResult.certainty` (0..1, default 1.0); `dispatch` propaga la confianza
+  del ruteo heurístico; `harness finish` rechaza cerrar con certeza < 0.6
+  (explícita o heredada del último informe del reviewer).
+- `harness record --packet` valida y guarda el informe §1 compacto
+  (E/S/R/Δ/μ + `§`) como frontmatter; `next` resume el precedente con el
+  packet (Δ + μ.cert) en vez del extracto crudo.
+- `audit` guarda `certainty`; `audit suggest` flagea "éxito con certeza baja".
+- `--json` omite `message` cuando `data` lo codifica (no pagar dos veces).
+- Boot seed de 3 ejemplos en `harness_workflow.md`; espejo `.claude` sincronizado.
+
+**Corpus — tres ficheros nuevos en `docs/knowledge/ml/`:**
+- `evals-de-sistemas.md` — golden sets, evals-as-code, property-based para
+  agentes, evaluar trayectorias, cuándo el eval miente (la eval es el foso).
+- `contexto-y-memoria.md` — la ventana como recurso finito, memoria externa,
+  handoff sin heredar contexto, compresión/eviction (fundamenta el codec §1).
+- `neurodifuso.md` — ANFIS como candidato de nicho y su "cuándo NO" por la
+  explosión combinatoria de reglas.
+
+`index.md`, `sources.md` y `sources.json` registran los nuevos ficheros y
+topics (44 topics). El RAG y el corpus de papers no se tocan.
+
 ### OMP-006: corpus de conocimiento ampliado
 
 Nuevos ficheros de teoría profunda en `docs/knowledge/ml/`:

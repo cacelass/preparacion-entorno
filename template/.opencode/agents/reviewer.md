@@ -61,6 +61,16 @@ EOF
 )"
 ```
 
+Declara tu certeza (`μ.cert`, 0..1): es la señal que `harness finish` lee
+para decidir si el `done` se puede cerrar. Si dudas (≥0.6 pero no pleno),
+dilo — mejor que el arnés lo sepa a que se cierre una feature que no avalas:
+
+```bash
+uv run python -m agents --json run harness record \
+  --agent reviewer --id <FEATURE-ID> --verdict "aprobado" --certainty 0.85 \
+  --content "..."
+```
+
 Un rechazo debe ser **accionable**: qué está mal, dónde, y qué haría que lo
 aprobaras. «No me convence» no es un rechazo válido.
 

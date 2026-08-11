@@ -109,7 +109,13 @@ class Orchestrator:
                 data={"selected_agent": decision.agent_name, "selected_action": chosen_action, "required_args": required},
             )
 
-        return self.run(decision.agent_name, chosen_action, **kwargs)
+        result = self.run(decision.agent_name, chosen_action, **kwargs)
+        # El ruteo por palabras clave es heurístico (ver can_handle): si la
+        # confianza de haber elegido el agente correcto es baja, el resultado
+        # hereda esa duda. Es la señal `μ.cert` — el agente ejecutó bien, pero
+        # quizá no era el agente correcto. `harness.finish` y `audit` la leen.
+        result.certainty = min(result.certainty, decision.confidence)
+        return result
 
     def _sin_agente(self, query: str, decision: RoutingDecision) -> AgentResult:
         """

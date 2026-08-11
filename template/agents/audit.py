@@ -58,6 +58,7 @@ def record(
     warnings: int = 0,
     kwarg_names: list[str] | None = None,
     error: str | None = None,
+    certainty: float | None = None,
 ) -> None:
     """
     Añade una entrada al log. Nunca lanza: la auditoría no rompe lo auditado.
@@ -82,6 +83,8 @@ def record(
             "warnings": warnings,
             "kwarg_names": kwarg_names or [],
         }
+        if certainty is not None:
+            entry["certainty"] = round(min(max(certainty, 0.0), 1.0), 3)
         if error:
             entry["error"] = error[:300]
         with open(audit_log_path(ctx), "a", encoding="utf-8") as f:

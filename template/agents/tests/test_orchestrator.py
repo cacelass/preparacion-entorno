@@ -90,3 +90,18 @@ def test_dispatch_disambiguates_commit_actions_via_aliases(context):
 
     suggest_result = orchestrator.dispatch("sugiéreme un mensaje de commit")
     assert suggest_result.action == "suggest_commit_message"
+
+
+def test_dispatch_propaga_la_confianza_del_ruteo_a_la_certeza(context):
+    # La certeza (μ.cert) del resultado hereda la confianza del ruteo
+    # heurístico: si no estoy seguro de que el agente sea el correcto, el
+    # resultado tampoco lo está — aunque el agente ejecutara perfecto.
+    orchestrator = Orchestrator(context=context)
+    decision = orchestrator.select_agent("revisa el dockerfile de este proyecto")
+    if decision.agent_name is None:
+        return  # docker no existe en este perfil — no es un fallo
+    (context.root / "Dockerfile").write_text("FROM python:3.12-slim\nUSER app\n")
+    result = orchestrator.dispatch("revisa el dockerfile de este proyecto")
+    assert result.success
+    assert result.certainty <= decision.confidence + 1e-9
+    assert result.certainty > 0.0

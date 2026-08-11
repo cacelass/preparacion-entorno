@@ -30,9 +30,10 @@ y se convirtieron con `markitdown` para extraer fórmulas exactas). La fecha de
 Estadística, probabilidad, causalidad, hiperparámetros, validación, métricas,
 interpretabilidad, features, fairness, seguridad, serving, deuda técnica,
 calidad de datos, aprendizaje por refuerzo, metaheurísticas, modelos
-fundacionales y guardarraíles se mantienen consultando arXiv con las queries
-de `sources.json` — la literatura cambia y es mejor verificar por tema que
-clavar una fuente.
+fundacionales, guardarraíles, evaluación de sistemas LLM (evals), gestión de
+contexto y memoria de agentes, y neurodifuso/ANFIS se mantienen consultando
+arXiv con las queries de `sources.json` — la literatura cambia y es mejor
+verificar por tema que clavar una fuente.
 
 ## Cómo mantenerlo
 

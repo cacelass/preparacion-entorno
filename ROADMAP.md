@@ -140,6 +140,67 @@ Registrar en `memory.md` el análisis de qué ideas encajan con la filosofía de
 dskit (Pi, Oh-My-Pi, Oratomic-Caltech, Right-Harness, omp.sh) y cuáles se
 descartan y por qué.
 
+### OMP-010 — Trasgo: certeza como señal y codec §1 para ahorrar tokens
+
+Incorporar de `jesusvilela/trasgo` (compresión de contexto en 3 ejemplos, sin
+entrenar) las dos ideas que sobreviven la filosofía de dskit: la certeza
+tipada (`μ.cert`) como puerta de cierre, y el packet compacto E/S/R/Δ/μ para
+el handoff de subagentes. Solo se toca el flujo de agentes; **el RAG y el
+corpus de papers no se tocan** (el usuario descarga papers a propósito).
+
+**Criterios**
+- `AgentResult.certainty` (0..1, default 1.0) retrocompatible; `dispatch`
+  propaga la confianza del ruteo heurístico a la certeza del resultado
+- `harness finish` rechaza cerrar si `certainty < 0.6` (explícito o heredado
+  del último informe del reviewer), devolviendo `needs` — no cierra con dudas
+- `harness record` acepta `--packet` (JSON §1 validado: ejes E/S/R/Δ/μ/§,
+  `μ.rol` obligatorio, `μ.cert` 0..1) y lo escribe como frontmatter; la prosa
+  sigue conviviendo como `--content`
+- `harness next` resume el precedente con el packet (Δ + μ.cert) en vez del
+  extracto crudo de 200 caracteres
+- `audit` guarda `certainty` en cada entrada; `audit suggest` flagea "éxito
+  con certeza baja" como señal de mejora
+- `--json` omite `message` cuando `data` lo codifica (no pagar dos veces)
+- Boot seed de 3 ejemplos en `harness_workflow.md`; espejo `.claude` sincronizado
+- Tests: umbral en finish, validación de packet, propagación en dispatch,
+  formato `--json`
+
+### OMP-011 — Plan `scope`: entrevista → objetivo + tickets, sin PRD
+
+Convertir la hoja en blanco del arranque (`references/00-objetivo.md` vacío,
+backlog sin rellenar) en un formulario guiado. **No es un agente `product` ni
+escribe el PRD** — el PRD vivo (`documentation update_prd`) ya nace del
+objetivo + backlog y duplicarlo sería rehacer SCOPE-001 (ver lección en
+memory.md). La entrevista adaptativa se implementa como acción nueva del
+agente `plan`, que ya tiene toda la maquinaria (`needs`, `answer`, borrador).
+
+**Criterios**
+- `plan scope` devuelve las preguntas vía `needs` (pregunta, métrica de éxito
+  con umbral numérico, datos de partida, criterio de parada — obligatorias;
+  usuarios, alcance, riesgos — opcionales); nunca repite lo ya respondido y
+  para en el mínimo
+- `plan scope_answer` valida que la métrica sea numérica con umbral (el
+  criterio #2 de SCOPE-001 — "que funcione bien" no pasa) y acepta
+  `aceptar_riesgos`/`descartar_riesgos` para decidir los riesgos detectados
+- **Detección de riesgos**: una heurística determinista identifica riesgos en
+  las respuestas (login → SQLi, fuga de credenciales; pago → fraude; datos
+  personales → GDPR...). `scope_commit` REHÚSA sembrar hasta que el usuario
+  decide cada riesgo detectado; los aceptados se siembran como `RISK-NNN`
+  "Mitigar: X", los descartados no
+- `plan scope_commit` REHÚSA sin las respuestas obligatorias; escribe
+  `references/00-objetivo.md` con el spec enriquecido y siembra el backlog en
+  orden lógico (SCOPE-001 → RESEARCH-001 → EDA-001 → DATA-001 → FEAT-001 →
+  MODEL-001, después las propuestas y los riesgos aceptados) delegando en
+  `harness add` (idempotente)
+- **Se propone solo**: la primera vez que `harness next` corre en un proyecto
+  recién generado (sin `references/00-objetivo.md`), propone `run plan scope`
+  — el ticket SCOPE-001 del backlog lo formaliza en su criterio
+- El PRD no se entrevista: lo genera `documentation update_prd`, que ahora
+  incluye la sección "Riesgos y mitigaciones" (vista de los tickets RISK-*)
+- Tests en `test_plan_agent.py` y `test_documentation_agent.py`: detección de
+  riesgos, gate de decisión obligatoria, sembrado solo de aceptados,
+  no-duplicación, PRD con riesgos
+
 ## Cerradas
 
 | ID | Título | Estado |
@@ -152,3 +213,5 @@ descartan y por qué.
 | OMP-005 | RAG: extractores site-aware | ✅ 14 tests |
 | DOC-002 | Lecciones de los videos y de omp.sh en memory.md | ✅ memory.md |
 | OMP-006 | Corpus: RL, metaheurísticas, modelos fundacionales y guardarraíles | ✅ 4 ficheros + refs corregidas + sources.json |
+| OMP-010 | Trasgo: certeza como señal y codec §1 | ✅ 21 tests nuevos · 632 totales · CI verde |
+| OMP-011 | Plan `scope`: entrevista → objetivo + tickets | ✅ 13 tests · detección de riesgos + gate de decisión · PRD con riesgos |

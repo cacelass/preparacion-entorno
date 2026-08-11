@@ -227,6 +227,21 @@
       "topic": "guardarrailes",
       "queries": ["guardrails large language models safety", "llm red teaming jailbreak", "prompt injection defense"],
       "sources": []
+    },
+    {
+      "topic": "evals-sistemas",
+      "queries": ["evaluating LLM systems golden set", "eval-driven development prompts", "evaluating AI agents trajectories tool use"],
+      "sources": []
+    },
+    {
+      "topic": "contexto-memoria-agentes",
+      "queries": ["context window limits LLM agents", "external memory agents MemGPT", "lost in the middle context"],
+      "sources": []
+    },
+    {
+      "topic": "neurodifuso",
+      "queries": ["ANFIS adaptive neuro fuzzy inference system", "fuzzy neural network regression", "fuzzy rule explosion curse dimensionality"],
+      "sources": []
     }
   ]
 }

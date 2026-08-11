@@ -32,6 +32,15 @@ REQUIRED_FIELDS = ("id", "title", "description", "acceptance_criteria", "status"
 #: casi nunca es el código, sino el criterio o cómo está planteada la feature.
 MAX_REVIEW_ROUNDS = 3
 
+#: Umbral de certeza (`μ.cert`) para cerrar una feature. Un `done` con certeza
+#: baja es una ronda que iba a fallar — quien la cierra debería saber por qué
+#: duda y pedir verificación explícita, no colarla por el hueco del `success`.
+FINISH_MIN_CERTAINTY = 0.6
+
+#: Acepta "1.0", "0.8", ".5"… el formato de `certainty` que escribe `record`,
+#: con o sin el negrita markdown del header (`- **Certeza:** 0.5`).
+_CERT_RE = re.compile(r"Certeza:\*{0,2}\s*(\d+(?:\.\d+)?)")
+
 _RECHAZOS = ("rechazado", "rechaza", "rejected", "fail", "ko")
 
 #: Longitud mínima que tiene una salida de comando real. "ok", "hecho" o "pasa"
@@ -59,6 +68,105 @@ def _evidencia_plausible(evidence: str) -> bool:
 
 def _es_rechazo(verdict: str) -> bool:
     return verdict.strip().lower() in _RECHAZOS
+
+
+#: Ejes del protocolo §1 (ver prompts/harness_workflow.md). `μ` es obligatorio
+#: porque es donde vive el rol y la certeza (`cert`) que `finish` lee. `§` es
+#: la versión del codec (1), igual que en el seed de trasgo — se acepta y se
+#: ignora salvo para futuras migraciones.
+_PACKET_AXES = ("E", "S", "R", "Δ", "μ", "§")
+
+
+def _validar_packet(packet: str) -> tuple[dict | None, str]:
+    """
+    Valida un packet §1 y devuelve (dict, error). Error vacío = válido.
+
+    El packet es la forma compacta de un informe de subagente (ver el boot
+    seed de prompts/harness_workflow.md): un JSON con los ejes E/S/R/Δ/μ.
+    No se exige que `E` y `S` estén llenos — un informe puede no tocar
+    entidades nuevas — pero sí que el JSON sea parseable, que no meta ejes
+    desconocidos (un typo en 'Entidades' silenciaría el ahorro de tokens) y
+    que declare `μ` con `rol`. El `cert` es opcional aquí: la prosa del
+    `--content` sigue existiendo igualmente.
+    """
+    try:
+        doc = json.loads(packet)
+    except json.JSONDecodeError as exc:
+        return None, f"packet no es JSON válido: {exc}"
+    if not isinstance(doc, dict):
+        return None, "el packet debe ser un objeto JSON"
+
+    claves = set(doc)
+    ejes = set(_PACKET_AXES)
+    extra = claves - ejes
+    if extra:
+        return None, f"ejes desconocidos en el packet: {sorted(extra)} (válidos: {sorted(ejes)})"
+    if "μ" not in doc:
+        return None, "el packet debe declarar el eje μ (rol, cert)"
+    mu = doc["μ"]
+    if not isinstance(mu, dict) or not isinstance(mu.get("rol"), str) or not mu["rol"]:
+        return None, "μ.rol es obligatorio (qué agente reporta este packet)"
+    cert = mu.get("cert")
+    if cert is not None:
+        try:
+            cert = float(cert)
+        except (TypeError, ValueError):
+            return None, f"μ.cert debe ser un número 0..1, no '{cert}'"
+        if not 0.0 <= cert <= 1.0:
+            return None, f"μ.cert debe estar entre 0 y 1, no '{cert}'"
+        mu["cert"] = round(cert, 3)
+    return doc, ""
+
+
+def _certeza_de_informe(path: Path) -> float | None:
+    """Lee la certeza (`μ.cert`) que `record` guardó en la cabecera del informe."""
+    try:
+        texto = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = _CERT_RE.search(texto)
+    if not match:
+        return None
+    try:
+        valor = float(match.group(1))
+    except ValueError:
+        return None
+    return min(max(valor, 0.0), 1.0)
+
+
+#: Frontmatter §1: `<!-- §1: {...} -->` al principio del informe (ver `record`).
+_PACKET_RE = re.compile(r"<!--\s*§1:\s*(\{.*?\})\s*-->", re.DOTALL)
+
+
+def _leer_packet(path: Path) -> dict | None:
+    """Extrae el packet §1 del frontmatter de un informe, o None si no lo tiene."""
+    try:
+        texto = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = _PACKET_RE.search(texto)
+    if not match:
+        return None
+    try:
+        doc = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def _packet_resumen(packet: dict) -> str:
+    """
+    Comprime un packet §1 a una línea legible para el siguiente agente: qué
+    cambió (`Δ`) y con qué certeza (`μ.cert`). El resto del packet vive en el
+    fichero; el handoff no necesita más que el resumen.
+    """
+    deltas = packet.get("Δ", [])
+    mu = packet.get("μ", {})
+    cert = mu.get("cert")
+    base = "; ".join(str(d) for d in deltas) if isinstance(deltas, list) and deltas else "(sin cambios)"
+    if isinstance(cert, (int, float)):
+        return f"Δ: {base} · μ.cert {float(cert):.2f}"
+    return f"Δ: {base}"
 
 
 def validate_gherkin(text: str) -> list[str]:
@@ -312,6 +420,21 @@ class HarnessAgent(BaseAgent):
             )
 
         feat = eligible[0]
+        if feat.get("id") == "SCOPE-001" and not (self.ctx.root / "references" / "00-objetivo.md").exists():
+            # Primera vez en un proyecto recién generado: no rellenes el spec a
+            # mano. La entrevista `plan scope` lo construye y siembra el backlog
+            # en orden lógico — el agente lo propone, no espera a que se lo pidan.
+            return AgentResult(
+                success=True, agent=self.name, action="next",
+                message=(
+                    f"Siguiente: {feat['id']} — {feat['title']}. Este proyecto no tiene spec todavía: "
+                    "ejecuta `run plan scope` para la entrevista de arranque que escribe "
+                    "references/00-objetivo.md y siembra el backlog en orden lógico."
+                ),
+                data={**feat, "sugerencia": "plan scope",
+                      "motivo": "sin references/00-objetivo.md (proyecto recién generado)"},
+            )
+
         return AgentResult(
             success=True, agent=self.name, action="next",
             message=f"Siguiente: {feat['id']} — {feat['title']}",
@@ -344,11 +467,36 @@ class HarnessAgent(BaseAgent):
             )
         except Exception:  # noqa: BLE001 — una pista de más no puede tumbar `next`
             return []
-        return [
-            {"source": h["source"], "line": h["line"], "extracto": h["text"][:200]}
-            for h in hits
-            if "error" not in h
-        ]
+
+        antecedentes = []
+        for h in hits:
+            if "error" in h:
+                continue
+            item: dict = {"source": h["source"], "line": h["line"]}
+            packet = _leer_packet(self.ctx.root / h["source"])
+            if packet is not None:
+                # El protocolo §1: el precedente se resume en su packet (Δ + μ),
+                # unos pocos tokens, en vez del extracto de 200 caracteres.
+                item["packet"] = packet
+                item["extracto"] = _packet_resumen(packet)
+            else:
+                item["extracto"] = h["text"][:200]
+            antecedentes.append(item)
+        return antecedentes
+
+    def _ultima_certeza_reviewer(self, feature_id: str) -> float | None:
+        """
+        La certeza del último informe del reviewer sobre `feature_id`, o None.
+
+        `finish` la usa como señal `μ.cert` cuando quien cierra no pasa una
+        certeza explícita: si el reviewer dudó al aprobar, el 'done' hereda
+        esa duda. Si no hay informe de reviewer (o no tiene certeza), se
+        devuelve None — y `finish` asume confianza plena, como siempre fue.
+        """
+        path = self._progress_dir / f"reviewer-{feature_id}.md"
+        if not path.exists():
+            return None
+        return _certeza_de_informe(path)
 
     def start(self, *, id: str = "", owner: str = "implementer") -> AgentResult:
         """Abre una feature: status in_progress y harness/progress/current.md rellenado."""
@@ -570,10 +718,16 @@ class HarnessAgent(BaseAgent):
         )
 
     def finish(self, *, id: str = "", evidence: str = "", changes: str = "",
-               decisions: str = "", pending: str = "") -> AgentResult:
+               decisions: str = "", pending: str = "", certainty: float | None = None) -> AgentResult:
         """
         Cierra una feature. REHÚSA si ./init.sh no pasa en verde: es la regla
         del arnés, y aquí es código, no una instrucción que se pueda ignorar.
+
+        `certainty` (0..1, idea `μ.cert`) es cuánta confianza tiene quien cierra
+        de que la feature está bien. Si no se pasa, se lee del último informe
+        del `reviewer` (si lo hay); si ninguno existe, se asume 1.0. Por debajo
+        de `FINISH_MIN_CERTAINTY` se rechaza: una feature que nadie avala con
+        seguridad no se cierra por la vía fácil.
         """
         if not id:
             return self._fail("finish", "Falta el id de la feature.",
@@ -616,6 +770,21 @@ class HarnessAgent(BaseAgent):
                     "Pega la salida LITERAL del comando que lo demuestra (pytest, "
                     "make check, ./init.sh). 'los tests pasan' es una afirmación, "
                     "no evidencia: si no puedes pegar la salida, no lo has ejecutado."
+                ],
+            )
+
+        if certainty is None:
+            certainty = self._ultima_certeza_reviewer(id)
+        if certainty is not None and certainty < FINISH_MIN_CERTAINTY:
+            return self._fail(
+                "finish",
+                f"'{id}' no se cierra: certeza {certainty:.2f} por debajo del "
+                f"umbral ({FINISH_MIN_CERTAINTY}). El reviewer dudó, y un 'done' "
+                f"con dudas es una ronda que iba a fallar.",
+                needs=[
+                    f"Revisa harness/progress/reviewer-{id}.md: ¿qué le falta a la "
+                    f"feature para que el reviewer la avale? No se cierra con certeza "
+                    f"baja — se reabre el bucle implementer ↔ reviewer."
                 ],
             )
 
@@ -677,7 +846,8 @@ class HarnessAgent(BaseAgent):
         )
 
     def record(self, *, agent: str = "", id: str = "", content: str = "",
-               verdict: str = "ok") -> AgentResult:
+               verdict: str = "ok", certainty: float | None = None,
+               packet: str = "") -> AgentResult:
         """Guarda el informe de un subagente en harness/progress/<agente>-<ID>.md."""
         if not agent or not id or not content:
             missing = []
@@ -689,13 +859,32 @@ class HarnessAgent(BaseAgent):
                 missing.append("¿Qué contenido? El informe no puede ir vacío.")
             return self._fail("record", "Faltan datos para guardar el informe.", needs=missing)
 
+        # Protocolo §1: el packet compacto (JSON) es la cabecera del informe.
+        # Se valida aquí — un JSON roto o con ejes inventados no entra al disco.
+        if packet:
+            packet_doc, error = _validar_packet(packet)
+            if packet_doc is None:
+                return self._fail("record", f"packet inválido: {error}",
+                                  needs=["Envía el packet como JSON §1 (E/S/R/Δ/μ), o usa solo --content."])
+            if certainty is None and "cert" in packet_doc["μ"]:
+                certainty = float(packet_doc["μ"]["cert"])
+        elif content.strip():
+            # Sin packet: se intenta inducir la certeza desde la prosa de la
+            # cabecera si alguien ya la escribió a mano — no se exige nada.
+            pass
+
         self._progress_dir.mkdir(parents=True, exist_ok=True)
         path = self._progress_dir / f"{agent}-{id}.md"
         header = (
             f"# {agent} · {id}\n\n"
             f"- **Fecha:** {date.today().isoformat()}\n"
-            f"- **Veredicto:** {verdict}\n\n"
+            f"- **Veredicto:** {verdict}\n"
         )
+        if certainty is not None:
+            header += f"- **Certeza:** {min(max(certainty, 0.0), 1.0):.2f}\n"
+        header += "\n"
+        if packet and packet_doc is not None:
+            header += f"<!-- §1: {json.dumps(packet_doc, ensure_ascii=False)} -->\n\n"
         path.write_text(header + content.strip() + "\n", encoding="utf-8")
 
         # El bucle implementer <-> reviewer es un patrón evaluador-optimizador,

@@ -168,6 +168,10 @@ class DocumentationAgent(BaseAgent):
         sections.append(contratos["markdown"])
         warnings.extend(contratos["warnings"])
 
+        riesgos = self._riesgos_section()
+        sections.append(riesgos["markdown"])
+        warnings.extend(riesgos["warnings"])
+
         prd = self._render_prd(sections)
 
         if dry_run:
@@ -262,6 +266,36 @@ class DocumentationAgent(BaseAgent):
             first = c.read_text(encoding="utf-8").strip().splitlines()
             titulo = next((ln for ln in first if ln.startswith("Feature:")), c.name)
             lines.append(f"- `{c.name}` — {titulo.removeprefix('Feature:').strip()}")
+        lines.append("")
+        return {"markdown": "\n".join(lines), "warnings": []}
+
+    def _riesgos_section(self) -> dict:
+        """
+        Los riesgos del proyecto, leídos del backlog (features `RISK-*`).
+
+        Cada riesgo detectado en la entrevista de arranque (`plan scope`) que
+        el usuario aceptó se siembra como ticket `RISK-NNN` "Mitigar: X". Aquí
+        se listan con su estado para que el PRD sea la vista completa del
+        riesgo — derivado del backlog, nunca fuente.
+        """
+        backlog_file = self.ctx.root / "harness" / "featureslist.json"
+        if not backlog_file.exists():
+            return {"markdown": "", "warnings": []}
+        try:
+            doc = json.loads(backlog_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {"markdown": "", "warnings": []}
+        features = doc.get("features", []) if isinstance(doc, dict) else []
+        riesgos = [f for f in features if isinstance(f, dict) and f.get("id", "").startswith("RISK-")]
+        if not riesgos:
+            return {"markdown": "", "warnings": []}
+
+        lines = ["## Riesgos y mitigaciones", ""]
+        lines.append("| ID | Estado | Mitigación |")
+        lines.append("|----|--------|------------|")
+        for r in riesgos:
+            titulo = (r.get("title") or "").removeprefix("Mitigar:").strip() or r.get("id")
+            lines.append(f"| {r['id']} | {r.get('status', 'pending')} | {titulo} |")
         lines.append("")
         return {"markdown": "\n".join(lines), "warnings": []}
 

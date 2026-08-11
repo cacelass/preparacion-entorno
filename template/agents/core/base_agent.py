@@ -65,6 +65,13 @@ class AgentResult:
     # información" del sistema (lo usa PlanAgent, y cualquier agente puede
     # usarlo igual).
     needs: list[str] = field(default_factory=list)
+    # Qué de seguro está el agente de su propio resultado, 0..1 (idea `μ.cert`
+    # del codec trasgo). El default es 1.0: un agente determinista que ejecutó
+    # la herramienta y la vio responder no tiene motivo para dudar. Quien lo
+    # baje es el que sabe — el ruteo heurístico con confianza baja, el
+    # reviewer que no le convence el diff. `harness.finish` la usa como puerta:
+    # un `done` con certeza baja es una ronda que iba a fallar.
+    certainty: float = 1.0
 
     def __bool__(self) -> bool:
         return self.success
@@ -165,6 +172,7 @@ class BaseAgent(ABC):
             duration_ms=(time.perf_counter() - start) * 1000,
             message=result.message, warnings=len(result.warnings),
             kwarg_names=sorted(kwargs),
+            certainty=getattr(result, "certainty", None),
         )
         return result
 

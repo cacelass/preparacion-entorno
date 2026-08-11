@@ -121,11 +121,13 @@ class Contract:
 CONTRACTS: dict[str, Contract] = {
     # ── Coordinación ─────────────────────────────────────────────────────
     "plan": Contract(
-        role="Jefe de proyecto: convierte un encargo humano en una orden de trabajo, pregunta lo que falte y delega.",
+        role="Jefe de proyecto: convierte un encargo humano en una orden de trabajo, pregunta lo que falte y delega. También dirige la entrevista de arranque (`plan scope`) que construye el spec y siembra el backlog.",
         can=(
             "descomponer un encargo en pasos y asignar cada paso al agente responsable",
             "detectar qué información falta y devolver las preguntas ANTES de ejecutar nada",
             "ejecutar la orden de trabajo aprobada (via GStack) y resumir qué debe verificar el humano",
+            "dirigir la entrevista de arranque (plan scope): preguntar el spec, validar la métrica numérica y escribir references/00-objetivo.md",
+            "sembrar el backlog con las features de dirección en su orden lógico, delegando en 'harness add' (un recurso, un dueño)",
             "leer docs/vault/00_META/IA_index.md para obtener contexto del proyecto y la topología de agentes",
             "consultar docs/vault/05_AGENTES/<Agent>.md para decidir a quién delegar cada paso",
         ),
@@ -133,6 +135,8 @@ CONTRACTS: dict[str, Contract] = {
             "ejecutar ninguna acción de dominio él mismo → siempre delega en el agente dueño",
             "inventar argumentos que no le han dado → los convierte en preguntas",
             "ejecutar una orden con preguntas sin responder",
+            "cerrar el scope sin las respuestas obligatorias (pregunta, métrica, datos, parada)",
+            "escribir docs/prd.md → es un documento derivado que genera `documentation update_prd`",
         ),
         needs=("el encargo (brief) en lenguaje natural", "las respuestas a las preguntas que genere"),
         collaborates=("todos — es el punto de entrada que delega en el resto",),
@@ -517,6 +521,8 @@ CONTRACTS: dict[str, Contract] = {
             "guardar los informes de los subagentes en harness/progress/<agente>-<FEATURE-ID>.md",
             "ejecutar ./init.sh y devolver el veredicto estructurado",
             "rechazar el cierre de una feature si la puerta no pasa o si no hay evidencia",
+            "rechazar el cierre si la certeza (μ.cert) del reviewer quedó por debajo de 0.6",
+            "aceptar el packet §1 de un subagente (E/S/R/Δ/μ) como frontmatter del informe",
         ),
         cannot=(
             "decidir QUÉ feature toca ni cómo implementarla → eso lo razonan los agentes "
@@ -524,6 +530,7 @@ CONTRACTS: dict[str, Contract] = {
             "escribir código del producto → 'refactor' y el implementer",
             "ejecutar los tests por su cuenta → los ejecuta init.sh, o el agente 'test'",
             "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
+            "cerrar una feature con certeza baja salvo verificación explícita → devuelve needs",
         ),
         needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),
         owns=("harness/featureslist.json", "harness/progress/", "harness/memory.md",

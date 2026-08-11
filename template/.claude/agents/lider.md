@@ -22,6 +22,10 @@ uv run python -m agents --json run harness gate
 
 # 2. ¿Qué toca? (retoma lo abierto, o la primera pendiente con deps en done)
 uv run python -m agents --json run harness next
+#   → Si es un proyecto recién generado, `next` te propone `plan scope`: la
+#      entrevista de arranque. NO rellenes el spec a mano. Ejecútala:
+uv run python -m agents --json run plan scope        # → responde con scope_answer
+uv run python -m agents --json run plan scope_commit # escribe el spec y siembra el backlog
 
 # 3. Abre la feature: la marca in_progress y vuelca sus criterios en current.md
 uv run python -m agents --json run harness start --id <FEATURE-ID>

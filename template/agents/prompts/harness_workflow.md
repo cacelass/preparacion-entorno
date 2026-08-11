@@ -52,6 +52,59 @@ agente edita `harness/featureslist.json` ni `harness/progress/` a mano.
 - No releas el repositorio en cada subagente. `harness/progress/` existe justo para eso.
 - No pases el contenido de un informe de subagente a otro: pasa la **ruta**.
 
+## Protocolo §1 — informes compactos de subagente (ahorro de tokens)
+
+Los subagentes reportan en prosa larga que el siguiente agente relee entera.
+El protocolo §1 factoriza el informe a sus dimensiones mínimas — entidades,
+estado, relaciones, cambios y certeza — en una línea JSON que `harness record`
+guarda como frontmatter. El siguiente agente lee el packet; la prosa queda
+debajo por si hace falta. Es un convenio de prompt, no un esquema nuevo: se
+induce con ejemplos, sin entrenar nada.
+
+Tres ejemplos, uno por rol del arnés:
+
+```
+EXPLORER (investigación, solo lectura)
+{"§":1,"E":{"X":["data/raw/clientes.csv","dataset"]},
+ "S":{"X.filas":"2.4M","X.nulos":{"ingresos":0.31}},
+ "R":["X→features:fuente"],
+ "Δ":["X.estado:nuevo→descargado@EDA-001"],
+ "μ":{"rol":"explorer","cert":0.9}}
+= "clientes.csv (2.4M filas) es la fuente de las features; ingresos tiene un
+   31% de nulos. Descargado para EDA-001. Alta confianza."
+
+IMPLEMENTER (implementación con evidencia)
+{"§":1,"E":{"M":["src/model.py","feature"]},
+ "S":{"M.firma":"predict(df)->df","tests":14},
+ "R":["M→data/raw/clientes.csv:consume"],
+ "Δ":["M.nuevo→implementado@FEAT-007","tests:0→14@FEAT-007"],
+ "μ":{"rol":"implementer","cert":0.95,"evidencia":"pytest: 14 passed"}}
+= "src/model.py implementado con 14 tests en verde (pytest 14 passed).
+   Consume clientes.csv."
+
+REVIEWER (veredicto)
+{"§":1,"E":{"F":["FEAT-007","feature"]},
+ "S":{"F.criterios":3,"F.cumplidos":2},
+ "R":[],
+ "Δ":["F.estado:in_progress→reviewed@FEAT-007"],
+ "μ":{"rol":"reviewer","cert":0.55,"veredicto":"rechazado",
+      "por_que":"falta cubrir el criterio 2 (caso vacío)"}}
+= "Revisión de FEAT-007: 2/3 criterios cumplidos. Rechazado — falta el caso
+   vacío. Certeza 0.55: el implementer acertó el grueso, pero no el todo."
+```
+
+Reglas:
+- `E` (qué entidades tocó), `S` (estado resultante), `R` (relaciones nuevas),
+  `Δ` (qué cambió y cuándo), `μ` (rol, `cert` 0..1, y `veredicto`/`evidencia`
+  si aplica).
+- `harness record --packet '<json>'` valida el JSON y lo guarda como frontmatter;
+  la prosa sigue siendo el `--content`. Ambos conviven.
+- El reviewer SIEMPRE declara `cert` en su packet: `harness finish` rechaza un
+  `done` si la certeza del reviewer quedó por debajo de 0.6 (ver
+  `FINISH_MIN_CERTAINTY`).
+- Un packet sin `cert` no es un fallo (la prosa sigue existiendo), pero el
+  arnés lo trata como confianza plena — como siempre fue.
+
 ## Cómo engancha con los agentes Python
 
 El arnés decide y verifica; el trabajo determinista lo hacen los agentes:
