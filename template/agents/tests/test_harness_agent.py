@@ -201,20 +201,20 @@ def test_finish_rechaza_sin_evidencia(harness):
 def test_finish_cierra_y_escribe_historial(harness):
     _write_gate(harness.ctx.root, GATE_OK)
     harness.start(id="A-001")
-    result = harness.finish(id="A-001", evidence="3 passed en 0.4s", changes="src/x.py")
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s", changes="src/x.py")
     assert result.success
     doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
     assert doc["features"][0]["status"] == "done"
     history = (harness.ctx.root / "harness" / "progress" / "history.md").read_text()
     assert "A-001" in history
-    assert "3 passed en 0.4s" in history
+    assert "3 passed" in history
     assert "src/x.py" in history
 
 
 def test_finish_deja_current_en_idle(harness):
     _write_gate(harness.ctx.root, GATE_OK)
     harness.start(id="A-001")
-    harness.finish(id="A-001", evidence="ok")
+    harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
     current = (harness.ctx.root / "harness" / "progress" / "current.md").read_text()
     assert "idle" in current
     assert "A-001" not in current
@@ -223,10 +223,30 @@ def test_finish_deja_current_en_idle(harness):
 def test_finish_desbloquea_la_dependiente(harness):
     _write_gate(harness.ctx.root, GATE_OK)
     harness.start(id="A-001")
-    harness.finish(id="A-001", evidence="ok")
+    harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
     result = harness.next()
     assert result.success
     assert result.data["id"] == "B-001"
+
+
+def test_finish_rechaza_evidencia_afirmacion(harness):
+    """'ok' / 'hecho' son afirmaciones, no salida de comando: se rechazan."""
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    result = harness.finish(id="A-001", evidence="ok")
+    assert not result.success
+    assert result.needs
+    assert "comando" in result.message.lower()
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "in_progress"
+
+
+def test_finish_rechaza_afirmacion_corta_aunque_tenga_palabras(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    result = harness.finish(id="A-001", evidence="los tests pasan")
+    assert not result.success
+    assert result.needs
 
 
 def test_finish_de_algo_ya_cerrado_falla(harness):

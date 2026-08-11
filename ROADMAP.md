@@ -6,6 +6,35 @@ del `lider`: primero al backlog, después se implementa con TDD y evidencia.
 
 ## Pendientes
 
+### OMP-007 — GStack: lock de pipeline
+
+Dos `GStack.run()` concurrentes sobre el mismo árbol pueden pisarse los
+cambios (uno commitea lo que el otro escribe). El pipeline toma un lock
+exclusivo no bloqueante sobre `agents/workspace/gstack/.lock`.
+
+**Criterios**
+- `run()` toma `flock(LOCK_EX|LOCK_NB)`; si está tomado, devuelve
+  `StackResult(success=False)` con el motivo, **sin ejecutar ningún paso**
+- El lock se libera en `finally`; fallo al crear el lock (filesystem ro) deja
+  pasar (fail-open, misma filosofía que `policy_guard`)
+- `GStack(lock=False)` desactiva el bloqueo de forma explícita
+- El evento queda anotado en `events.jsonl` (`pipeline_bloqueado`)
+- Tests en `test_gstack_control.py`
+
+### OMP-008 — Harness: la evidencia debe parecer salida de comando
+
+`harness finish` aceptaba cualquier string no vacío como evidencia ("ok",
+"hecho"). Ahora rechaza afirmaciones sueltas: la evidencia debe tener la
+estructura de una salida de comando real (longitud y nº de palabras mínimos).
+La verificación de que es *verdad* sigue siendo `init.sh` (gate); este check
+solo obliga a documentar esa ejecución.
+
+**Criterios**
+- `_evidencia_plausible()`: rechaza texto < 24 chars o < 3 palabras
+- `finish()` devuelve `success=false` + `needs` para "ok"/"hecho"/"los tests pasan"
+- Tests existentes con `evidence="ok"` actualizados a salida real; nuevos
+  tests de rechazo en `test_harness_agent.py`
+
 ### OMP-006 — Corpus: RL, metaheurísticas, modelos fundacionales y guardarraíles
 
 Ampliar `docs/knowledge/` con los huecos de teoría profunda que el `lider` no

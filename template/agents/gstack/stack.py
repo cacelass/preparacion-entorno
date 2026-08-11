@@ -14,6 +14,12 @@ from agents.context import get_context
 from agents.core.base_agent import AgentResult
 from agents.orchestrator import Orchestrator
 
+#: Centinela para "no se pudo crear el lock": un filesystem de solo lectura no
+#: debe tumbar un pipeline — ante la duda, dejar pasar (misma filosofía que
+#: `policy_guard`). Un handle real o `_NO_LOCK` dejan ejecutar; `None` significa
+#: que OTRO pipeline tiene el lock tomado y bloquea.
+_NO_LOCK = object()
+
 
 @dataclass
 class StackStep:
@@ -31,6 +37,7 @@ class StackResult:
     steps: list[StackStep]
     results: list[AgentResult]
     failed_at: int | None = None
+    message: str = ""
 
     @property
     def summary(self) -> str:
@@ -38,6 +45,8 @@ class StackResult:
         ok = sum(1 for r in self.results if r.success)
         skipped = sum(1 for r in self.results if not r.success and r.action == "__skipped__")
         lines = [f"Stack: {ok}/{total} pasos completados ({skipped} omitidos)"]
+        if self.message:
+            lines.insert(0, self.message)
         for i, (step, result) in enumerate(zip(self.steps, self.results)):
             if result.action == "__skipped__":
                 status = "SKIP"
@@ -70,16 +79,25 @@ class GStack:
         detenerse. Sujeto a la misma autorización.
     confirm : bool
         Autoriza los commits automáticos de esta stack.
+    lock : bool
+        Si True (default), `run()` toma un lock exclusivo sobre
+        ``agents/workspace/gstack/.lock``. Dos pipelines corriendo a la vez
+        sobre el mismo árbol de trabajo pueden pisarse los cambios entre sí
+        (uno commitea lo que el otro está escribiendo); el lock hace que el
+        segundo devuelva `success=False` sin ejecutar nada en vez de corromper
+        el árbol en silencio. Si no se puede crear el lock (filesystem de solo
+        lectura) se deja pasar.
     log_events : bool
         Si True, escribe cada acción a ``agents/workspace/events.jsonl``.
     """
 
     def __init__(self, auto_commit: bool = False, commit_on_error: bool = True, log_events: bool = True,
-                 context=None, confirm: bool = False):
+                 context=None, confirm: bool = False, lock: bool = True):
         self._steps: list[StackStep] = []
         self.auto_commit = auto_commit
         self.commit_on_error = commit_on_error
         self.confirm = confirm
+        self.lock = lock
         self.log_events = log_events
         self._ctx = context or get_context()
         self._orch = Orchestrator(context=self._ctx)
@@ -117,6 +135,54 @@ class GStack:
         if not self._steps:
             return StackResult(success=True, steps=[], results=[])
 
+        handle = None
+        if self.lock:
+            handle = self._try_lock()
+            if handle is None:
+                mensaje = (
+                    "Otro pipeline (GStack) tiene el lock tomado "
+                    "(agents/workspace/gstack/.lock). Dos stacks a la vez pueden "
+                    "pisarse el árbol de trabajo: espera a que termine o usa lock=False "
+                    "si sabes que no hay concurrencia."
+                )
+                self._log_evento_suelto({"event": "pipeline_bloqueado", "message": mensaje})
+                return StackResult(success=False, steps=self._steps, results=[], message=mensaje)
+        try:
+            return self._ejecutar()
+        finally:
+            if handle is not None and handle is not _NO_LOCK:
+                self._release_lock(handle)
+
+    def _try_lock(self) -> Any | None:
+        """Lock exclusivo no bloqueante. `None` = ya tomado; `_NO_LOCK` = no se pudo crear."""
+        import fcntl
+
+        try:
+            lock_dir = self._ctx.agent_workspace("gstack")
+            lock_dir.mkdir(parents=True, exist_ok=True)
+            fh = open(lock_dir / ".lock", "w", encoding="utf-8")
+        except OSError:
+            return _NO_LOCK
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            return None
+        return fh
+
+    def _release_lock(self, handle: Any) -> None:
+        import fcntl
+
+        try:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+        except Exception:  # noqa: BLE001 — liberar un lock nunca debe tumbar nada
+            pass
+        try:
+            handle.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _ejecutar(self) -> StackResult:
         results: list[AgentResult] = []
         result_map: dict[str, AgentResult] = {}
 

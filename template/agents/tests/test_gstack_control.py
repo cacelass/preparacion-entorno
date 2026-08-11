@@ -15,7 +15,7 @@ import pytest
 
 from agents import permissions
 from agents.core.base_agent import AgentResult
-from agents.gstack.stack import GStack
+from agents.gstack.stack import GStack, StackResult
 
 
 @pytest.fixture(autouse=True)
@@ -118,3 +118,54 @@ def test_to_mermaid_colorea_los_resultados(context):
 def test_to_mermaid_de_una_stack_vacia_no_revienta(context):
     diagrama = GStack(context=context).to_mermaid()
     assert "inicio --> fin" in diagrama
+
+
+# -- lock de pipeline ----------------------------------------------------------
+def test_lock_tomado_bloquea_el_segundo_pipeline_sin_ejecutar(context):
+    """
+    Dos GStack a la vez pueden pisarse el árbol de trabajo. El segundo debe
+    devolver fallo ANTES de ejecutar ningún paso — el lock se comprueba antes
+    de tocar el orquestador.
+    """
+    a = GStack(context=context)
+    a.push("env", "info")
+    holder = a._try_lock()  # noqa: SLF001 — el test sostiene el lock a propósito
+    assert holder is not None
+    try:
+        b = GStack(context=context)
+        b.push("env", "info")
+        b.push("env", "info")
+        resultado = b.run()
+        assert not resultado.success
+        assert "lock" in resultado.message.lower()
+        assert resultado.results == [], "no debe haber ejecutado ningún paso"
+    finally:
+        a._release_lock(holder)
+
+
+def test_el_lock_se_libera_y_se_puede_volver_a_tomar(context):
+    a = GStack(context=context)
+    a.push("env", "info")
+    holder = a._try_lock()  # noqa: SLF001
+    assert holder is not None
+    a._release_lock(holder)
+    holder2 = a._try_lock()  # noqa: SLF001 — ya libre, debe poder tomarlo otro
+    assert holder2 is not None
+    a._release_lock(holder2)
+
+
+def test_lock_false_omite_el_bloqueo(context, monkeypatch):
+    """`lock=False` es la salida explícita: el pipeline confía en que no hay concurrencia."""
+    stack = GStack(context=context, lock=False)
+    stack.push("env", "info")
+
+    def _no_bloquear(self):  # si se llama, el flag no funcionó
+        raise AssertionError("con lock=False no se debe intentar tomar el lock")
+
+    monkeypatch.setattr(GStack, "_try_lock", _no_bloquear)
+    monkeypatch.setattr(
+        GStack, "_ejecutar",
+        lambda self: StackResult(success=True, steps=self._steps, results=[]),
+    )
+    resultado = stack.run()
+    assert resultado.success

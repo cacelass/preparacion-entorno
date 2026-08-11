@@ -34,6 +34,28 @@ MAX_REVIEW_ROUNDS = 3
 
 _RECHAZOS = ("rechazado", "rechaza", "rejected", "fail", "ko")
 
+#: Longitud mínima que tiene una salida de comando real. "ok", "hecho" o "pasa"
+#: son afirmaciones, no evidencia — y `finish()` las rechaza (ver
+#: `_evidencia_plausible`).
+_EVIDENCIA_MIN_LEN = 24
+
+
+def _evidencia_plausible(evidence: str) -> bool:
+    """
+    ¿Esto parece la salida literal de un comando, o una afirmación?
+
+    Un pytest/make/init.sh real siempre produce varias palabras y algo de
+    estructura. Una evidencia inventada suele ser corta y llana ("ok",
+    "los tests pasan"). La puerta no puede saber si la salida es verdad, pero
+    sí puede exigir que no sea una afirmación suelta: la verificación de que
+    es verdad ya la hace `gate()` ejecutando `init.sh` — este check solo
+    obliga a que la evidencia documente esa ejecución, no a que se la inventen.
+    """
+    texto = evidence.strip()
+    if len(texto) < _EVIDENCIA_MIN_LEN:
+        return False
+    return len(texto.split()) >= 3
+
 
 def _es_rechazo(verdict: str) -> bool:
     return verdict.strip().lower() in _RECHAZOS
@@ -446,8 +468,8 @@ class HarnessAgent(BaseAgent):
         for i, criterion in enumerate(feat.get("acceptance_criteria", []), start=1):
             lines += [
                 f"  Scenario: S{i} — {criterion}",
-                f"    Given el sistema en su estado inicial",
-                f"    When se ejecuta el comportamiento de esta feature",
+                "    Given el sistema en su estado inicial",
+                "    When se ejecuta el comportamiento de esta feature",
                 f"    Then {criterion}",
                 "",
             ]
@@ -583,6 +605,17 @@ class HarnessAgent(BaseAgent):
                 needs=[
                     "Pega la salida real del comando que demuestra cada criterio "
                     "(pytest, make check, ./init.sh). Una afirmación no es evidencia."
+                ],
+            )
+
+        if not _evidencia_plausible(evidence):
+            return self._fail(
+                "finish",
+                f"'{id}' no se cierra: la evidencia no parece la salida de un comando.",
+                needs=[
+                    "Pega la salida LITERAL del comando que lo demuestra (pytest, "
+                    "make check, ./init.sh). 'los tests pasan' es una afirmación, "
+                    "no evidencia: si no puedes pegar la salida, no lo has ejecutado."
                 ],
             )
 
