@@ -68,7 +68,9 @@ _SPEC_REQUIRED = tuple(k for k, _, req in _SPEC_FIELDS if req)
 #: depends_on. `scope commit` garantiza que existan (sembrado idempotente).
 _BACKLOG_DIRECCION: tuple[dict, ...] = (
     {"id": "SCOPE-001", "title": "Definir qué se quiere resolver",
-     "description": "Escribir en references/00-objetivo.md qué pregunta responde este proyecto, cómo se mide que la respuesta es buena (umbral numérico), con qué datos se cuenta y cuándo se da por terminado.",
+     "description": "Escribir en references/00-objetivo.md qué pregunta responde este proyecto, "
+                    "cómo se mide que la respuesta es buena (umbral numérico), con qué datos se "
+                    "cuenta y cuándo se da por terminado.",
      "criteria": ["references/00-objetivo.md con los apartados del spec",
                   "La métrica de éxito es un número con umbral, no 'que funcione bien'",
                   "El criterio de parada dice qué resultado haría abandonar el proyecto"],

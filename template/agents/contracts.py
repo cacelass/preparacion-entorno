@@ -121,7 +121,9 @@ class Contract:
 CONTRACTS: dict[str, Contract] = {
     # ── Coordinación ─────────────────────────────────────────────────────
     "plan": Contract(
-        role="Jefe de proyecto: convierte un encargo humano en una orden de trabajo, pregunta lo que falte y delega. También dirige la entrevista de arranque (`plan scope`) que construye el spec y siembra el backlog.",
+        role=("Jefe de proyecto: convierte un encargo humano en una orden de trabajo, pregunta "
+              "lo que falte y delega. También dirige la entrevista de arranque (`plan scope`) "
+              "que construye el spec y siembra el backlog."),
         can=(
             "descomponer un encargo en pasos y asignar cada paso al agente responsable",
             "detectar qué información falta y devolver las preguntas ANTES de ejecutar nada",
