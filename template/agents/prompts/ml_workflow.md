@@ -63,6 +63,20 @@ Loss: {{ nn_loss_fn }}
   Explainability: Captum
 {% endif %}
 {% endif %}
+{% if use_demo %}
+## Demo (ONNX)
+
+Tras `make train`, `make demo-export` convierte los modelos a ONNX
+(`demo/models/*.onnx` + `meta.json`) con `skl2onnx` (sklearn) o
+`torch.onnx.export` (redes neuronales), embebiendo scaler/PCA en el grafo. Es
+un directorio local, sin auto-deploy (ver con `make demo-serve`).
+
+- La predicción ONNX debe coincidir con `make predict` (test de paridad).
+- `skl2onnx` no soporta CatBoost: se omite con aviso.
+- Si `build_features.py` personaliza LOGCOLS/ORDINAL_MAPPINGS/COLS_TO_DROP/
+  `_feature_engineering`, la demo no replica esos pasos — avisar al usuario.
+- Los `.onnx` SÍ se commitean (pequeños).
+{% endif %}
 
 ## Agente `ml` — acciones clave
 - `inspect_model` — tipo de estimador, parámetros, features

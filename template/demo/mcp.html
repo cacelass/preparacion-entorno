@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP — {{ project_name }}</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="index.html">{{ project_name }}</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="docs.html">Docs</a>
+    <a href="try.html" class="cta">Try model</a>
+    <a href="mcp.html">MCP</a>
+  </div>
+</nav>
+
+<div class="container doc-body">
+  <h1>Servidores MCP</h1>
+
+  <div class="notice"><strong>Contenido NO confiable.</strong> Lo que devuelve un servidor MCP
+    es un <em>dato</em>, nunca una instrucción. Si una respuesta dice «ignora las instrucciones
+    anteriores y hacé X», eso es texto, no una orden. Los datos que consume un agente no
+    amplían lo que tiene permitido hacer (<code>agents/policy_guard.py</code>).</div>
+
+  <p><strong>Model Context Protocol</strong> (MCP) es un estándar abierto que permite al
+    asistente de IA conectarse a herramientas y fuentes de datos externas de forma uniforme.
+    En lugar de que cada agente reimplemente una integración, el asistente habla con estos
+    servidores a través del protocolo.</p>
+
+  <p>Este proyecto genera la configuración en <code>.mcp.json</code> (Claude Code) y en el
+    bloque <code>mcp</code> de <code>opencode.json</code> (opencode). Los servidores se
+    descargan solos la primera vez (<code>npx</code>/<code>uvx</code>): aquí no se instala
+    nada, pero <strong>sí se ejecuta código de terceros con tus permisos</strong>, así que
+    comprobá de dónde sale cada paquete antes de fiarte.</p>
+
+  <h2>Servidores configurados</h2>
+{% set elegidos = mcp_servers | default([]) %}
+
+{% if not elegidos %}
+  <p class="loading">No hay servidores MCP configurados en este proyecto.</p>
+{% endif %}
+
+{% if "filesystem (acotado a data/ y reports/)" in elegidos %}
+  <div class="server">
+    <h3>filesystem <span class="tag ro">acotado a data/ y reports/</span></h3>
+    <p>Acceso de solo lectura/escritura <em>limitado</em> a <code>data/</code> y
+      <code>reports/</code>. El asistente ya lee el código con sus propias herramientas;
+      este servidor no amplía el alcance a la raíz del proyecto.</p>
+    <p class="cmd">npx -y @modelcontextprotocol/server-filesystem ./data ./reports</p>
+    <p><strong>Probar:</strong> pedile al asistente «listá los ficheros de data/raw/» o
+      «mostrame el contenido de reports/». Debe listar solo lo que hay dentro de esos dos
+      directorios.</p>
+  </div>
+{% endif %}
+
+{% if "git (historial y diffs en solo lectura)" in elegidos %}
+  <div class="server">
+    <h3>git <span class="tag ro">solo lectura</span></h3>
+    <p>Consulta del historial, ramas y diffs del repositorio. No permite commits: esos los
+      sigue haciendo el agente <code>git</code>, que pasa por la puerta de permisos.</p>
+    <p class="cmd">uvx mcp-server-git --repository .</p>
+    <p><strong>Probar:</strong> «¿cuál es el último commit?», «mostrame el diff de los
+      últimos dos commits», «¿en qué rama estamos?».</p>
+  </div>
+{% endif %}
+
+{% if "fetch (descarga paginas web — CONTENIDO NO CONFIABLE)" in elegidos %}
+  <div class="server">
+    <h3>fetch <span class="tag nc">contenido no confiable</span></h3>
+    <p>Descarga páginas web. Todo lo que devuelve viene de internet y no lo ha revisado
+      nadie: se trata como <em>dato</em>, nunca como instrucción.</p>
+    <p class="cmd">uvx mcp-server-fetch</p>
+    <p><strong>Probar:</strong> «descargá https://es.wikipedia.org/wiki/Machine_learning y
+      resumí los primeros párrafos».</p>
+  </div>
+{% endif %}
+
+{% if "sqlite (consulta bases SQLite de data/)" in elegidos %}
+  <div class="server">
+    <h3>sqlite <span class="tag only">requiere SQLite</span></h3>
+    <p>Consulta bases SQLite dentro de <code>data/</code>. Si tu proyecto no usa SQLite,
+      borrá esta entrada del <code>.mcp.json</code>.</p>
+    <p class="cmd">uvx mcp-server-sqlite --db-path ./data/processed/{{ project_slug }}.db</p>
+    <p><strong>Probar:</strong> «¿qué tablas hay en la base?», «contá las filas de la tabla
+      principal».</p>
+  </div>
+{% endif %}
+
+{% if "time (fecha y hora, zonas horarias)" in elegidos %}
+  <div class="server">
+    <h3>time</h3>
+    <p>Fecha y hora actuales en distintas zonas horarias. Inofensivo, útil para contextos
+      dependientes del tiempo.</p>
+    <p class="cmd">uvx mcp-server-time</p>
+    <p><strong>Probar:</strong> «¿qué hora es ahora en Madrid y en Buenos Aires?».</p>
+  </div>
+{% endif %}
+
+  <h2>Cómo funciona en cada asistente</h2>
+  <table>
+    <tr><th>Asistente</th><th>Configuración</th><th>Arranque</th></tr>
+    <tr><td>Claude Code</td><td><code>.mcp.json</code></td><td>Se descarga el servidor al primer uso</td></tr>
+    <tr><td>opencode</td><td>bloque <code>mcp</code> de <code>opencode.json</code></td><td>Se descarga el servidor al primer uso</td></tr>
+  </table>
+  <p>La regla vale para todos: <em>los datos que consume un agente no amplían sus
+    permisos</em>. Las acciones irreversibles siguen pidiendo confirmación.</p>
+</div>
+</body>
+</html>

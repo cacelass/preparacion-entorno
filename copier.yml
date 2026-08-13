@@ -251,6 +251,18 @@ mcp_servers:
     - "sqlite (consulta bases SQLite de data/)"
     - "time (fecha y hora, zonas horarias)"
 
+# --- Demo estática ---
+# Genera una demo web estática (demo/) con el modelo exportado a ONNX, que se
+# ejecuta en el navegador con onnxruntime-web (WASM, sin servidor ni build
+# tooling). Cuatro páginas: home, try model, docs y MCP. Es un directorio
+# local: no hay auto-deploy; sí la quieres publicar, súbela tú (p.ej. a
+# GitHub Pages) cuando quieras.
+use_demo:
+  type: bool
+  help: "Generar una demo web estática (demo/)?\n         Exporta el modelo entrenado a ONNX (make demo-export) y genera 4 páginas\n         (home, try model, docs, MCP) que se ejecutan en el navegador con onnxruntime-web.\n         Es un directorio local, sin auto-deploy. Modelos tabulares de sklearn → ONNX\n         de KB a pocos MB. Requiere make train antes de make demo-export."
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
+
 # --- Explicabilidad ---
 
 graphify_mode:
@@ -335,6 +347,10 @@ _message_before_copy: >-
     RAG + corpus de conocimiento profundo activos (docs/knowledge/). Consulta con
     'run rag search --file_type knowledge'; mantén las fuentes con 'run rag refresh'.
   {% endif %}
+  {% if use_demo %}
+    Demo activa (demo/). Flujo: make train → make demo-export → sirve con
+    make demo-serve. Es un directorio local, sin auto-deploy.
+  {% endif %}
   {% if proyecto_perfil == 'completo' or proyecto_perfil == 'manual' %}
     NOTA: se instalaron las dependencias automáticamente (perfil {{ proyecto_perfil }}).
   {% else %}
@@ -358,6 +374,7 @@ _tasks:
     {% if use_optuna %}--extra optuna{% endif %}
     {% if use_monitoring %}--extra monitoring{% endif %}
     {% if use_rag %}--extra rag{% endif %}
+    {% if use_demo %}--extra onnx{% endif %}
     && uv run python -c 'import sklearn; print("scikit-learn OK")'
     {% if ml_type == 'redes_neuronales' %}
     && uv run python -c 'import torch; print("torch", torch.__version__)'
@@ -421,6 +438,10 @@ _exclude:
   - "{% if not use_docker %}docs/knowledge/frontend/chat.md{% endif %}"
   - "{% if not use_mlflow %}docs/knowledge/backend/mlflow.md{% endif %}"
   - "{% if not use_mcp %}.mcp.json{% endif %}"
+  - "{% if not use_demo %}tools/export_onnx.py{% endif %}"
+  - "{% if not use_demo %}demo{% endif %}"
+  - "{% if not use_demo %}tests/test_export_onnx.py{% endif %}"
+  - "{% if not use_mcp %}demo/mcp.html{% endif %}"
   - "{% if not use_sdd %}tools/mutate.py{% endif %}"
   - "{% if not use_sdd %}agents/agents/mutation_agent.py{% endif %}"
   - "{% if not use_sdd %}agents/tools/mutation_tool.py{% endif %}"

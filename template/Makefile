@@ -8,6 +8,7 @@
 {% if use_sdd %}        mutation crap {% endif %}\
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
+{% if use_demo %}        demo-export demo-serve {% endif %}\
         agents-list agents-run agents-doctor agents-memory agents-eval \
         init harness-check backlog prompts-sync prompts-check assistants-sync \
         skills opencode-init opencode-check \
@@ -57,6 +58,11 @@ help:
 	@echo "    make audit          radon cc + agents audit (complejidad + equipo)"
 {% if use_sdd %}	@echo "    make mutation       mutation testing de un módulo (spec-driven)"
 	@echo "    make crap           métrica CRAP de un módulo (complejidad × cobertura)"
+{% endif %}
+{% if use_demo %}	@echo ""
+	@echo "  Demo"
+	@echo "    make demo-export    exporta modelos a ONNX → demo/models/"
+	@echo "    make demo-serve     sirve la demo en http://localhost:8000"
 {% endif %}
 	@echo ""
 	@echo "  Jupyter"
@@ -482,6 +488,23 @@ recommended-tools:
 	@echo ""
 
 recommended-all: recommended-tools
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Demo (ONNX)
+#  Flujo: make train → make demo-export → make demo-serve (local)
+#  No hay auto-deploy: si la quieres publicar, súbela tú cuando quieras.
+# ─────────────────────────────────────────────────────────────────────────────
+demo-export:
+	@echo "▶  Exportando modelos a ONNX → demo/models/"
+	uv run $(PYTHON) tools/export_onnx.py
+	@echo ""
+	@echo "  Demo lista. Para verla localmente: make demo-serve"
+	@echo "  (directorio local: no hay auto-deploy. Los .onnx SÍ van al repo —"
+	@echo "   son pequeños, KB a pocos MB.)"
+
+demo-serve:
+	@echo "▶  Sirviendo demo en http://localhost:8000"
+	@cd demo && uv run $(PYTHON) -m http.server 8000
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Limpieza

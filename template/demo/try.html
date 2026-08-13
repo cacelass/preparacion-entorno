@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Try model — {{ project_name }}</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="index.html">{{ project_name }}</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="docs.html">Docs</a>
+    <a href="try.html" class="cta">Try model</a>
+{% if use_mcp %}    <a href="mcp.html">MCP</a>
+{% endif %}  </div>
+</nav>
+
+<div class="container">
+  <h1>Try model</h1>
+  <p>Completá las features y ejecutá una predicción en tu navegador. El modelo corre
+     localmente con ONNX Runtime (WebAssembly): nada de tu data sale de tu equipo.</p>
+
+  <div class="controls">
+    <label for="model-select">Modelo:</label>
+    <select id="model-select" style="min-width:220px"></select>
+    <span id="status"></span>
+  </div>
+  <div id="loading" class="loading" style="display:none"></div>
+
+  <form id="feature-form" class="form-grid"></form>
+
+  <div id="result" class="result" style="display:none"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

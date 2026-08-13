@@ -7,6 +7,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
 ## [No publicado]
 
+### Demo: modelos a ONNX ejecutables en el navegador
+
+Nueva opción `use_demo` (por defecto en el perfil `completo`): genera una demo
+web estática (`demo/`) con 4 páginas (home, try model, docs y MCP) donde el
+modelo entrenado corre en el navegador vía `onnxruntime-web` (WebAssembly),
+sin servidor ni build tooling. Es un directorio **local, sin auto-deploy**.
+
+- **`tools/export_onnx.py`** (`make demo-export`): convierte `.joblib`/`.pt` a
+  ONNX embebiendo el preprocesado (scaler, PCA) en el grafo. `meta.json`
+  describe features y modelos; `docs.html` se renderiza en **Python** desde el
+  README (sin librerías JS de terceros).
+- **`demo/`**: páginas estáticas con el nav inline (sin fetch de JS). El único
+  JS propio es `app.js` (inferencia); `onnxruntime-web` se carga desde CDN.
+- Los `.onnx` (KB–MB) viajan en el repo; sin auto-deploy ni GitHub Actions.
+- Gating por extras: `demo/`, `export_onnx.py`, el test y el extra `onnx` se
+  excluyen si `use_demo=false`; `mcp.html` si `use_mcp=false`.
+
 ### OMP-011: plan `scope` — la entrevista que construye el spec y siembra el backlog
 
 Al empezar un proyecto, `plan scope` es la mega entrevista: pregunta lo

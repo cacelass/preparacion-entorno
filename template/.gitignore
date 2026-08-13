@@ -80,6 +80,9 @@ reports/**/*.csv
 # La interfaz del chat es código fuente del template, no un informe generado:
 # sin esta excepción `*.html` se la traga y el proyecto nace sin UI.
 !chat/static/*.html
+# La demo es código fuente estático (páginas de la web GitHub Pages), no un
+# informe generado: sin esta excepción `*.html` se traga index/try/docs/mcp.
+!demo/**/*.html
 
 # --- Modelos entrenados ---
 models/**/*.joblib
@@ -88,6 +91,11 @@ models/**/*.pt
 models/**/*.pth
 models/**/*.onnx
 !models/**/.gitkeep
+
+# Los ONNX de la demo SÍ se commitean: son pequeños (KB a pocos MB) y viajan
+# como archivos normales del repo para la demo web.
+!demo/**/*.onnx
+!demo/**/meta.json
 
 # --- Artefactos ML ---
 artifacts/**/*.joblib

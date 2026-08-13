@@ -378,6 +378,10 @@ Y en el asistente, para arrancar el ciclo:
   dependencias del proyecto (pandas, sklearn, etc.).
 - **Conoce este template.** Los agentes saben que el código vive en
   `{{ project_slug }}/`, los datasets en `data/`, los modelos en `models/`.
+{% if use_demo %}  Si existe `use_demo`, `make demo-export` convierte los modelos a ONNX
+  (`demo/models/`) para la demo web; no tocar `demo/` salvo que el usuario lo
+  pida — es un artefacto de publicación.
+{% endif %}
 
 ## Principios de comportamiento
 

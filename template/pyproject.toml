@@ -186,6 +186,18 @@ rag_multilingual = [
 ]
 {% endif %}
 
+{% if use_demo %}
+# Demo: exporta el modelo entrenado (.joblib / .pt) a ONNX para la demo web.
+# skl2onnx envuelve el preprocesado (encoders, scaler, PCA) y el modelo en un
+# único grafo; onnxruntime-web lo ejecuta en el navegador sin servidor.
+onnx = [
+    "skl2onnx>=1.17,<2.0",
+    "onnx>=1.16,<2.0",
+    "onnxruntime>=1.19,<2.0",
+    "markdown",  # renderiza README.md → docs.html en Python (demo sin JS de terceros)
+]
+{% endif %}
+
 [tool.setuptools]
 packages = ["{{ project_slug }}"]
 

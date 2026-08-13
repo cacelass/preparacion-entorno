@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ project_name }} — Demo</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="index.html">{{ project_name }}</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="docs.html">Docs</a>
+    <a href="try.html" class="cta">Try model</a>
+{% if use_mcp %}    <a href="mcp.html">MCP</a>
+{% endif %}  </div>
+</nav>
+
+<div class="container">
+  <header class="hero">
+    <div class="badges">
+      <span class="badge">ML: {{ ml_type }}</span>
+{% if ml_type in ['supervisado', 'hibrido'] %}      <span class="badge">Tarea: {{ task_type }}</span>
+{% endif %}{% if ml_type == 'redes_neuronales' %}      <span class="badge">Arquitectura: {{ nn_model }}</span>
+{% endif %}      <span class="badge">ONNX + WebAssembly</span>
+      <span class="badge">Sin servidor</span>
+    </div>
+    <h1>{{ project_name }}</h1>
+    <p>{{ project_description }}</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="try.html">Try model</a>
+      <a class="btn" href="docs.html">Documentación</a>
+{% if use_mcp %}      <a class="btn" href="mcp.html">MCP</a>
+{% endif %}    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Probá el modelo</h3>
+      <p>Cargá las features y ejecutá una predicción real en tu navegador: el modelo corre localmente con ONNX Runtime (WebAssembly), sin servidor.</p>
+      <p><a href="try.html">Ir al playground →</a></p>
+    </div>
+    <div class="card">
+      <h3>Documentación</h3>
+      <p>Instalación, entrenamiento, evaluación y arquitectura del proyecto. Basada en el README y la documentación generada por dskit.</p>
+      <p><a href="docs.html">Leer la documentación →</a></p>
+    </div>
+{% if use_mcp %}    <div class="card">
+      <h3>Agentes MCP</h3>
+      <p>Este proyecto expone servidores MCP (Model Context Protocol) para el asistente: filesystem, git, fetch, sqlite y time. Qué hacen y cómo probarlos.</p>
+      <p><a href="mcp.html">Ver los servidores MCP →</a></p>
+    </div>
+{% endif %}  </div>
+
+  <h2>Cómo funciona</h2>
+  <ol>
+    <li><code>make train</code> entrena los modelos y los guarda en <code>models/</code>.</li>
+    <li><code>make demo-export</code> convierte cada modelo a ONNX (<code>demo/models/*.onnx</code>) embebiendo el preprocesado (scaler, PCA).</li>
+    <li>Estas páginas cargan <code>models/meta.json</code> + <code>models/*.onnx</code> y ejecutan la inferencia en el navegador con <code>onnxruntime-web</code>.</li>
+    <li>La demo es un directorio local: se sirve con <code>make demo-serve</code> y se puede publicar en cualquier hosting estático.</li>
+  </ol>
+</div>
+</body>
+</html>

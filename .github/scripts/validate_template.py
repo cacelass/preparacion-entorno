@@ -59,6 +59,7 @@ DEFAULTS = dict(
     use_rag=False,
     use_sdd=False,
     use_mcp=False,
+    use_demo=False,
     graphify_mode="no",
 )
 
@@ -85,6 +86,7 @@ PINNED: list[tuple[str, dict]] = [
             use_rag=True,
             use_conformal=True,
             use_mcp=True,
+            use_demo=True,
             # Todos los servidores a la vez: es el unico combo donde el
             # generador de .mcp.json y de opencode.json tiene que encadenar
             # varias entradas, que es donde se cuela una coma de mas.

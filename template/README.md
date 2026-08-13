@@ -24,7 +24,8 @@
 - [Inicio rápido](#inicio-rápido)
 - [Arnés de IA](#arnés-de-ia)
 - [Sistema de agentes](#sistema-de-agentes){% if use_docker %}
-- [Docker — Interfaz de chat](#docker--interfaz-de-chat){% endif %}{% if graphify_mode == "graphify + obsidian vault" %}
+- [Docker — Interfaz de chat](#docker--interfaz-de-chat){% endif %}{% if use_demo %}
+- [Demo](#demo){% endif %}{% if graphify_mode == "graphify + obsidian vault" %}
 - [Obsidian Vault](#obsidian-vault){% endif %}
 
 ---
@@ -169,6 +170,68 @@ make docker-down    # parar y eliminar contenedores
 | `train` | Lanzar entrenamiento desde el chat |
 | `reload` | Recargar modelos del disco |
 | `help` | Mostrar ayuda |
+
+---
+{% endif %}
+
+{% if use_demo %}
+## Demo
+
+Generado con la plantilla **[dskit](https://github.com/cacelass/dskit)**.
+
+Este proyecto incluye una **demo web estática** (`demo/`) con 4 páginas:
+
+- **Home** (`index.html`) — presentación del proyecto con acceso a todo.
+- **Try model** (`try.html`) — playground que ejecuta el modelo en tu
+  navegador con ONNX Runtime (WebAssembly): las features viajan a tu máquina,
+  no a un servidor.
+- **Docs** (`docs.html`) — el README renderizado a HTML en Python por
+  `make demo-export` (sin librerías JS de terceros) + acceso a la documentación
+  Sphinx.
+- **MCP** (`mcp.html`) — los servidores MCP del proyecto y cómo probarlos.
+
+La demo es un directorio **local, sin auto-deploy**. Los `.onnx` y `meta.json`
+viajan en el repo (son pequeños) pero nada se publica automáticamente. Si algún
+día quieres publicarla (p.ej. a GitHub Pages o cualquier hosting estático),
+sube `demo/` cuando quieras — el contenido es 100% estático.
+
+### Por qué ONNX
+
+Los modelos entrenados se guardan como `.joblib` (sklearn) / `.pt` (PyTorch),
+y el navegador no puede cargarlos. `make demo-export` los convierte a **ONNX**
+(`skl2onnx` para sklearn, `torch.onnx.export` para redes neuronales)
+embebiendo el preprocesado (encoders, scaler, PCA) en un único grafo. El
+navegador los ejecuta con `onnxruntime-web` (WebAssembly), sin servidor ni
+build tooling.
+
+### Flujo
+
+```bash
+# 1. Entrenar los modelos (obligatorio antes de exportar)
+make train
+
+# 2. Exportar a ONNX → demo/models/*.onnx + meta.json + docs.html
+make demo-export
+
+# 3. Ver la demo localmente
+make demo-serve    # http://localhost:8000
+
+# 4. Si quieres versionarla en el repo (recomendado)
+git add demo/
+git commit -m "feat: exportar demo ONNX"
+```
+
+### Límites y advertencias
+
+- **Tamaño**: los ONNX de modelos tabulares de sklearn pesan de KB a pocos MB.
+  Son pequeños y se pueden commitear; Git LFS no haría falta.
+- **CatBoost** no lo soporta `skl2onnx`: se omite con un aviso en
+  `make demo-export`.
+- Si personalizas `LOGCOLS`, `ORDINAL_MAPPINGS`, `COLS_TO_DROP` o
+  `_feature_engineering` en `build_features.py`, la demo **no** replica esos
+  pasos y la predicción puede divergir de `make predict`.
+- **Privacidad**: la demo corre 100% en el navegador; ningún dato enviado sale
+  de la máquina del visitante.
 
 ---
 {% endif %}
