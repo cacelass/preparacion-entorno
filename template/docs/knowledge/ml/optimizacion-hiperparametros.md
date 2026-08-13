@@ -229,17 +229,17 @@ que lo guió, y el test se toca una sola vez al final.
 ## Optuna en este proyecto
 
 Este proyecto se generó con `use_optuna` activo: `make tune` ejecuta
-`uv run python -m tuning.tune_model`. El módulo declara objetivos por tipo de
+`uv run python -m tools.tune_model`. El módulo declara objetivos por tipo de
 modelo (regresión, clasificación, KNN...) con `trial.suggest_*`, usa
 `TPESampler(seed=42)` y `MedianPruner` por defecto, y reporta el mejor trial y
 su configuración. Ajusta `n_trials` (default 30) desde la CLI:
 
 ```bash
 make tune
-uv run python -m tuning.tune_model --n-trials 100
+uv run python -m tools.tune_model --n-trials 100
 ```
 
-Reglas al tocar `tuning/tune_model.py`: mantén fijas las semillas de sampler y
+Reglas al tocar `tools/tune_model.py`: mantén fijas las semillas de sampler y
 de entrenamiento para que un mismo trial sea comparable entre ejecuciones;
 loguea el historial de cada estudio (SQLite, o mlflow si está activo); y
 recuerda que la métrica del estudio es de validación, no de test — el modelo

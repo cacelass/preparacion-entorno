@@ -1,12 +1,12 @@
 {% if use_optuna %}
 """
-tuning/tune_model.py — Optimización de hiperparámetros con Optuna.
+tools/tune_model.py — Optimización de hiperparámetros con Optuna.
 
 Ejecutar con:
     make tune
 
 O directamente:
-    uv run python -m tuning.tune_model
+    uv run python -m tools.tune_model
 
 Qué hace:
     1. Ejecuta un estudio Optuna por cada modelo activo.

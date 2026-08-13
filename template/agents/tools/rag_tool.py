@@ -602,14 +602,13 @@ class RagTool:
     #: (subdirectorio, patron, recursivo, sufijos admitidos o None, troceador)
     FUENTES = (
         ("{{ project_slug }}", "*.py", True, None, "py"),
-        # El codigo que se despliega tambien es documentacion: sin estas cuatro
-        # filas, preguntar por la API o por el drift solo devolvia los prompts
-        # que los describen, nunca la implementacion que los hace. Los
-        # subdirectorios que no existan (extras desactivados) se saltan solos.
+        # El codigo que se despliega tambien es documentacion: sin estas filas,
+        # preguntar por la API o por el drift solo devolvia los prompts que los
+        # describen, nunca la implementacion que los hace. Los subdirectorios
+        # que no existan (extras desactivados) se saltan solos.
         ("api", "*.py", True, None, "py"),
         ("chat", "*.py", True, None, "py"),
-        ("monitoring", "*.py", True, None, "py"),
-        ("tuning", "*.py", True, None, "py"),
+        ("tools", "*.py", True, None, "py"),
         ("agents", "*.py", True, None, "py"),
         ("agents/prompts", "*.md", False, None, "md"),
         # docs/ NO es recursivo a proposito: si lo fuera absorberia docs/vault y
@@ -620,7 +619,7 @@ class RagTool:
         # Corpus de conocimiento profundo (docs/knowledge/): la base de teoria y
         # practica que el lider consulta antes de aconsejar. Incluye los
         # papers descargados por `rag refresh` en docs/knowledge/papers/. No
-        # existe sin use_rag, igual que api/chat/monitoring/tuning, y se salta.
+        # existe sin use_rag, igual que api/chat/tools, y se salta.
         ("docs/knowledge", "*.md", True, None, "md"),
         # Memoria del arnes: el historico de features cerradas y sus decisiones
         # es lo que un agente nuevo necesita buscar en lenguaje natural sin

@@ -209,7 +209,7 @@ run:
 # ─────────────────────────────────────────────────────────────────────────────
 monitor:
 	@echo "▶  Ejecutando monitorización de drift y rendimiento..."
-	uv run python -m monitoring.monitor
+	uv run python -m tools.monitor
 
 {% endif %}
 {% if use_optuna %}
@@ -218,7 +218,7 @@ monitor:
 # ─────────────────────────────────────────────────────────────────────────────
 tune:
 	@echo "▶  Lanzando optimizacion Optuna (OPTUNA_TRIALS en main.py)"
-	uv run python -m tuning.tune_model
+	uv run python -m tools.tune_model
 
 {% endif %}
 {% if use_duckdb %}

@@ -13,7 +13,7 @@ make monitor  →  reports/monitoring/
 | Revisar | `reports/monitoring/*.json` | Reportes generados | — |
 
 ## Paths
-- `monitoring/monitor.py` — script de monitorización
+- `tools/monitor.py` — script de monitorización
 - `reports/monitoring/` — reportes generados (JSON)
 - `reports/figures/` — gráficos de drift y rendimiento
 

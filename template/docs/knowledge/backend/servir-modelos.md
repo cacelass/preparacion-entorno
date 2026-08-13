@@ -190,7 +190,7 @@ cuelga la petición deja colgados a todos los clientes.
   truth, aunque sea retrasado.
 
 {% if use_monitoring %}
-Este proyecto incluye `monitoring/monitor.py`: drift KS/chi² y rendimiento
+Este proyecto incluye `tools/monitor.py`: drift KS/chi² y rendimiento
 frente a baseline, vía `make monitor`, con informes en `reports/monitoring/`
 (`drift_report.csv`, `drift_report.html`, `performance.csv`). Es la fuente de
 salud del modelo desplegado; se ejecuta sobre los mismos datos que sirve la API.

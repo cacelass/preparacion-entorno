@@ -301,7 +301,7 @@ PSI = Σ_i (p_i − q_i) · ln(p_i / q_i)
   distribuciones sin supuestos paramétricos.
 
 {% if use_monitoring %}
-Este proyecto incluye `monitoring/monitor.py` como hook de
+Este proyecto incluye `tools/monitor.py` como hook de
 monitorización: drift KS/chi² entre la referencia (X_train) y los datos
 actuales, y degradación de métricas frente al baseline, vía `make monitor`.
 Genera `reports/monitoring/drift_report.csv` y `drift_report.html`. Se

@@ -1,12 +1,12 @@
 {% if use_monitoring %}
 """
-monitoring/monitor.py — Monitorización de drift y rendimiento del modelo.
+tools/monitor.py — Monitorización de drift y rendimiento del modelo.
 
 Ejecutar con:
     make monitor
 
 O directamente:
-    uv run python -m monitoring.monitor
+    uv run python -m tools.monitor
 
 Qué detecta:
     - Data drift: cambio en la distribución de features entre referencia y producción

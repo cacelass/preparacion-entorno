@@ -230,7 +230,7 @@ La escalera del baseline — de lo simple a lo complejo, en ese orden:
    ordenado y las features validadas.
 
 {% if use_optuna %}
-Este proyecto trae `tuning/` con Optuna (`make tune`): optimiza los
+Este proyecto trae `tools/tune_model.py` con Optuna (`make tune`): optimiza los
 hiperparámetros sobre el pipeline ya ordenado, con CV anidada o holdout de
 validación, y deja el mejor trial en `models/best_params.json`. Se usa en el
 escalón 4, nunca antes de tener un baseline.

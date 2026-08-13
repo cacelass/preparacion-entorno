@@ -241,8 +241,8 @@ ignore = [
 #      arriba les quitaria el efecto.
 # W293: linea en blanco con sangria que deja el motor de plantillas al
 # colapsar un bloque condicional. `make format` la limpia.
-"tuning/tune_model.py"    = ["E402", "W293"]
-"monitoring/monitor.py"   = ["E402"]
+"tools/tune_model.py"    = ["E402", "W293"]
+"tools/monitor.py"       = ["E402"]
 "{{ project_slug }}/models/predict_model.py" = ["E402"]
 
 [tool.isort]

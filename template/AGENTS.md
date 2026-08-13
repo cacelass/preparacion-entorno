@@ -218,7 +218,7 @@ preguntarle al histórico en lenguaje natural. El reindexado es incremental y
 
 ```bash
 uv run python -m agents --json run rag search --query "¿por qué elegimos este modelo?"
-uv run python -m agents --json run rag search --query "drift" --file_type code --source monitoring/
+uv run python -m agents --json run rag search --query "drift" --file_type code --source tools/
 uv run python -m agents --json run doc search --query "qué se decidió sobre las features"
 ```
 

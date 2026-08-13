@@ -297,7 +297,7 @@ coste del error.
   concreta no es reproducible.
 
 {% if use_monitoring %}
-En producción la exprimición no termina en offline: `monitoring/monitor.py`
+En producción la exprimición no termina en offline: `tools/monitor.py`
 (KS/chi² para drift, rendimiento vs baseline) avisa cuándo el modelo
 exprimido dejó de serlo. La calibración y los umbrales se revalidan con los
 datos nuevos.
@@ -320,7 +320,7 @@ La secuencia concreta y el criterio de parada:
    agotaron.
 
 {% if use_optuna %}
-Este proyecto trae `tuning/` con Optuna (`make tune`): define el presupuesto
+Este proyecto trae `tools/tune_model.py` con Optuna (`make tune`): define el presupuesto
 de búsqueda (trials), explora con TPE y deja el mejor trial en
 `models/best_params.json`. El escalón 4 se hace aquí, sobre el pipeline
 ordenado.

@@ -98,12 +98,16 @@ class SharedContext:
         return self.root / "api"
 
     @property
+    def tools_dir(self) -> Path:
+        return self.root / "tools"
+
+    @property
     def monitoring_module_dir(self) -> Path:
-        return self.root / "monitoring"
+        return self.root / "tools"
 
     @property
     def tuning_dir(self) -> Path:
-        return self.root / "tuning"
+        return self.root / "tools"
 
     @property
     def dockerfile(self) -> Path:

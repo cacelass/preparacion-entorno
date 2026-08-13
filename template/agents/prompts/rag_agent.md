@@ -12,7 +12,7 @@ solo no la ve.
 ## Acciones
 
 ### `index` — Construye/actualiza el índice
-Escanea el paquete principal, `api/`, `chat/`, `monitoring/`, `tuning/`,
+Escanea el paquete principal, `api/`, `chat/`, `tools/`,
 `agents/`, los prompts, `docs/` (fichas raíz, `docs/source/` de Sphinx, el
 vault `docs/vault/` y el corpus `docs/knowledge/`), `harness/progress/`,
 `harness/featureslist.json`, README, AGENTS.md y CHANGELOG.md.

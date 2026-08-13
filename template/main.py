@@ -62,7 +62,7 @@ def run_full_pipeline() -> None:
 
 {% if use_optuna %}
     print('\n4. Optimizando hiperparámetros con Optuna...')
-    from tuning.tune_model import tune_models as _tune
+    from tools.tune_model import tune_models as _tune
     _tune(X_train, y_train, n_trials=OPTUNA_TRIALS)
 
     print('\n5. Entrenando modelos con mejores params...')

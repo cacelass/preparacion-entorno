@@ -14,7 +14,7 @@ make tune  →  mejores params  →  make train (con mejores params)
 | Reentrenar | `make train` | Entrenar modelo final con mejores params | `ml` (inspect_model) |
 
 ## Paths
-- `tuning/tune_model.py` — script de optimización
+- `tools/tune_model.py` — script de optimización
 - Los estudios se almacenan en la base de datos de Optuna (local por defecto)
 
 ## Agente `ml` — acciones relevantes

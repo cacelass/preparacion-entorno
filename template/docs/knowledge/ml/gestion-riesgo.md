@@ -117,7 +117,7 @@ lo cubre el rollback; si nada responde, lo cubre la supervisión humana — la
 única capa que no se automatiza y la última que se debe quitar.
 
 {% if use_monitoring %}
-La capa de monitoreo está implementada en `monitoring/monitor.py`: drift
+La capa de monitoreo está implementada en `tools/monitor.py`: drift
 KS/chi² entre la referencia (`X_train`) y los datos actuales, y degradación
 de métricas frente al baseline, vía `make monitor` (detalle en
 `ml/ciclo-vida-mlops.md`). El monitor no decide nada: produce la señal que

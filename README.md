@@ -325,10 +325,11 @@ nombre_proyecto/
 ├── api/                          ← (use_api=true)
 │   ├── main.py                   ← FastAPI: /health /info /predict + lifespan
 │   └── schemas.py                ← Pydantic V2: PredictRequest, PredictResponse
-├── tuning/                       ← (use_optuna=true)
-│   └── tune_model.py             ← _objective_* por modelo + tune_models()
-├── monitoring/                   ← (use_monitoring=true)
-│   └── monitor.py                ← check_drift, check_performance, run_monitoring
+├── tools/                        ← scripts operativos del ciclo de vida ML
+│   ├── export_onnx.py            ← (use_demo=true) modelos → ONNX para la demo
+│   ├── mutate.py                 ← (use_sdd=true) mutation testing
+│   ├── monitor.py                ← (use_monitoring=true) drift + performance
+│   └── tune_model.py             ← (use_optuna=true) _objective_* + tune_models()
 ├── chat/                         ← (use_docker=true)
 │   └── app.py                    ← interfaz Gradio conectada al modelo
 ├── vault/                        ← (graphify_mode = "graphify + obsidian vault")

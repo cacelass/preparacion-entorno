@@ -105,10 +105,10 @@ def patch_paths(monkeypatch, tmp_path):
         f"{slug}.visualization.visualize",
         f"{slug}.data.make_dataset",
 {% if use_optuna %}
-        "tuning.tune_model",
+        "tools.tune_model",
 {% endif %}
 {% if use_monitoring %}
-        "monitoring.monitor",
+        "tools.monitor",
 {% endif %}
 {% if use_api %}
         "api.main",

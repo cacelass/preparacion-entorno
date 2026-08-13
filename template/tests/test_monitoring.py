@@ -31,7 +31,7 @@ def _make_ref_curr(n=200, n_feat=4, with_drift=False):
 # ---------------------------------------------------------------------------
 def test_check_drift_sin_drift(patch_paths):
     """Distribuciones similares no deben mostrar drift."""
-    from monitoring.monitor import check_drift
+    from tools.monitor import check_drift
     ref, curr = _make_ref_curr(with_drift=False)
     result = check_drift(ref, curr)
     assert isinstance(result, pd.DataFrame)
@@ -42,7 +42,7 @@ def test_check_drift_sin_drift(patch_paths):
 
 def test_check_drift_con_drift(patch_paths):
     """Distribución con shift debe detectar drift en feat_0."""
-    from monitoring.monitor import check_drift
+    from tools.monitor import check_drift
     ref, curr = _make_ref_curr(with_drift=True)
     result = check_drift(ref, curr)
     drifted = result[result["drift_detected"]]
@@ -51,7 +51,7 @@ def test_check_drift_con_drift(patch_paths):
 
 def test_check_drift_devuelve_columnas_correctas(patch_paths):
     """El DataFrame de drift debe tener todas las columnas esperadas."""
-    from monitoring.monitor import check_drift
+    from tools.monitor import check_drift
     ref, curr = _make_ref_curr()
     result = check_drift(ref, curr)
     for col in ["feature", "test", "statistic", "p_value", "drift_detected"]:
@@ -60,7 +60,7 @@ def test_check_drift_devuelve_columnas_correctas(patch_paths):
 
 def test_check_drift_threshold_alto_detecta_mas(patch_paths):
     """Threshold alto (p-value más laxo) debe detectar más drift que threshold bajo."""
-    from monitoring.monitor import check_drift
+    from tools.monitor import check_drift
     ref, curr = _make_ref_curr(with_drift=False)
     lenient = check_drift(ref, curr, threshold=0.5)
     strict = check_drift(ref, curr, threshold=0.001)
@@ -69,7 +69,7 @@ def test_check_drift_threshold_alto_detecta_mas(patch_paths):
 
 def test_check_drift_categorica(patch_paths):
     """check_drift debe usar chi2 para features categóricas."""
-    from monitoring.monitor import check_drift
+    from tools.monitor import check_drift
     np.random.seed(0)
     ref  = pd.DataFrame({"cat": np.random.choice(["A", "B", "C"], 100)})
     curr = pd.DataFrame({"cat": np.random.choice(["A", "B", "C"], 50)})
@@ -82,7 +82,7 @@ def test_check_drift_categorica(patch_paths):
 # ---------------------------------------------------------------------------
 def test_run_monitoring_guarda_csv(patch_paths, tmp_path):
     """run_monitoring debe guardar drift_report.csv."""
-    from monitoring.monitor import run_monitoring
+    from tools.monitor import run_monitoring
     ref, curr = _make_ref_curr()
     mon_dir = tmp_path / "monitoring"
     run_monitoring(reference=ref, current=curr, monitoring_dir=mon_dir)
@@ -91,7 +91,7 @@ def test_run_monitoring_guarda_csv(patch_paths, tmp_path):
 
 def test_run_monitoring_guarda_html(patch_paths, tmp_path):
     """run_monitoring debe guardar drift_report.html."""
-    from monitoring.monitor import run_monitoring
+    from tools.monitor import run_monitoring
     ref, curr = _make_ref_curr()
     mon_dir = tmp_path / "monitoring"
     run_monitoring(reference=ref, current=curr, monitoring_dir=mon_dir)
@@ -104,7 +104,7 @@ def test_run_monitoring_guarda_html(patch_paths, tmp_path):
 
 def test_run_monitoring_csv_columnas_correctas(patch_paths, tmp_path):
     """El CSV de drift debe tener las columnas esperadas."""
-    from monitoring.monitor import run_monitoring
+    from tools.monitor import run_monitoring
     ref, curr = _make_ref_curr()
     mon_dir = tmp_path / "monitoring"
     run_monitoring(reference=ref, current=curr, monitoring_dir=mon_dir)
@@ -119,7 +119,7 @@ def test_run_monitoring_csv_columnas_correctas(patch_paths, tmp_path):
 # ---------------------------------------------------------------------------
 def test_check_performance_crea_baseline(patch_paths, tmp_path):
     """Sin baseline existente, check_performance debe crear uno."""
-    from monitoring.monitor import check_performance
+    from tools.monitor import check_performance
     np.random.seed(42)
 {% if task_type == "clasificacion" %}
     y_true = np.array([0, 1, 0, 1, 0, 1, 1, 0])
@@ -137,7 +137,7 @@ def test_check_performance_crea_baseline(patch_paths, tmp_path):
 
 def test_check_performance_compara_con_baseline(patch_paths, tmp_path):
     """Con baseline existente, check_performance debe comparar métricas."""
-    from monitoring.monitor import check_performance
+    from tools.monitor import check_performance
 {% if task_type == "clasificacion" %}
     y_true = np.array([0, 1, 0, 1, 0, 1, 1, 0])
     y_pred = np.array([0, 1, 0, 1, 1, 1, 0, 0])
@@ -157,7 +157,7 @@ def test_check_performance_compara_con_baseline(patch_paths, tmp_path):
 
 def test_run_monitoring_con_predicciones(patch_paths, tmp_path):
     """run_monitoring con y_true e y_pred guarda performance.csv."""
-    from monitoring.monitor import run_monitoring
+    from tools.monitor import run_monitoring
     ref, curr = _make_ref_curr()
 {% if task_type == "clasificacion" %}
     y_true = np.random.randint(0, 2, 50)

@@ -22,7 +22,7 @@ rag index  →  rag search  →  (uso en agentes)
 - `.rag-index/` — base de datos vectorial ChromaDB (gitignored)
 
 ## Qué entra en el índice
-- El paquete del proyecto, `api/`, `chat/`, `monitoring/`, `tuning/` y `agents/`
+- El paquete del proyecto, `api/`, `chat/`, `tools/` y `agents/`
 - Prompts de agentes y `docs/` (fichas raíz, `docs/source/` de Sphinx)
 - El corpus de conocimiento profundo `docs/knowledge/` (incluidos los papers
   descargados por `rag refresh` en `docs/knowledge/papers/`), etiquetado como

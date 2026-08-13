@@ -42,8 +42,8 @@ qué se hace ni cierras la feature: eso es del líder y del reviewer.
 | Modelos entrenados | `models/` |
 | Figuras e informes | `reports/`, `reports/figures/` |
 {% if use_api %}| Endpoints REST | `api/` |
-{% endif %}{% if use_monitoring %}| Drift y performance | `monitoring/` |
-{% endif %}{% if use_optuna %}| Búsqueda de hiperparámetros | `tuning/` |
+{% endif %}{% if use_monitoring %}| Drift y performance | `tools/monitor.py` |
+{% endif %}{% if use_optuna %}| Búsqueda de hiperparámetros | `tools/tune_model.py` |
 {% endif %}
 
 ## Antes de devolver el control

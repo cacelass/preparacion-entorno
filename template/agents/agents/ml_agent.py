@@ -117,9 +117,9 @@ class MLAgent(BaseAgent):
         except ImportError:
             return AgentResult(False, self.name, "analyze_optuna", "Optuna no está instalado.")
 
-        study_dir = self.ctx.root / "tuning"
+        study_dir = self.ctx.tools_dir
         if not study_dir.exists():
-            return AgentResult(False, self.name, "analyze_optuna", "El directorio 'tuning/' no existe.")
+            return AgentResult(False, self.name, "analyze_optuna", "El directorio 'tools/' no existe.")
 
         dbs = list(study_dir.glob("*.db"))
         if not dbs:

@@ -82,7 +82,7 @@ chi² son las alternativas paramétricas para numéricas y categóricas (detalle
 en `data/calidad-datos.md`).
 
 {% if use_monitoring %}
-Este proyecto trae el hook de detección en `monitoring/monitor.py`: drift
+Este proyecto trae el hook de detección en `tools/monitor.py`: drift
 KS/chi² entre la referencia (X_train) y los datos actuales, y degradación de
 métricas frente al baseline, vía `make monitor`. Genera
 `reports/monitoring/drift_report.csv` y `drift_report.html`. La salida es la

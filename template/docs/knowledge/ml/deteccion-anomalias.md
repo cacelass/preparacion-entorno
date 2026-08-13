@@ -268,7 +268,7 @@ limpiar el train o cambiar de sabio a *novelty* (entrenar solo con normales).
    detector entrenado una vez acumula falsos positivos con el tiempo; ver
    [ciclo-vida-mlops.md](ciclo-vida-mlops.md).
    {% if use_monitoring %}
-   Este proyecto trae `monitoring/monitor.py` con `make monitor`: drift
+   Este proyecto trae `tools/monitor.py` con `make monitor`: drift
    KS/chi² de features y degradación de métricas frente a baseline. Úsalo
    como señal para **reentrenar** el detector (o su referencia de "normalidad")
    cuando el score empiece a dispararse sin que cambie el negocio.

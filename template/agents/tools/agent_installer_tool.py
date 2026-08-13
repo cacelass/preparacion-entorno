@@ -33,7 +33,7 @@ from agents.tools.registry import register_tool
 # estas carpetas por otro motivo), así que se reporta como aviso, no como
 # fallo — decide tú si es un problema real revisando el código señalado.
 _SUSPICIOUS_PATH_RE = re.compile(
-    r"^(\.?/)?(data|models|reports|tests|docs|notebooks|api|monitoring|tuning)(/|$)"
+    r"^(\.?/)?(data|models|reports|tests|docs|notebooks|api|tools)(/|$)"
 )
 
 
