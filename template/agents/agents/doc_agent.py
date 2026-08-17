@@ -22,12 +22,6 @@ try:
 except ImportError:
     HAS_GRAPHIFY = False
 
-try:
-    from agents.tools.rag_tool import RagTool
-    HAS_RAG = True
-except ImportError:
-    HAS_RAG = False
-
 
 @register_agent
 class DocAgent(BaseAgent):
@@ -100,7 +94,9 @@ class DocAgent(BaseAgent):
 
     def _buscar_rag(self, query: str, avisos: list) -> list[dict]:
         """Coincidencias semanticas del indice vectorial."""
-        if not (HAS_RAG and RagTool.available()):
+        from agents.tools.rag_tool import RagTool
+
+        if not RagTool.available():
             return []
         try:
             resultados = RagTool.search(self.ctx.root, query, top_k=5)
@@ -296,15 +292,12 @@ class DocAgent(BaseAgent):
     # -------------------------------------------------------------------------
     def rag_search(self, *, query: str, top_k: int = 10) -> AgentResult:
         """Búsqueda semántica pura vía RAG."""
-        if not HAS_RAG:
-            return AgentResult(
-                False, self.name, "rag_search",
-                "RAG no disponible (chromadb no instalado).",
-            )
+        from agents.tools.rag_tool import RagTool
+
         if not RagTool.available():
             return AgentResult(
                 False, self.name, "rag_search",
-                "chromadb no instalado. Ejecuta: uv sync --extra rag",
+                "RAG no disponible (chromadb no instalado).",
             )
         results = RagTool.search(self.ctx.root, query, top_k=top_k)
         if not results:
@@ -377,7 +370,9 @@ class DocAgent(BaseAgent):
         else:
             results["graphify"] = {"skipped": True}
 
-        if HAS_RAG and RagTool.available():
+        from agents.tools.rag_tool import RagTool
+
+        if RagTool.available():
             try:
                 rag_result = RagTool.index_project(self.ctx.root)
                 results["rag"] = rag_result
@@ -420,7 +415,9 @@ class DocAgent(BaseAgent):
         return datos, True, f"{datos['nodes']} nodos / {datos['edges']} aristas"
 
     def _estado_rag(self) -> tuple[dict, bool, str]:
-        disponible = HAS_RAG and RagTool.available()
+        from agents.tools.rag_tool import RagTool
+
+        disponible = RagTool.available()
         datos = {"available": disponible}
         if not disponible:
             return datos, False, "chromadb no instalado"

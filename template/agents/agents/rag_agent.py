@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
-from agents.tools.rag_tool import RagTool
 from agents.tools.rest_tool import RestTool
 
 
@@ -55,6 +54,8 @@ class RagAgent(BaseAgent):
         }
 
     def index(self, *, rebuild: bool = False) -> AgentResult:
+        from agents.tools.rag_tool import RagTool
+
         if not RagTool.available():
             return AgentResult(
                 False, self.name, "index",
@@ -74,6 +75,8 @@ class RagAgent(BaseAgent):
         )
 
     def index_urls(self, *, urls: list[str]) -> AgentResult:
+        from agents.tools.rag_tool import RagTool
+
         if not RagTool.available():
             return AgentResult(
                 False, self.name, "index_urls",
@@ -120,6 +123,8 @@ class RagAgent(BaseAgent):
         `source` a un prefijo de ruta, `max_per_source` reparte el top_k entre
         ficheros y `expand` devuelve los chunks vecinos en `context`.
         """
+        from agents.tools.rag_tool import RagTool
+
         if not RagTool.available():
             return AgentResult(
                 False, self.name, "search",
@@ -197,6 +202,8 @@ class RagAgent(BaseAgent):
         )
 
     def status(self) -> AgentResult:
+        from agents.tools.rag_tool import RagTool
+
         info = RagTool.status(self.ctx.root)
         if not info.get("available"):
             return AgentResult(

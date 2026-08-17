@@ -30,6 +30,35 @@ from agents.context import SharedContext, get_context
 from agents.exceptions import ActionNotSupportedError
 
 
+# Conjugaciones frecuentes -> forma canónica que declaran las capabilities.
+# El ruteo compara palabra completa (no subcadena), así que "revisa" no
+# acierta la capability "revisar" ni "commitea" acierta "commit": la consulta
+# llega conjugada y la palabra clave está en infinitivo. En vez de un stemmer
+# general (que reintroduciría el bug de subcadenas que prohíbe
+# test_can_handle_no_substring_match), se expande la consulta con la forma
+# canónica cuando el match exacto no encuentra nada.
+_CONJUGACIONES: dict[str, str] = {
+    "commitea": "commit", "commitean": "commit", "commitear": "commit",
+    "revisa": "revisar", "revisas": "revisar", "revisan": "revisar",
+    "revisando": "revisar", "reviso": "revisar",
+    "actualiza": "actualizar", "actualizas": "actualizar", "actualizan": "actualizar",
+    "ejecuta": "ejecutar", "ejecutas": "ejecutar", "ejecutan": "ejecutar",
+    "genera": "generar", "generas": "generar", "generan": "generar",
+    "indexa": "indexar", "indexas": "indexar", "indexan": "indexar",
+    "navega": "navegar", "navegas": "navegar", "navegan": "navegar",
+    "sincroniza": "sincronizar", "sincronizas": "sincronizar", "sincronizan": "sincronizar",
+    "refactoriza": "refactorizar", "refactorizas": "refactorizar",
+    "corre": "correr", "corren": "correr",
+    "cierra": "cerrar", "cierras": "cerrar", "cierran": "cerrar",
+    "compara": "comparar", "compite": "competir",
+    "planea": "planificar", "planifica": "planificar",
+}
+
+
+def _expandir_conjugacion(text: str) -> str:
+    return " ".join(_CONJUGACIONES.get(w, w) for w in text.split())
+
+
 def _fold(text: str) -> str:
     """
     Minúsculas sin acentos. El ruteo compara palabra completa, así que sin
@@ -227,6 +256,14 @@ class BaseAgent(ABC):
         eso cada acierto suma un valor fijo (0.4), sin dividir por el total
         de capacidades del agente.
 
+        Y el recall se resuelve con un fallback explícito, no con stemming:
+        "commitea la feature" no acierta 'commit' ni "revisa el codigo"
+        acierta 'revisar' porque la consulta conjuga el verbo y la palabra
+        clave está en infinitivo. Un stemmer general reintroduciría el bug
+        de subcadenas (por eso la suite lo prohíbe), así que el fallback
+        expande la consulta con una tabla acotada de conjugaciones frecuentes
+        y reintenta, solo cuando el match exacto no ha acertado nada.
+
         Es una heurística simple y determinista a propósito (ver filosofía en
         `agents/README.md`: estos agentes no son un chatbot). Si en el futuro
         quieres un ruteo más inteligente, este es el único método a sobreescribir
@@ -236,6 +273,15 @@ class BaseAgent(ABC):
             return 0.0
         text = _fold(query)
         matched = [kw for kw in self.capabilities if re.search(rf"\b{re.escape(_fold(kw))}\b", text)]
+        if not matched:
+            # Recall: la consulta llega conjugada ("revisa", "commitea") y la
+            # palabra clave está en infinitivo. El match exacto no ve la
+            # conjugación (límites \b), así que se expande la consulta con la
+            # forma canónica y se reintenta — solo aquí, solo si nada acertó,
+            # para no alterar el ranking cuando ya hay aciertos exactos.
+            expandida = _expandir_conjugacion(text)
+            if expandida != text:
+                matched = [kw for kw in self.capabilities if re.search(rf"\b{re.escape(_fold(kw))}\b", expandida)]
         if not matched:
             return 0.0
         # Cada acierto vale por las PALABRAS que cubre, no por ser un acierto.

@@ -6,7 +6,7 @@ from hypothesis import given, assume
 from hypothesis import strategies as st
 
 from agents.contracts import CONTRACTS, Contract, validate_contracts
-from agents.core.base_agent import AgentResult, BaseAgent
+from agents.core.base_agent import _CONJUGACIONES, AgentResult, BaseAgent
 from agents.context import SharedContext
 from agents.config import ProjectConfig
 
@@ -110,6 +110,12 @@ def test_can_handle_no_substring_match(keyword: str, infix: str):
     assume(keyword)
     assume(infix)
     no_match = keyword + infix
+    # Si `keyword` es una forma conjugada real (p.ej. "revisa") y `no_match`
+    # su canónica ("revisar"), el fallback de conjugación legitima el match:
+    # es palabra completa de la forma canónica, no una subcadena. Ese caso
+    # está cubierto por los tests de ruteo conjugado; aquí se excluye para
+    # probar el invariante anti-subcadena puro.
+    assume(_CONJUGACIONES.get(keyword) != no_match)
     agent = _TestAgent.__new__(_TestAgent)
     agent.capabilities = [no_match]
     agent.ctx = SharedContext(root="/tmp", config=ProjectConfig())

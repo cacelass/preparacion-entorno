@@ -12,15 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
-from agents.tools.data_io_tool import DataIOTool
-from agents.tools.dataframe_analysis_tool import DataFrameAnalysisTool
-from agents.tools.validate_tool import ValidateTool
-from agents.tools.stats_tool import StatsTool
 
 
 def _has_plt() -> bool:
@@ -71,7 +64,10 @@ class DataAgent(BaseAgent):
         }
 
     # -------------------------------------------------------------------------
-    def _load(self, path: Path) -> pd.DataFrame:
+    def _load(self, path: Path):
+        import pandas as pd
+        from agents.tools.data_io_tool import DataIOTool
+
         reader = DataIOTool.infer_reader(path)
         result = reader(path)
         if not isinstance(result, pd.DataFrame):
@@ -110,6 +106,8 @@ class DataAgent(BaseAgent):
         except (ValueError, TypeError) as exc:
             return AgentResult(False, self.name, "eda_report", str(exc))
 
+        from agents.tools.dataframe_analysis_tool import DataFrameAnalysisTool
+
         tool = DataFrameAnalysisTool
         report = {
             "summary": tool.summary(df),
@@ -147,6 +145,8 @@ class DataAgent(BaseAgent):
             df = self._load(path)
         except (ValueError, TypeError) as exc:
             return AgentResult(False, self.name, "detect_leakage", str(exc))
+
+        from agents.tools.dataframe_analysis_tool import DataFrameAnalysisTool
 
         suspects = DataFrameAnalysisTool.leakage_suspects(df, target_col, correlation_threshold=correlation_threshold)
         return AgentResult(
@@ -253,6 +253,8 @@ class DataAgent(BaseAgent):
         except (ValueError, TypeError) as exc:
             return AgentResult(False, self.name, "detect_skewness", str(exc))
 
+        import numpy as np
+
         num_cols = df.select_dtypes(include=[np.number]).columns
         skew_values = df[num_cols].skew().dropna().to_dict()
 
@@ -281,6 +283,8 @@ class DataAgent(BaseAgent):
             df = self._load(path)
         except (ValueError, TypeError) as exc:
             return AgentResult(False, self.name, "quality_check", str(exc))
+
+        from agents.tools.validate_tool import ValidateTool
 
         quality = ValidateTool.check_data_quality(df)
         profile = ValidateTool.profile(df)
@@ -317,6 +321,9 @@ class DataAgent(BaseAgent):
             df = self._load(path)
         except (ValueError, TypeError) as exc:
             return AgentResult(False, self.name, "statistical_summary", str(exc))
+
+        import numpy as np
+        from agents.tools.stats_tool import StatsTool
 
         num_cols = df.select_dtypes(include=[np.number]).columns
         normality_results = {}
@@ -399,6 +406,8 @@ class DataAgent(BaseAgent):
 
         out_dir = Path(output_dir) if output_dir else self.ctx.agent_workspace("data") / "plots"
         out_dir.mkdir(parents=True, exist_ok=True)
+        import numpy as np
+
         num_cols = df.select_dtypes(include=[np.number]).columns[:10]
         cat_cols = df.select_dtypes(exclude=[np.number]).columns[:5]
         sns.set_theme(style="whitegrid")

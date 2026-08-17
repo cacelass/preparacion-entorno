@@ -118,6 +118,15 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("dónde está documentado el módulo de datos", "doc"),
     ("cuál es la siguiente tarea pendiente del backlog", "harness"),
     ("abre la feature del arnés", "harness"),
+    # Parafraseadas/conjugadas: la consulta conjuga el verbo y la keyword está
+    # en infinitivo — el fallback de conjugación debe rutear igual.
+    ("commitea la feature", "git"),
+    ("revisa este código", "review"),
+    ("revisa el codigo", "review"),
+    ("ejecuta los tests del módulo", "test"),
+    ("sincroniza el grafo de conocimiento", "knowledge"),
+    ("actualiza las dependencias", "dependency"),
+    ("genera un workflow de CI para el proyecto", "cicd"),
 ]
 
 
