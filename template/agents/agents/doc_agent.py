@@ -14,7 +14,6 @@ import hashlib
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
-from agents.tools.cache_tool import CacheTool
 
 try:
     from agents.tools.graphify_tool import GraphifyTool
@@ -189,6 +188,8 @@ class DocAgent(BaseAgent):
                 False, self.name, "graph_query",
                 "graphify no está instalado — no se puede consultar. Ejecuta el skill /graphify.",
             )
+        from agents.tools.cache_tool import CacheTool
+
         CacheTool.set_cache_dir(GraphifyTool.cache_dir(self.ctx.root))
 
         def _run() -> str:
@@ -208,6 +209,8 @@ class DocAgent(BaseAgent):
                 # entre procesos, así que la caché en disco nunca acertaría entre
                 # invocaciones de la CLI.
                 digest = hashlib.md5(f"{question}|{budget}".encode()).hexdigest()[:16]
+                from agents.tools.cache_tool import CacheTool
+
                 answer = CacheTool.disk_cache(name=f"query_{digest}")(_run)()
         except RuntimeError as exc:
             return AgentResult(False, self.name, "graph_query", f"graphify query falló: {exc}")

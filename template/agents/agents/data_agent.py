@@ -38,6 +38,7 @@ class DataAgent(BaseAgent):
         "dataset", "datos", "eda", "outlier", "outliers", "cardinalidad",
         "fuga de informacion", "leakage", "correlacion", "csv", "parquet",
         "limpieza", "features", "skewness", "sesgo", "imputacion", "profiling",
+        "pandas",
     ]
 
     def action_aliases(self) -> dict:

@@ -34,7 +34,6 @@ from pathlib import Path
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
-from agents.tools.cache_tool import CacheTool
 from agents.tools.graphify_tool import GraphifyTool
 
 # Árbol adaptado que se crea dentro de una bóveda nueva. Cada carpeta agrupa un
@@ -87,6 +86,8 @@ class KnowledgeAgent(BaseAgent):
     # -------------------------------------------------------------------------
     def _cache_dir(self) -> Path:
         """Fija (y crea) el directorio de caché en graphify-out/cache/."""
+        from agents.tools.cache_tool import CacheTool
+
         cache_dir = GraphifyTool.cache_dir(self.ctx.root)
         CacheTool.set_cache_dir(cache_dir)
         return cache_dir
@@ -360,6 +361,8 @@ class KnowledgeAgent(BaseAgent):
             # distintos pueden tener el mismo nº de nodos/aristas).
             mtime = int(GraphifyTool.graph_json(root).stat().st_mtime)
             cache_key = f"parents_{mtime}_{min_children}_{top}"
+            from agents.tools.cache_tool import CacheTool
+
             summaries = CacheTool.disk_cache(name=cache_key)(_compute)()
 
         if not summaries:

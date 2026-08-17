@@ -91,6 +91,7 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("diagnóstico del proyecto", "doctor"),
     ("actualiza el changelog", "documentation"),
     ("analiza el dataset clientes.csv", "data"),
+    ("que modulo usa pandas", "data"),
     ("revisa el código por duplicación", "review"),
     ("actualiza dependencias", "dependency"),
     ("escanea secretos hardcodeados", "secrets"),

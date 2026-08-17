@@ -21,7 +21,6 @@ from __future__ import annotations
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
 from agents.exceptions import ToolExecutionError
-from agents.tools.cache_tool import CacheTool
 from agents.tools.graphify_tool import GraphifyTool
 from agents.tools.research_tool import ResearchTool
 
@@ -61,6 +60,8 @@ class ResearchAgent(BaseAgent):
 
     # -------------------------------------------------------------------------
     def _cache_dir(self) -> None:
+        from agents.tools.cache_tool import CacheTool
+
         CacheTool.set_cache_dir(GraphifyTool.cache_dir(self.ctx.root))
 
     def _gather_project_text(self) -> str:
@@ -117,6 +118,8 @@ class ResearchAgent(BaseAgent):
             if no_cache:
                 papers = _run()
             else:
+                from agents.tools.cache_tool import CacheTool
+
                 papers = CacheTool.disk_cache(name=f"research_{backend}_{query}_{max_results}")(_run)()
         except ToolExecutionError as exc:
             return AgentResult(False, self.name, "search", f"Búsqueda en {backend} falló (¿sin red?): {exc}")

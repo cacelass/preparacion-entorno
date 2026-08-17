@@ -13,11 +13,8 @@ el proyecto es `supervisado`, `no_supervisado`, `redes_neuronales` o `hibrido`
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
-from agents.tools.sklearn_tool import SklearnTool
 
 
 @register_agent
@@ -53,6 +50,8 @@ class MLAgent(BaseAgent):
         return base
 
     def inspect_model(self, *, model_name: str) -> AgentResult:
+        from agents.tools.sklearn_tool import SklearnTool
+
         path = self._resolve_model_path(model_name)
         if path is None:
             return AgentResult(False, self.name, "inspect_model", f"No se encontró el modelo '{model_name}' en models/.")
@@ -65,6 +64,8 @@ class MLAgent(BaseAgent):
         return AgentResult(True, self.name, "inspect_model", f"'{model_name}' inspeccionado.", data=info)
 
     def feature_importance(self, *, model_name: str, feature_names: list[str] | None = None) -> AgentResult:
+        from agents.tools.sklearn_tool import SklearnTool
+
         path = self._resolve_model_path(model_name)
         if path is None:
             return AgentResult(False, self.name, "feature_importance", f"No se encontró el modelo '{model_name}' en models/.")
@@ -83,6 +84,8 @@ class MLAgent(BaseAgent):
         )
 
     def check_overfitting(self, *, train_score: float, test_score: float, gap_threshold: float = 0.1) -> AgentResult:
+        from agents.tools.sklearn_tool import SklearnTool
+
         verdict = SklearnTool.detect_overfitting(train_score, test_score, gap_threshold=gap_threshold)
         warnings = [] if verdict["verdict"] == "ok" else [verdict["note"]]
         return AgentResult(
@@ -91,6 +94,8 @@ class MLAgent(BaseAgent):
 
     def list_models(self) -> AgentResult:
         """Lista modelos según el ml_type del proyecto."""
+        from agents.tools.sklearn_tool import SklearnTool
+
         models = SklearnTool.list_models(self.ctx.models_dir)
         if self.ctx.config.ml_type == "no_supervisado":
             models = [p for p in models if "KMeans" in p.name or "Agglomerative" in p.name or "Pipeline" in p.name]
@@ -153,6 +158,8 @@ class MLAgent(BaseAgent):
         Compara todos los modelos supervisados entrenados: métricas, tamaño y tipo.
         Útil para elegir el mejor modelo para producción.
         """
+        from agents.tools.sklearn_tool import SklearnTool
+
         models = SklearnTool.list_models(self.ctx.models_dir)
         joblib_models = [p for p in models if p.suffix == ".joblib"]
         if not joblib_models:

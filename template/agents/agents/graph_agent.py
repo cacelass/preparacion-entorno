@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
-from agents.tools.vision_tool import VisionTool
 
 
 @register_agent
@@ -34,6 +33,8 @@ class GraphAgent(BaseAgent):
         }
 
     def list_figures(self) -> AgentResult:
+        from agents.tools.vision_tool import VisionTool
+
         figures = VisionTool.list_figures(self.ctx.figures_dir)
         return AgentResult(
             True, self.name, "list_figures",
@@ -42,6 +43,8 @@ class GraphAgent(BaseAgent):
         )
 
     def audit_figures(self) -> AgentResult:
+        from agents.tools.vision_tool import VisionTool
+
         figures = VisionTool.list_figures(self.ctx.figures_dir)
         if not figures:
             return AgentResult(
