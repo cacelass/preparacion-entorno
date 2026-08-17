@@ -569,6 +569,73 @@ def test_finish_sin_reviewer_ni_certeza_cierra(harness):
     assert result.success, "sin señal de duda, confianza plena — como siempre fue"
 
 
+# -- GATE-3: el veredicto del reviewer es parte de la puerta ---------------------
+# La rúbrica (agents/rubric.py) conecta la revisión con el gate: un 'done'
+# sobre un rechazo del reviewer se salta la revisión entera. La certeza alta
+# de quien cierra no lo anula — comparte el punto ciego de quien hizo la
+# feature, que es justo lo que la revisión independiente corrige.
+
+def test_finish_rechaza_sobre_un_rechazo_del_reviewer(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.record(agent="reviewer", id="A-001", verdict="rechazado",
+                   content="## Bloqueantes\nfalta el test", certainty=0.9)
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    assert not result.success
+    assert result.needs, "cerrar sobre un rechazo escala al bucle, no falla en seco"
+    assert "rechazo" in result.message.lower() or "rechazado" in result.message.lower()
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["status"] == "in_progress"  # NO se tocó
+
+
+def test_finish_rechaza_aunque_la_certeza_explicita_sea_alta(harness):
+    """Una certeza alta de quien cierra no anula el NO del reviewer (GATE-3)."""
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.record(agent="reviewer", id="A-001", verdict="rechazado",
+                   content="## Bloqueantes\nfalta el test")
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s",
+                            certainty=0.99)
+    assert not result.success, "el rechazo del reviewer es un NO explícito, no una duda suave"
+
+
+def test_finish_acepta_veredicto_aprobado_del_reviewer(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.record(agent="reviewer", id="A-001", verdict="aprobado",
+                   content="## Criterios\nR-1: cumplido", certainty=0.95)
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    assert result.success
+
+
+def test_finish_registra_veredicto_y_certeza_en_el_historial(harness):
+    """Traza del cierre en history.md: qué revisión avaló el done y con qué certeza."""
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.record(agent="reviewer", id="A-001", verdict="aprobado",
+                   content="## Criterios\nR-1: cumplido", certainty=0.9)
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    assert result.success
+    history = (harness.ctx.root / "harness" / "progress" / "history.md").read_text()
+    assert "**Revisión:**" in history
+    assert "aprobado" in history
+    assert "0.90" in history
+
+
+def test_finish_sin_informe_de_reviewer_lo_dice_en_el_historial(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    history = (harness.ctx.root / "harness" / "progress" / "history.md").read_text()
+    assert "sin informe de reviewer" in history
+
+def test_finish_devuelve_los_criterios_de_puerta_aplicados(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    result = harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    assert result.data["criterios_puerta"] == ["GATE-1", "GATE-2", "GATE-3", "GATE-4"]
+
+
 def test_record_guarda_la_certeza_en_la_cabecera(harness):
     harness.record(agent="reviewer", id="A-001", verdict="aprobado",
                    content="## Criterios\ncumplidos", certainty=0.42)

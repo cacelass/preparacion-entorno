@@ -99,9 +99,10 @@ Reglas:
   si aplica).
 - `harness record --packet '<json>'` valida el JSON y lo guarda como frontmatter;
   la prosa sigue siendo el `--content`. Ambos conviven.
-- El reviewer SIEMPRE declara `cert` en su packet: `harness finish` rechaza un
-  `done` si la certeza del reviewer quedó por debajo de 0.6 (ver
-  `FINISH_MIN_CERTAINTY`).
+- El reviewer SIEMPRE declara `cert` en su packet: `harness finish` aplica la
+  rúbrica de la puerta (`agents/rubric.py`, GATE-1..4) y rechaza un `done` si
+  la certeza del reviewer quedó por debajo del umbral (`UMBRAL_CERTEZA`), si
+  la evidencia no parece real o si el reviewer rechazó la feature (GATE-3).
 - Un packet sin `cert` no es un fallo (la prosa sigue existiendo), pero el
   arnés lo trata como confianza plena — como siempre fue.
 

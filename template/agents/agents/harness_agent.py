@@ -8,7 +8,9 @@ estado, escribir el histórico, ejecutar la puerta— vive aquí, en Python, y n
 en un prompt: un LLM editando JSON a mano se equivoca, `json.dump` no.
 
 La regla del arnés deja de ser una instrucción y pasa a ser código:
-`finish()` REHÚSA cerrar una feature si `./init.sh` no pasa en verde. No hay
+`finish()` aplica los criterios de la puerta de `agents/rubric.py` (GATE-1..4)
+y REHÚSA cerrar una feature si `./init.sh` no pasa en verde, si la evidencia
+no parece real, si el reviewer la rechazó o si la certeza quedó baja. No hay
 forma de saltársela pidiéndoselo amablemente al modelo.
 """
 
@@ -22,6 +24,7 @@ from typing import Any
 
 from agents.core.base_agent import AgentResult, BaseAgent
 from agents.core.registry import register_agent
+from agents.rubric import CRITERIOS_PUERTA, UMBRAL_CERTEZA
 from agents.tools.process_tool import run_command
 
 VALID_STATUS = ("pending", "spec_ready", "in_progress", "done", "blocked")
@@ -32,14 +35,12 @@ REQUIRED_FIELDS = ("id", "title", "description", "acceptance_criteria", "status"
 #: casi nunca es el código, sino el criterio o cómo está planteada la feature.
 MAX_REVIEW_ROUNDS = 3
 
-#: Umbral de certeza (`μ.cert`) para cerrar una feature. Un `done` con certeza
-#: baja es una ronda que iba a fallar — quien la cierra debería saber por qué
-#: duda y pedir verificación explícita, no colarla por el hueco del `success`.
-FINISH_MIN_CERTAINTY = 0.6
-
 #: Acepta "1.0", "0.8", ".5"… el formato de `certainty` que escribe `record`,
 #: con o sin el negrita markdown del header (`- **Certeza:** 0.5`).
 _CERT_RE = re.compile(r"Certeza:\*{0,2}\s*(\d+(?:\.\d+)?)")
+
+#: El veredicto que `record` escribe en la cabecera (`- **Veredicto:** aprobado`).
+_VEREDICTO_RE = re.compile(r"Veredicto:\*{0,2}\s*([^\n]+)")
 
 _RECHAZOS = ("rechazado", "rechaza", "rejected", "fail", "ko")
 
@@ -498,6 +499,28 @@ class HarnessAgent(BaseAgent):
             return None
         return _certeza_de_informe(path)
 
+    def _ultimo_veredicto_reviewer(self, feature_id: str) -> str | None:
+        """
+        El veredicto del último informe del reviewer sobre `feature_id`, o None.
+
+        Es el criterio GATE-3 de la rúbrica: `finish` no cierra una feature
+        que el reviewer ha rechazado, aunque quien cierra diga que confía. Un
+        veredicto no es una señal suave como la certeza — es un NO explícito,
+        y saltárselo es la «rúbrica desconectada del gate» que convierte la
+        revisión en un sistema de alertas llamado gobernanza.
+        """
+        path = self._progress_dir / f"reviewer-{feature_id}.md"
+        if not path.exists():
+            return None
+        try:
+            texto = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        match = _VEREDICTO_RE.search(texto)
+        if not match:
+            return None
+        return match.group(1).strip()
+
     def start(self, *, id: str = "", owner: str = "implementer") -> AgentResult:
         """Abre una feature: status in_progress y harness/progress/current.md rellenado."""
         if not id:
@@ -720,13 +743,16 @@ class HarnessAgent(BaseAgent):
     def finish(self, *, id: str = "", evidence: str = "", changes: str = "",
                decisions: str = "", pending: str = "", certainty: float | None = None) -> AgentResult:
         """
-        Cierra una feature. REHÚSA si ./init.sh no pasa en verde: es la regla
-        del arnés, y aquí es código, no una instrucción que se pueda ignorar.
+        Cierra una feature aplicando la rúbrica de la puerta (`agents/rubric.py`,
+        GATE-1..4) en código. REHÚSA si init.sh no pasa en verde, si la evidencia
+        no parece real, si el reviewer rechazó la feature o si la certeza quedó
+        por debajo del umbral: es la regla del arnés, y aquí es código, no una
+        instrucción que se pueda ignorar.
 
         `certainty` (0..1, idea `μ.cert`) es cuánta confianza tiene quien cierra
         de que la feature está bien. Si no se pasa, se lee del último informe
         del `reviewer` (si lo hay); si ninguno existe, se asume 1.0. Por debajo
-        de `FINISH_MIN_CERTAINTY` se rechaza: una feature que nadie avala con
+        de `UMBRAL_CERTEZA` se rechaza: una feature que nadie avala con
         seguridad no se cierra por la vía fácil.
         """
         if not id:
@@ -773,13 +799,31 @@ class HarnessAgent(BaseAgent):
                 ],
             )
 
+        # GATE-3: el veredicto del reviewer es parte de la puerta. Un 'done'
+        # sobre un rechazo se salta la revisión entera — la certeza no puede
+        # anularlo porque quien cierra comparte el punto ciego de quien hizo
+        # la feature (ver agents/rubric.py).
+        ultimo_veredicto = self._ultimo_veredicto_reviewer(id)
+        if _es_rechazo(ultimo_veredicto or ""):
+            return self._fail(
+                "finish",
+                f"'{id}' no se cierra: el último veredicto del reviewer es rechazo "
+                f"(rúbrica GATE-3).",
+                needs=[
+                    f"Reabre el bucle implementer ↔ reviewer: lee "
+                    f"harness/progress/reviewer-{id}.md, arregla lo que bloquea y "
+                    f"haz que el reviewer registre un veredicto 'aprobado'. Cerrar "
+                    f"sobre un rechazo es saltarse la puerta."
+                ],
+            )
+
         if certainty is None:
             certainty = self._ultima_certeza_reviewer(id)
-        if certainty is not None and certainty < FINISH_MIN_CERTAINTY:
+        if certainty is not None and certainty < UMBRAL_CERTEZA:
             return self._fail(
                 "finish",
                 f"'{id}' no se cierra: certeza {certainty:.2f} por debajo del "
-                f"umbral ({FINISH_MIN_CERTAINTY}). El reviewer dudó, y un 'done' "
+                f"umbral ({UMBRAL_CERTEZA}). El reviewer dudó, y un 'done' "
                 f"con dudas es una ronda que iba a fallar.",
                 needs=[
                     f"Revisa harness/progress/reviewer-{id}.md: ¿qué le falta a la "
@@ -797,10 +841,22 @@ class HarnessAgent(BaseAgent):
             (c["detail"] for c in gate_line if c.get("check") == "pytest"), "init.sh en verde"
         )
 
+        # Traza de la revisión en el histórico: veredicto + certeza usadas al
+        # cerrar, para que un humano pueda auditar el cierre a posteriori sin
+        # tener que volver a leer el informe del reviewer.
+        informe_reviewer = self._progress_dir / f"reviewer-{id}.md"
+        if informe_reviewer.exists():
+            revision = ultimo_veredicto or "sin veredicto"
+            if certainty is not None:
+                revision += f" · μ.cert {certainty:.2f}"
+        else:
+            revision = "sin informe de reviewer"
+
         entry = (
             f"\n## {id} — {feat.get('title', '')}\n\n"
             f"- **Cerrada:** {feat['closed']}\n"
             f"- **Verificación:** ./init.sh en verde · {pytest_line}\n"
+            f"- **Revisión:** {revision}\n"
             f"- **Cambios:** {changes or '_(no indicados)_'}\n"
             f"- **Decisiones:** {decisions or '_(ninguna reseñable)_'}\n"
             f"- **Pendiente:** {pending or '_(nada)_'}\n\n"
@@ -815,7 +871,9 @@ class HarnessAgent(BaseAgent):
         return AgentResult(
             success=True, agent=self.name, action="finish",
             message=f"{id} cerrada. Histórico actualizado y current.md en idle.",
-            data={"id": id, "closed": feat["closed"]},
+            data={"id": id, "closed": feat["closed"],
+                  "criterios_puerta": [cid for cid, _ in CRITERIOS_PUERTA],
+                  "revision": revision},
         )
 
     def block(self, *, id: str = "", reason: str = "") -> AgentResult:

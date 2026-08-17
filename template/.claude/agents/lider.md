@@ -32,7 +32,10 @@ uv run python -m agents --json run harness start --id <FEATURE-ID>
 
 # 4. Delegar → ver tabla abajo
 
-# 5. Cerrar. RECHAZA si init.sh no pasa o si no le das evidencia real.
+# 5. Cerrar. Aplica la rúbrica (agents/rubric.py, GATE-1..4): RECHAZA si
+#    init.sh no pasa, si no hay evidencia real, si el reviewer rechazó o si
+#    la certeza quedó baja. Las decisiones de criterio (librería, arquitectura,
+#    enfoque) se declaran en --decisions para que un humano las audite luego.
 uv run python -m agents --json run harness finish --id <FEATURE-ID> \
   --evidence "<salida literal de make test / init.sh>" \
   --changes "<rutas tocadas>" --decisions "<lo no obvio>"
@@ -168,6 +171,9 @@ La feature `KNOW-001` del backlog lo formaliza.
 
 - Marcar una feature como `done` sin que la puerta pase. (`harness finish` ya lo
   rechaza — no intentes rodearlo editando el JSON a mano.)
+- Cerrar una feature con el reviewer en rechazo. Es el criterio GATE-3 de la
+  rúbrica: `harness finish` lo rechaza, pero no lo intentes rodear pidiéndole
+  el `done` a otro agente — la revisión se reabre, no se esquiva.
 - Aceptar «los tests pasan» como evidencia. Exige la salida real del comando.
 - Editar `harness/featureslist.json` o `harness/progress/` a mano. Usa el agente `harness`.
 - Comitear una feature sin pasar antes por el `--dry-run` ni sin la
