@@ -59,6 +59,7 @@ def record(
     kwarg_names: list[str] | None = None,
     error: str | None = None,
     certainty: float | None = None,
+    confirmed: bool | None = None,
 ) -> None:
     """
     Añade una entrada al log. Nunca lanza: la auditoría no rompe lo auditado.
@@ -67,6 +68,10 @@ def record(
     esto es un fichero que se queda en el disco y —si el proyecto no lo
     ignora— acaba en un commit, así que no puede depender de que quien llame
     se haya acordado de limpiar el texto.
+
+    `confirmed` distingue la confirmación humana real (un `--yes` sobre una
+    destructiva) del resto de ejecuciones: es la señal que la puerta usa para
+    medir la fatiga de aprobaciones (ver `agents/permissions.py`).
     """
     from agents.redaction import redactar
 
@@ -85,6 +90,8 @@ def record(
         }
         if certainty is not None:
             entry["certainty"] = round(min(max(certainty, 0.0), 1.0), 3)
+        if confirmed is not None:
+            entry["confirmed"] = bool(confirmed)
         if error:
             entry["error"] = error[:300]
         with open(audit_log_path(ctx), "a", encoding="utf-8") as f:

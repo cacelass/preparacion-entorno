@@ -65,8 +65,9 @@ capas y la división es estricta:
   un LLM editando JSON a mano se equivoca.
 
 Por eso la regla del arnés no es una instrucción sino código:
-`harness.finish()` rechaza cerrar una feature si `./init.sh` no pasa o si no
-se aporta evidencia. No hay forma de saltársela pidiéndoselo al modelo.
+`harness.finish()` aplica la rúbrica de la puerta (`agents/rubric.py`) y
+rechaza cerrar una feature si `./init.sh` no pasa, si no se aporta evidencia
+o si el reviewer la rechazó. No hay forma de saltársela pidiéndoselo al modelo.
 
 Recursos del arnés que no tienen dueño en `CONTRACTS`:
 
@@ -105,6 +106,11 @@ class Contract:
     # se niega a ejecutarlas sin autorización explícita — ver
     # `agents/permissions.py`.
     destructive: tuple[str, ...] = ()
+    # Subconjunto de `destructive` con el radio de explosión más alto y peor
+    # reversibilidad. Autorizarlas no basta con `--yes`: exigen el nombre
+    # exacto del objetivo (`--confirm-string`), como el type-to-confirm de
+    # GitHub. Ver `agents/permissions.py`.
+    critical: tuple[str, ...] = ()
 
     def as_dict(self) -> dict:
         return {
@@ -115,6 +121,7 @@ class Contract:
             "owns": list(self.owns),
             "collaborates": list(self.collaborates),
             "destructive": list(self.destructive),
+            "critical": list(self.critical),
         }
 
 
@@ -372,6 +379,7 @@ CONTRACTS: dict[str, Contract] = {
             "commit_with_changelog", "commit_atomic", "commit_feature", "tag_release",
             "create_branch", "merge_branch",
         ),
+        critical=("tag_release", "merge_branch"),
     ),
     "documentation": Contract(
         role="Dueño de la documentación: CHANGELOG.md, README.md, docs/ y la versión del proyecto.",
@@ -469,6 +477,7 @@ CONTRACTS: dict[str, Contract] = {
         owns=("agents/external/",),
         collaborates=("env",),
         destructive=("install_from_git", "install_from_path"),
+        critical=("install_from_git", "install_from_path"),
     ),
     "doctor": Contract(
         role="Diagnóstico integral del proyecto: agrega las verificaciones de los demás.",
@@ -522,8 +531,11 @@ CONTRACTS: dict[str, Contract] = {
             "escribir harness/progress/current.md y añadir entradas a harness/progress/history.md",
             "guardar los informes de los subagentes en harness/progress/<agente>-<FEATURE-ID>.md",
             "ejecutar ./init.sh y devolver el veredicto estructurado",
-            "rechazar el cierre de una feature si la puerta no pasa o si no hay evidencia",
-            "rechazar el cierre si la certeza (μ.cert) del reviewer quedó por debajo de 0.6",
+            "aplicar la rúbrica de la puerta al cerrar (agents/rubric.py, GATE-1..4): "
+            "gate, evidencia, veredicto del reviewer y certeza (μ.cert)",
+            "rechazar el cierre de una feature si la puerta no pasa, si no hay evidencia "
+            "o si el reviewer la rechazó (GATE-3)",
+            "rechazar el cierre si la certeza (μ.cert) del reviewer quedó por debajo del umbral",
             "aceptar el packet §1 de un subagente (E/S/R/Δ/μ) como frontmatter del informe",
         ),
         cannot=(
@@ -532,6 +544,7 @@ CONTRACTS: dict[str, Contract] = {
             "escribir código del producto → 'refactor' y el implementer",
             "ejecutar los tests por su cuenta → los ejecuta init.sh, o el agente 'test'",
             "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
+            "cerrar una feature con el reviewer en rechazo → GATE-3, devuelve needs",
             "cerrar una feature con certeza baja salvo verificación explícita → devuelve needs",
         ),
         needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),

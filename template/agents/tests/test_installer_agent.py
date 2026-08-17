@@ -86,10 +86,11 @@ def test_install_from_git_valid_agent_end_to_end_via_cli(tmp_path):
     repo = _make_external_repo(tmp_path, VALID_AGENT_SOURCE)
 
     result = subprocess.run(
-        # `--yes` autoriza la puerta de permisos: instalar código de terceros
-        # es destructivo, así que sin esto la CLI se para y pregunta.
+        # `--confirm-string` autoriza una acción crítica: instalar código de
+        # terceros no basta con `--yes`, exige el nombre exacto de lo que se
+        # va a tocar (el repo), como el type-to-confirm de GitHub.
         [sys.executable, "-m", "agents", "run", "installer", "install_from_git",
-         "--repo_url", str(repo), "--yes"],
+         "--repo_url", str(repo), "--yes", "--confirm-string", str(repo)],
         cwd=project_dir, capture_output=True, text=True, timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr

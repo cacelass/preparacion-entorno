@@ -135,14 +135,35 @@ class BaseAgent(ABC):
             )
 
         confirmado = bool(kwargs.pop("confirm", False))
-        if not confirmado and permissions.requiere_confirmacion(self.name, action, kwargs):
-            mensaje, needs = permissions.peticion(self.name, action, kwargs)
+        confirm_string = kwargs.pop("confirm_string", None)
+
+        needs_confirm = not confirmado and permissions.requiere_confirmacion(self.name, action, kwargs)
+        if needs_confirm:
+            if permissions.exige_nombre(self.name, action, kwargs, self.ctx):
+                mensaje, needs = permissions.peticion_nombre(self.name, action, kwargs)
+            else:
+                mensaje, needs = permissions.peticion(self.name, action, kwargs)
             # Se audita: lo que un agente INTENTÓ hacer y no se le dejó es
             # justo el dato que hace falta para saber si la puerta estorba o
             # está salvando el repositorio.
             audit.record(
                 self.ctx, agent=self.name, action=action, success=False,
                 duration_ms=0.0, message="bloqueado: falta confirmación",
+                kwarg_names=sorted(kwargs),
+            )
+            return AgentResult(False, self.name, action, mensaje, needs=needs)
+
+        # La escalera crítica: aunque venga `confirm=True`, si la acción exige
+        # el nombre del objetivo y no coincide, se corta igual. Un reflejo no
+        # teclea el nombre exacto de la cosa que va a destruir.
+        if (
+            permissions.exige_nombre(self.name, action, kwargs, self.ctx)
+            and not permissions.nombre_valido(self.name, action, confirm_string, kwargs)
+        ):
+            mensaje, needs = permissions.peticion_nombre(self.name, action, kwargs)
+            audit.record(
+                self.ctx, agent=self.name, action=action, success=False,
+                duration_ms=0.0, message="bloqueado: falta --confirm-string",
                 kwarg_names=sorted(kwargs),
             )
             return AgentResult(False, self.name, action, mensaje, needs=needs)
@@ -167,12 +188,22 @@ class BaseAgent(ABC):
         # sitio para una credencial (ver agents/redaction.py).
         redaction.redactar_resultado(result)
 
+        # Una destructiva ejecutada por confirmación humana real (no por
+        # DSKIT_ASSUME_YES) se marca en el log: es la señal de la racha de
+        # aprobaciones que mide la fatiga (ver agents/permissions.py).
+        aprobada_por_humano = (
+            not permissions.puerta_desactivada()
+            and confirmado
+            and action in permissions.acciones_destructivas(self.name)
+        )
+
         audit.record(
             self.ctx, agent=self.name, action=action, success=result.success,
             duration_ms=(time.perf_counter() - start) * 1000,
             message=result.message, warnings=len(result.warnings),
             kwarg_names=sorted(kwargs),
             certainty=getattr(result, "certainty", None),
+            confirmed=aprobada_por_humano,
         )
         return result
 

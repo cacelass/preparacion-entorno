@@ -170,11 +170,12 @@ uv run python -m agents doctor --fix
 uv run python -m agents ask "revisa el Dockerfile"
 
 # Release completo (versión + changelog + CI + commit + tag)
-uv run python -m agents run git tag_release --version 1.9.0
+# `tag_release` es crítica: autoriza con el nombre exacto de la versión.
+uv run python -m agents run git tag_release --version 1.9.0 --yes --confirm-string 1.9.0
 
 # Cierre de una feature del arnés (bump + CHANGELOG + commit, sin tag)
 uv run python -m agents run git commit_feature --id DATA-001 --title "EDA del dataset" --dry-run true
-uv run python -m agents run git commit_feature --id DATA-001 --title "EDA del dataset"
+uv run python -m agents run git commit_feature --id DATA-001 --title "EDA del dataset" --yes
 
 # Entorno: sync, check, info
 uv run python -m agents run env sync
@@ -196,7 +197,8 @@ uv run python -m agents run refactor fix_mutable_defaults
 ## Instalación de agentes externos
 
 ```bash
-uv run python -m agents run installer install_from_git --repo_url usuario/mi-agente
+# `installer.*` son críticas: autoriza con el nombre exacto del repo.
+uv run python -m agents run installer install_from_git --repo_url usuario/mi-agente --yes --confirm-string usuario/mi-agente
 ```
 
 
