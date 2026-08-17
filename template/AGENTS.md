@@ -262,6 +262,34 @@ DSKIT_ASSUME_YES=1 make ...   # desactiva la puerta entera (CI, automatismos)
 
 Un `--dry-run` nunca pregunta: enseñar una propuesta no cambia nada.
 
+### La escalera de fricción
+
+Un `--yes` para todo es una caseta de peaje, no una puerta: cuantas más
+confirmaciones se aprueban por reflejo, menos se leen. Por eso la fricción es
+proporcional al daño, y hay tres niveles:
+
+| Nivel | Autorización | Ejemplos |
+|-------|--------------|----------|
+| Reversible | no pregunta (o `--dry-run`) | enseñar una propuesta |
+| Destructiva | `--yes` / `confirm=True` | `commit_feature`, `create_branch`, refactors |
+| Crítica | `--confirm-string "<nombre exacto>"` | `tag_release`, `merge_branch`, `installer.*` |
+
+Una acción **crítica** no se deja aprobar por reflejo: exige el nombre exacto
+de lo que toca (la `version`, el `source_branch`, el `repo_url`...), como el
+type-to-confirm de GitHub. El token cambia en cada operación, así que `--yes`
+solo no basta. Y si la puerta detecta fatiga —5 aprobaciones destructivas
+seguidas sin ningún fallo—, la siguiente destructiva también exige ese nombre
+hasta que algo falle y rearme la vigilancia.
+
+```bash
+uv run python -m agents run git commit_feature --id DATA-001 --title "..." --yes          # destructiva: --yes basta
+uv run python -m agents run git tag_release --version 0.1.1 --yes                          # crítica: se para
+uv run python -m agents run git tag_release --version 0.1.1 --yes --confirm-string 0.1.1   # crítica: autorizada
+DSKIT_ASSUME_YES=1 make ...   # desactiva la puerta entera (CI, automatismos)
+```
+
+Un `--dry-run` nunca pregunta: enseñar una propuesta no cambia nada.
+
 Lo mismo vale para los pipelines: `GStack` con `auto_commit=True` **no
 commitea** salvo que se le pase `confirm=True` (o `--yes` en la CLI). Sin
 autorización hace su trabajo, deja los cambios en el árbol y anota en
@@ -326,15 +354,38 @@ Un agente no declara que algo funciona: lo demuestra. Cada criterio de
 aceptación se cierra pegando la **salida real** del comando que lo prueba.
 «Los tests pasan» sin la salida de `pytest` es motivo de rechazo automático.
 
+## La rúbrica del arnés
+
+Cerrar una feature no es una opinión: es pasar una checklist binaria definida
+en `agents/rubric.py`. Dos capas, según quién la aplica:
+
+- **La puerta (código).** `harness finish` aplica en Python los criterios
+  GATE-1..4 — init.sh en verde, evidencia real (no afirmaciones), el reviewer
+  no ha rechazado, y certeza suficiente (μ.cert ≥ umbral). Si uno falla, no
+  hay `done`, da igual cuánto insista quien lo pide. El umbral es política
+  fijada por el humano en `agents/rubric.py`, no algo que el sistema se
+  autoconceda.
+- **La revisión (el reviewer).** `.opencode/agents/reviewer.md` evalúa la
+  rúbrica R-1..R-6 como checklist binaria, criterio por criterio, con
+  evidencia. El reviewer trabaja con contexto mínimo —criterios, diff y
+  evidencia reproducible— y sin la narrativa del implementer: la justificación
+  es el vehículo que transmite el punto ciego de quien la escribió.
+
+Y las decisiones de criterio (qué librería, cómo se diseña, qué enfoque) no se
+bloquean, se **registran**: al cerrar, `harness finish --decisions` las declara
+y quedan en `harness/progress/history.md` para que un humano las audite a
+posteriori sin depender del recuerdo de quien las tomó.
+
 ## El arnés se automejora
 
 Estos ficheros son parte del repositorio, así que se corrigen como cualquier
 otro código. Si un fallo se cuela dos veces:
 
-- ¿Es una comprobación automatizable? → a `init.sh`, y deja de depender de que
-  alguien se acuerde.
+- ¿Es una comprobación automatizable? → a `init.sh`, o a `CRITERIOS_PUERTA` de
+  `agents/rubric.py`, y deja de depender de que alguien se acuerde.
 - ¿Es una regla del proyecto? → a este fichero.
-- ¿Es un criterio de revisión? → a `.opencode/agents/reviewer.md`.
+- ¿Es un criterio de revisión? → a `CRITERIOS_REVISION` de `agents/rubric.py`
+  (el reviewer la aplica; la rúbrica es la fuente única).
 
 Deja constancia del cambio en `harness/progress/history.md`.
 
@@ -342,9 +393,10 @@ Deja constancia del cambio en `harness/progress/history.md`.
 
 Cuando algo salga mal, convierte el incidente en una **regla que solo cuesta
 cuando se viola**, y **valídala contra el historial**: si el fallo hubiera
-disparado esa regla, pasa al sitio correcto (init.sh / AGENTS.md / reviewer);
-si no, la regla no lo habría evitado y hay que refinarla. No se registra una
-regla que no habría saltado — eso es ruido que se aprende a ignorar.
+disparado esa regla, pasa al sitio correcto (init.sh / agents/rubric.py /
+AGENTS.md); si no, la regla no lo habría evitado y hay que refinarla. No se
+registra una regla que no habría saltado — eso es ruido que se aprende a
+ignorar.
 
 Es el mismo principio que `policy_guard` aplica a las herramientas: la
 restricción vive en código o en un prompt cargado al dispararse, no pagando

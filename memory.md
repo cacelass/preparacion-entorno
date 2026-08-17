@@ -242,3 +242,67 @@ Qué adoptar y qué descartar del codec de compresión de contexto de trasgo
   README), y el CLI `trasgo pack/boot` (deps y superficie nueva).
 - **Restricción del usuario: el RAG NO se toca.** Ya descarga papers e
   información a propósito para ahorrar tokens; no se le aplica compresión.
+
+### Rúbrica del arnés (Aug 2026)
+
+El cierre de features pasó de depender de dos señales sueltas a una rúbrica
+binaria única en `template/agents/rubric.py`:
+
+- **La rúbrica tiene dos capas.** `CRITERIOS_PUERTA` (GATE-1..4: init.sh verde,
+  evidencia real, reviewer no ha rechazado, μ.cert ≥ umbral) los aplica
+  `harness finish` en Python; `CRITERIOS_REVISION` (R-1..R-6) los aplica el
+  reviewer como checklist binaria con evidencia. `UMBRAL_CERTEZA = 0.6`
+  sustituyó a `FINISH_MIN_CERTAINTY` (borrada de harness_agent.py).
+- **Lección clave que motivó el cambio (GATE-3).** En producción un `finish`
+  solo miraba la certeza, no el veredicto del reviewer: una rúbrica
+  desconectada del gate es "un sistema de alertas llamado gobernanza". Un
+  `done` sobre un rechazo del reviewer se salta la revisión entera. La certeza
+  explícita alta de quien cierra NO anula el rechazo (comparte el punto ciego
+  de quien hizo la feature). Añadido `_VEREDICTO_RE` +
+  `_ultimo_veredicto_reviewer(id)` en harness_agent.py.
+- **Traza auditable.** `history.md` ahora registra `- **Revisión:** <veredicto>
+  · μ.cert <n>` (o "sin informe de reviewer") y `finish` devuelve
+  `criterios_puerta` en data. Las decisiones de criterio (librería, arquitectura,
+  enfoque) no se bloquean — se declaran con `--decisions` y quedan en el histórico.
+- **Reviewer con contexto mínimo.** `reviewer.md` ya NO lee la narrativa del
+  implementer (`progress/implementer-<ID>.md`): la justificación transmite el
+  punto ciego. Evalúa criterios + diff + evidencia reproducible.
+- **Tests:** `test_rubric.py` (7 tests: ids únicos, preguntas binarias, capas
+  disjuntas, umbral en rango) + 6 tests de GATE-3 en `test_harness_agent.py`.
+  Suite completa del template: **660 pasan, 2 skipped** (sigue sin poder
+  ejecutarse sobre el template sin renderizar; ver Testing arriba).
+- **Nota técnica para regenerar los espejos .claude:** `uv run
+  agents.prompts_sync --write` NO funciona sobre el template (pyproject y
+  fuentes con Jinja2 rompen uv/imports). Trabajarlo: copiar `agents/` a tmp,
+  quitar `{% raw %}` con sed, y desde ahí llamar
+  `sync_assistants(write=True, context=SharedContext(root=<template>, config=ProjectConfig()))`.
+
+### Escalera de fricción en la puerta (Aug 2026)
+
+Ataca la fatiga de aprobaciones (Anthropic mide ~93% de permisos aprobados;
+un gate que abre 93/100 es una caseta de peaje, no una puerta) con fricción
+proporcional al daño, siguiendo el patrón type-to-confirm de GitHub:
+
+- **Tres niveles**: reversible → no pregunta; `destructive` → `--yes`;
+  `critical` (subset de destructive) → `--confirm-string "<nombre exacto>"`.
+- **`critical` en contracts.py**: `git.tag_release`, `git.merge_branch`,
+  `installer.*`. El token tiene que coincidir con el kwarg-objetivo
+  (`version`, `source_branch`, `repo_url`, `local_path`...) declarado en
+  `OBJETIVO_CONFIRMACION` de permissions.py — no es un "DELETE" memorizable,
+  es la identidad de lo que se toca.
+- **Fatiga** (`MAX_APROBACIONES_SIN_FALLO=5`): 5 destructivas aprobadas por
+  humano seguidas sin fallo → la siguiente destructiva con objetivo nombrable
+  exige también el nombre. Se lee de `audit.jsonl` con el nuevo campo
+  `confirmed` (solo confirmación humana real, no DSKIT_ASSUME_YES). Cualquier
+  `success=false` corta la racha. Es política fijada como constante, como el
+  `UMBRAL_CERTEZA` de la rúbrica.
+- **Copia**: `CONSECUENCIAS_CRITICAS` nombra qué se pierde y si es
+  recuperable ("la copia es la seguridad, no el marco del diálogo").
+- **Claves de implementación**: `confirm` y `confirm_string` se hacen `pop`
+  antes de llamar a la acción (no deben filtrarse); `requiere_confirmacion`
+  mantiene su firma; la fatiga necesita `ctx` opcional para no romper los
+  tests de política pelada. El test end-to-end de installer usaba `--yes`
+  para una crítica → ahora exige `--confirm-string`.
+- **Fuera de alcance (señalizado)**: `DSKIT_ASSUME_YES=deny` (fail-closed en
+  CI — dontAsk > bypassPermissions) y ventana de frescura tipo sudo.
+- Suite del template: **677 pasan, 2 skipped**.
