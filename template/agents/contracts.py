@@ -537,6 +537,10 @@ CONTRACTS: dict[str, Contract] = {
             "o si el reviewer la rechazó (GATE-3)",
             "rechazar el cierre si la certeza (μ.cert) del reviewer quedó por debajo del umbral",
             "aceptar el packet §1 de un subagente (E/S/R/Δ/μ) como frontmatter del informe",
+            "reclamar y liberar los ficheros que una feature tocará (touched_files): "
+            "dos features no pueden reclamar el mismo fichero — un recurso, un dueño",
+            "ordenar las features elegibles por cuántas dependen de cada una "
+            "(prioridad de desbloqueo: más dependientes primero)",
         ),
         cannot=(
             "decidir QUÉ feature toca ni cómo implementarla → eso lo razonan los agentes "
@@ -546,6 +550,7 @@ CONTRACTS: dict[str, Contract] = {
             "cerrar una feature sin evidencia → devuelve needs, nunca la da por buena",
             "cerrar una feature con el reviewer en rechazo → GATE-3, devuelve needs",
             "cerrar una feature con certeza baja salvo verificación explícita → devuelve needs",
+            "dejar que dos features reclamen el mismo fichero → claim devuelve needs",
         ),
         needs=("el id de la feature", "la evidencia real de verificación para cerrarla"),
         owns=("harness/featureslist.json", "harness/progress/", "harness/memory.md",

@@ -10,6 +10,8 @@ Ejecuta la parte mecánica del arnés. No decide nada: los agentes markdown
 | `status` | Recuento del backlog + qué está in_progress + qué es elegible |
 | `next` | La feature que toca (in_progress, o la primera con deps en done) |
 | `start --id <ID>` | Abre la feature y vuelca sus criterios en `harness/progress/current.md` |
+| `claim --id <ID> --files "<ruta1>;<ruta2>"` | Reclama los ficheros que la feature tocará; rechaza si otro feature activo ya los reclama |
+| `release --id <ID>` | Libera los ficheros reclamados por la feature (`touched_files` → `[]`) |
 | `write_feature --id <ID> [--content "<gherkin>"]` | Escribe `features/<ID>.feature` y deja la feature en `spec_ready` |
 | `approve --id <ID>` | Puerta humana: aprueba la spec y abre la feature (`in_progress`) |
 | `gate [--quick true]` | Ejecuta `./init.sh` y devuelve el veredicto estructurado |
@@ -43,6 +45,8 @@ mide después con el agente `mutation` (`skill mutation_agent`).
 - **`finish` sin `evidence`** → devuelve `needs`. Una afirmación no es evidencia.
 - **`start` con otra feature abierta** → una cosa a la vez.
 - **`start` con `depends_on` sin cerrar** → primero las dependencias.
+- **`claim` de ficheros que otro feature activo ya reclama** → un recurso, un dueño.
+- **`claim` de una feature que no está `in_progress`** → ábrela primero.
 - **`add` con `depends_on` inexistente** → el backlog no se corrompe.
 - **`approve` de algo que no está en `spec_ready`** → primero el contrato.
 - **`write_feature` con Gherkin inválido** → el contrato no pasa la puerta roto.
@@ -64,6 +68,8 @@ Ver el ciclo completo: `skill harness_workflow`.
 | `run harness status` | — |
 | `run harness next` | — |
 | `run harness start` | `--id`, `--owner` |
+| `run harness claim` | `--id`, `--files` |
+| `run harness release` | `--id` |
 | `run harness write_feature` | `--id`, `--content` |
 | `run harness approve` | `--id`, `--owner` |
 | `run harness finish` | `--id`, `--evidence`, `--changes`, `--decisions`, `--pending` |

@@ -238,6 +238,9 @@ def _problemas_backlog(features: list) -> list[str]:
             problemas.append(f"{feat['id']}: status '{feat['status']}' no válido")
         if not isinstance(feat["acceptance_criteria"], list) or not feat["acceptance_criteria"]:
             problemas.append(f"{feat['id']}: acceptance_criteria vacío o no es lista")
+        touched = feat.get("touched_files")
+        if touched is not None and (not isinstance(touched, list) or not all(isinstance(f, str) and f for f in touched)):
+            problemas.append(f"{feat['id']}: touched_files debe ser una lista de rutas")
 
     for feat in features:
         if isinstance(feat, dict):
@@ -248,6 +251,16 @@ def _problemas_backlog(features: list) -> list[str]:
     abiertas = [f["id"] for f in features if isinstance(f, dict) and f.get("status") == "in_progress"]
     if len(abiertas) > 1:
         problemas.append(f"{len(abiertas)} features in_progress a la vez: {', '.join(abiertas)}")
+
+    reclamados: dict[str, list[str]] = {}
+    for feat in features:
+        if not isinstance(feat, dict):
+            continue
+        for f in feat.get("touched_files", []):
+            reclamados.setdefault(f, []).append(feat["id"])
+    for f, ids in reclamados.items():
+        if len(ids) > 1:
+            problemas.append(f"{f} reclamado por varias features: {', '.join(ids)}")
     return problemas
 
 

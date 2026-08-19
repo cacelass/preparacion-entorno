@@ -58,7 +58,7 @@ el modelo pueda ignorar.
 {% if proyecto_perfil in ['completo', 'manual'] %}| `research` | Busca papers (arXiv/OpenAlex) relacionados con el proyecto |{% endif %}
 | `memory` | **Memoria proactiva**: observa trayectorias de agentes, mantiene un banco estructurado (facts/state/traces) e inyecta contexto para combatir *behavioral state decay* en tareas largas |
 | `doc` | **Documentación unificada y navegación del grafo**: busca en graphify (estructura), RAG (semántica) y vault Obsidian (notas) |
-| `harness` | **Dueño del arnés**: backlog (`harness/featureslist.json`) y progreso (`harness/progress/`); ejecuta la puerta y **rehúsa cerrar** una feature sin `init.sh` en verde y evidencia real |
+| `harness` | **Dueño del arnés**: backlog (`harness/featureslist.json`) y progreso (`harness/progress/`); reclama/libera los ficheros que toca cada feature (`touched_files`), ordena las elegibles por dependencias, ejecuta la puerta y **rehúsa cerrar** una feature sin `init.sh` en verde y evidencia real |
 {% if use_rag %}| `rag` | **RAG semántico local**: indexa código, prompts, docs y vault en ChromaDB; busca en lenguaje natural y también indexa URLs externas |{% endif %}
 
 

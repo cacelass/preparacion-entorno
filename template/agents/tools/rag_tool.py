@@ -708,10 +708,12 @@ class RagTool:
         bloques = []
         for feat in doc.get("features", []):
             criterios = "\n".join("- " + c for c in feat.get("acceptance_criteria", []))
+            tocados = feat.get("touched_files", [])
+            ficheros = ("\nFicheros que toca:\n" + "\n".join("- " + f for f in tocados)) if tocados else ""
             bloques.append(
-                "## {} — {} [{}]\n\n{}\n\nCriterios de aceptación:\n{}\n".format(
+                "## {} — {} [{}]\n\n{}{}\n\nCriterios de aceptación:\n{}\n".format(
                     feat.get("id"), feat.get("title"), feat.get("status"),
-                    feat.get("description", ""), criterios,
+                    feat.get("description", ""), ficheros, criterios,
                 )
             )
         return "\n".join(bloques)

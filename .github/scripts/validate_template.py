@@ -228,6 +228,11 @@ def validate_backlog(doc: object) -> list[str]:
         criteria = feat["acceptance_criteria"]
         if not isinstance(criteria, list) or not criteria:
             problems.append(f"{feat['id']}: acceptance_criteria vacío o no es lista")
+        touched = feat.get("touched_files")
+        if touched is not None and (
+            not isinstance(touched, list) or not all(isinstance(f, str) and f for f in touched)
+        ):
+            problems.append(f"{feat['id']}: touched_files debe ser una lista de rutas")
 
     for feat in features:
         if not isinstance(feat, dict):
@@ -235,6 +240,16 @@ def validate_backlog(doc: object) -> list[str]:
         for dep in feat.get("depends_on", []):
             if dep not in ids:
                 problems.append(f"{feat.get('id')}: depends_on '{dep}' no existe en este combo")
+
+    reclamados: dict[str, list[str]] = {}
+    for feat in features:
+        if not isinstance(feat, dict):
+            continue
+        for f in feat.get("touched_files", []):
+            reclamados.setdefault(f, []).append(feat["id"])
+    for f, ids in reclamados.items():
+        if len(ids) > 1:
+            problems.append(f"{f} reclamado por varias features: {', '.join(ids)}")
 
     return problems
 

@@ -170,6 +170,9 @@ for i, feat in enumerate(features):
     criteria = feat["acceptance_criteria"]
     if not isinstance(criteria, list) or not criteria:
         problems.append("%s: acceptance_criteria debe ser una lista no vacía" % fid)
+    touched = feat.get("touched_files")
+    if touched is not None and (not isinstance(touched, list) or not all(isinstance(f, str) and f for f in touched)):
+        problems.append("%s: touched_files debe ser una lista de rutas" % fid)
 
 for feat in features:
     if not isinstance(feat, dict):
@@ -191,6 +194,14 @@ for feat in features:
 running = [f["id"] for f in features if f["status"] == "in_progress"]
 if len(running) > 1:
     print("warn\t%d features en in_progress a la vez: %s" % (len(running), ", ".join(running)))
+
+reclamados = {}
+for feat in features:
+    for f in feat.get("touched_files", []):
+        reclamados.setdefault(f, []).append(feat["id"])
+for f, ids in reclamados.items():
+    if len(ids) > 1:
+        print("warn\t%s reclamado por varias features: %s" % (f, ", ".join(ids)))
 
 print("ok\t%d features · %d pending · %d in_progress · %d done · %d blocked" % (
     len(features), counts["pending"], counts["in_progress"], counts["done"], counts["blocked"]))

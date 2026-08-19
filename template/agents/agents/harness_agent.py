@@ -266,6 +266,8 @@ class HarnessAgent(BaseAgent):
             "status": self.status,
             "next": self.next,
             "start": self.start,
+            "claim": self.claim,
+            "release": self.release,
             "write_feature": self.write_feature,
             "approve": self.approve,
             "finish": self.finish,
@@ -333,15 +335,55 @@ class HarnessAgent(BaseAgent):
         return None
 
     @staticmethod
+    def _peso_dependientes(doc: dict) -> dict[str, int]:
+        """
+        Cuántas features dependen (transitivamente) de cada una.
+
+        Es la prioridad de desbloqueo: implementar la feature que más desbloquea
+        antes despeja el camino del resto. El cierre transitivo se hace con un
+        recorrido iterativo sobre el grafo inverso (dep -> dependiente) para no
+        heredar el contexto de los LLM: `depends_on` es un campo de cada
+        feature, y aquí se lee una vez.
+        """
+        dependientes: dict[str, set[str]] = {}
+        for feat in doc["features"]:
+            if not isinstance(feat, dict):
+                continue
+            fid = feat.get("id")
+            if not fid:
+                continue
+            dependientes.setdefault(fid, set())
+            for dep in feat.get("depends_on", []):
+                dependientes.setdefault(dep, set()).add(fid)
+        peso: dict[str, int] = {}
+        for fid in dependientes:
+            vistos: set[str] = set()
+            pila = list(dependientes[fid])
+            while pila:
+                actual = pila.pop()
+                if actual in vistos:
+                    continue
+                vistos.add(actual)
+                pila.extend(dependientes.get(actual, ()))
+            peso[fid] = len(vistos)
+        return peso
+
+    @staticmethod
     def _eligible(doc: dict) -> list[dict]:
-        """Pendientes cuyas dependencias están todas en done, en orden de backlog."""
+        """
+        Pendientes cuyas dependencias están todas en done, por prioridad de
+        desbloqueo (más dependientes primero). El sort es estable: ante el
+        mismo peso, manda el orden del backlog.
+        """
         done = {f["id"] for f in doc["features"] if f.get("status") == "done"}
-        return [
+        candidatos = [
             f
             for f in doc["features"]
             if f.get("status") == "pending"
             and all(dep in done for dep in f.get("depends_on", []))
         ]
+        peso = HarnessAgent._peso_dependientes(doc)
+        return sorted(candidatos, key=lambda f: -peso.get(f.get("id", ""), 0))
 
     def _fail(self, action: str, message: str, **kw: Any) -> AgentResult:
         return AgentResult(success=False, agent=self.name, action=action, message=message, **kw)
@@ -380,6 +422,7 @@ class HarnessAgent(BaseAgent):
                 "counts": counts,
                 "in_progress": running,
                 "eligible": [f["id"] for f in eligible],
+                "prioridad": self._peso_dependientes(doc),
                 "features": [
                     {"id": f.get("id"), "title": f.get("title"), "status": f.get("status")}
                     for f in features
@@ -404,6 +447,7 @@ class HarnessAgent(BaseAgent):
             )
 
         eligible = self._eligible(doc)
+        peso = self._peso_dependientes(doc)
         if not eligible:
             blocked = [f["id"] for f in doc["features"] if f.get("status") == "blocked"]
             pending = [f["id"] for f in doc["features"] if f.get("status") == "pending"]
@@ -420,26 +464,29 @@ class HarnessAgent(BaseAgent):
                 data={"blocked": blocked},
             )
 
-        feat = eligible[0]
-        if feat.get("id") == "SCOPE-001" and not (self.ctx.root / "references" / "00-objetivo.md").exists():
-            # Primera vez en un proyecto recién generado: no rellenes el spec a
-            # mano. La entrevista `plan scope` lo construye y siembra el backlog
-            # en orden lógico — el agente lo propone, no espera a que se lo pidan.
+        # Primera vez en un proyecto recién generado: SCOPE-001 manda aunque otra
+        # feature pendiente desbloquee a más (el orden por peso lo desplazaría).
+        # No rellenes el spec a mano: la entrevista `plan scope` lo construye y
+        # siembra el backlog en orden lógico — el agente lo propone, no espera.
+        scope = next((f for f in eligible if f.get("id") == "SCOPE-001"), None)
+        if scope is not None and not (self.ctx.root / "references" / "00-objetivo.md").exists():
             return AgentResult(
                 success=True, agent=self.name, action="next",
                 message=(
-                    f"Siguiente: {feat['id']} — {feat['title']}. Este proyecto no tiene spec todavía: "
+                    f"Siguiente: {scope['id']} — {scope['title']}. Este proyecto no tiene spec todavía: "
                     "ejecuta `run plan scope` para la entrevista de arranque que escribe "
                     "references/00-objetivo.md y siembra el backlog en orden lógico."
                 ),
-                data={**feat, "sugerencia": "plan scope",
+                data={**scope, "sugerencia": "plan scope",
                       "motivo": "sin references/00-objetivo.md (proyecto recién generado)"},
             )
 
+        feat = eligible[0]
         return AgentResult(
             success=True, agent=self.name, action="next",
             message=f"Siguiente: {feat['id']} — {feat['title']}",
-            data={**feat, "antecedentes": self._antecedentes(feat)},
+            data={**feat, "antecedentes": self._antecedentes(feat),
+                  "prioridad": peso.get(feat.get("id", ""), 0)},
         )
 
     def _antecedentes(self, feat: dict) -> list[dict]:
@@ -558,6 +605,7 @@ class HarnessAgent(BaseAgent):
         # por agotar el bucle, se reabre con las tres rondas enteras — el
         # humano ya intervino, no tiene sentido heredar el castigo anterior.
         feat["review_rounds"] = 0
+        feat["touched_files"] = []
         feat.pop("blocked_reason", None)
         self._save(doc)
 
@@ -581,6 +629,106 @@ class HarnessAgent(BaseAgent):
             success=True, agent=self.name, action="start",
             message=f"{id} abierta (in_progress) y volcada en harness/progress/current.md.",
             data={"id": id, "criteria": feat.get("acceptance_criteria", [])},
+        )
+
+    # -- contratar ficheros: claim / release --------------------------------
+    def claim(self, *, id: str = "", files: str = "") -> AgentResult:
+        """
+        Reclama los ficheros que una feature tocará (touched_files).
+
+        «Un recurso, un dueño»: si otro feature activo ya reclama alguno de
+        esos ficheros, se rechaza — dos implementaciones no pueden pisarse a la
+        vez. Es la formalización de «si tocan los mismos ficheros, secuencial».
+        `files` es una lista separada por `;`.
+        """
+        if not id or not files:
+            missing = []
+            if not id:
+                missing.append("¿Qué feature reclama ficheros? (id de featureslist.json)")
+            if not files:
+                missing.append("¿Qué ficheros tocará? Sepáralos con ';'.")
+            return self._fail("claim", "Faltan datos para reclamar.", needs=missing)
+
+        doc, error = self._load()
+        if doc is None:
+            return self._fail("claim", error)
+
+        feat = self._find(doc, id)
+        if feat is None:
+            return self._fail("claim", f"No existe la feature '{id}' en el backlog.")
+        if feat.get("status") != "in_progress":
+            return self._fail(
+                "claim",
+                f"'{id}' no está in_progress (está en '{feat.get('status')}'). "
+                f"Abre la feature con `harness start` (o `approve`) antes de reclamar ficheros.",
+            )
+
+        reclamados = [f.strip() for f in files.split(";") if f.strip()]
+        if not reclamados:
+            return self._fail("claim", "La lista de ficheros va vacía.",
+                              needs=["Pasa al menos un fichero en --files, separados por ';'."])
+
+        conflictos = []
+        for otra in doc["features"]:
+            if not isinstance(otra, dict) or otra.get("id") == id:
+                continue
+            if otra.get("status") in ("done", "blocked"):
+                continue
+            choque = [f for f in reclamados if f in set(otra.get("touched_files", []))]
+            if choque:
+                conflictos.append(f"{otra.get('id')} → {', '.join(choque)}")
+
+        if conflictos:
+            return self._fail(
+                "claim",
+                f"No se reclama para '{id}': {', '.join(conflictos)}",
+                data={"conflictos": conflictos},
+                needs=[
+                    f"Elige otra feature o coordina: {', '.join(c.split(' → ')[0] for c in conflictos)} "
+                    f"ya toca esos ficheros."
+                ],
+            )
+
+        reclamados_previos = feat.setdefault("touched_files", [])
+        for f in reclamados:
+            if f not in reclamados_previos:
+                reclamados_previos.append(f)
+        self._save(doc)
+
+        return AgentResult(
+            success=True, agent=self.name, action="claim",
+            message=f"{id} reclama {len(reclamados_previos)} fichero(s): {', '.join(reclamados_previos)}.",
+            data={"id": id, "touched_files": reclamados_previos},
+        )
+
+    def release(self, *, id: str = "") -> AgentResult:
+        """Libera los ficheros reclamados por una feature (touched_files → [])."""
+        if not id:
+            return self._fail("release", "Falta el id de la feature.",
+                              needs=["¿Qué feature libera sus ficheros? Usa su id de featureslist.json."])
+
+        doc, error = self._load()
+        if doc is None:
+            return self._fail("release", error)
+
+        feat = self._find(doc, id)
+        if feat is None:
+            return self._fail("release", f"No existe la feature '{id}' en el backlog.")
+
+        previos = list(feat.get("touched_files", []))
+        if not previos:
+            return AgentResult(
+                success=True, agent=self.name, action="release",
+                message=f"{id} no tenía ficheros reclamados.",
+                data={"id": id, "touched_files": []},
+            )
+
+        feat["touched_files"] = []
+        self._save(doc)
+        return AgentResult(
+            success=True, agent=self.name, action="release",
+            message=f"{id} liberó {len(previos)} fichero(s): {', '.join(previos)}.",
+            data={"id": id, "released": previos, "touched_files": []},
         )
 
     # -- contrato Gherkin (flujo SDD) ----------------------------------------
@@ -680,6 +828,7 @@ class HarnessAgent(BaseAgent):
         feat["status"] = "in_progress"
         feat["started"] = date.today().isoformat()
         feat["review_rounds"] = 0
+        feat["touched_files"] = []
         feat.pop("blocked_reason", None)
         self._save(doc)
 
@@ -834,6 +983,9 @@ class HarnessAgent(BaseAgent):
 
         feat["status"] = "done"
         feat["closed"] = date.today().isoformat()
+        # Al cerrar se liberan los ficheros reclamados: la feature ya no se
+        # trabaja, y lo que ella reclamó vuelve a estar disponible.
+        feat["touched_files"] = []
         self._save(doc)
 
         gate_line = gate.data.get("checks", []) if isinstance(gate.data, dict) else []
@@ -896,6 +1048,9 @@ class HarnessAgent(BaseAgent):
 
         feat["status"] = "blocked"
         feat["blocked_reason"] = reason
+        # Al bloquear se liberan los ficheros reclamados: otra feature puede
+        # tomar el relevo sin esperar a que se desbloquee esta.
+        feat["touched_files"] = []
         self._save(doc)
         return AgentResult(
             success=True, agent=self.name, action="block",
@@ -1021,6 +1176,7 @@ class HarnessAgent(BaseAgent):
             "acceptance_criteria": [c.strip() for c in criteria.split(";") if c.strip()],
             "status": "pending",
             "depends_on": [d.strip() for d in depends_on.split(";") if d.strip()],
+            "touched_files": [],
         }
         unknown = [d for d in feature["depends_on"] if self._find(doc, d) is None]
         if unknown:

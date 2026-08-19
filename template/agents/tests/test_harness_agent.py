@@ -186,6 +186,141 @@ def test_start_exige_dependencias_cerradas(harness):
     assert "A-001" in result.message
 
 
+# -- reclamar ficheros (claim / release) -------------------------------------
+def test_claim_registra_los_ficheros(harness):
+    harness.start(id="A-001")
+    result = harness.claim(id="A-001", files="src/x.py;src/y.py")
+    assert result.success
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["touched_files"] == ["src/x.py", "src/y.py"]
+
+
+def test_claim_sin_ficheros_pide_datos(harness):
+    harness.start(id="A-001")
+    result = harness.claim(id="A-001")
+    assert not result.success
+    assert result.needs
+
+
+def test_claim_sin_id_pide_datos(harness):
+    harness.start(id="A-001")
+    result = harness.claim(files="src/x.py")
+    assert not result.success
+    assert result.needs
+
+
+def test_claim_exige_feature_in_progress(harness):
+    result = harness.claim(id="A-001", files="src/x.py")
+    assert not result.success
+    assert "in_progress" in result.message
+
+
+def test_claim_rechaza_fichero_reclamado_por_otra_feature(harness):
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"][0]["status"] = "in_progress"
+    doc["features"][0]["touched_files"] = ["src/x.py"]
+    doc["features"][1]["status"] = "in_progress"
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    result = harness.claim(id="B-001", files="src/x.py;src/y.py")
+    assert not result.success
+    assert "A-001" in result.message
+
+
+def test_claim_ignora_ficheros_de_features_cerradas(harness):
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"][0]["status"] = "done"
+    doc["features"][0]["touched_files"] = ["src/x.py"]
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    harness.start(id="B-001")
+    result = harness.claim(id="B-001", files="src/x.py")
+    assert result.success
+
+
+def test_release_libera_los_ficheros(harness):
+    harness.start(id="A-001")
+    harness.claim(id="A-001", files="src/x.py;src/y.py")
+    result = harness.release(id="A-001")
+    assert result.success
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["touched_files"] == []
+
+
+def test_release_sin_ficheros_es_ok(harness):
+    harness.start(id="A-001")
+    result = harness.release(id="A-001")
+    assert result.success
+
+
+def test_finish_libera_los_ficheros_reclamados(harness):
+    _write_gate(harness.ctx.root, GATE_OK)
+    harness.start(id="A-001")
+    harness.claim(id="A-001", files="src/x.py")
+    harness.finish(id="A-001", evidence="pytest: 3 passed, 0 failed en 0.4s")
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["touched_files"] == []
+
+
+def test_block_libera_los_ficheros_reclamados(harness):
+    harness.start(id="A-001")
+    harness.claim(id="A-001", files="src/x.py")
+    harness.block(id="A-001", reason="falta el dataset")
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["touched_files"] == []
+
+
+def test_start_reinicia_los_ficheros_reclamados(harness):
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"][0]["touched_files"] = ["src/x.py"]
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    harness.start(id="A-001")
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    assert doc["features"][0]["touched_files"] == []
+
+
+# -- prioridad por dependencias ------------------------------------------------
+def test_next_prioriza_la_que_mas_desbloquea(harness):
+    """De dos elegibles, se implementa antes la que desbloquea más features."""
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"][0]["status"] = "done"  # A-001 hecho
+    doc["features"].extend([
+        {"id": "C-001", "title": "Tercera", "description": "d",
+         "acceptance_criteria": ["c"], "status": "pending", "depends_on": ["B-001"]},
+        {"id": "D-001", "title": "Independiente", "description": "d",
+         "acceptance_criteria": ["c"], "status": "pending", "depends_on": []},
+    ])
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    result = harness.next()
+    assert result.success
+    assert result.data["id"] == "B-001", "B desbloquea a C; D no desbloquea a nadie"
+    assert result.data["prioridad"] == 1
+
+
+def test_next_respeta_el_orden_del_backlog_en_empates(harness):
+    """A igual peso, manda el orden del backlog (sort estable)."""
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"][0]["status"] = "done"  # A-001 hecho
+    doc["features"].append({"id": "D-001", "title": "Independiente", "description": "d",
+                            "acceptance_criteria": ["c"], "status": "pending",
+                            "depends_on": []})
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    result = harness.next()
+    assert result.success
+    assert result.data["id"] == "B-001", "B-001 y D-001 pesan igual; gana el orden del backlog"
+
+
+def test_status_expone_la_prioridad_por_dependientes(harness):
+    doc = json.loads((harness.ctx.root / "harness" / "featureslist.json").read_text())
+    doc["features"][0]["status"] = "done"
+    doc["features"].append({"id": "C-001", "title": "Tercera", "description": "d",
+                            "acceptance_criteria": ["c"], "status": "pending",
+                            "depends_on": ["B-001"]})
+    (harness.ctx.root / "harness" / "featureslist.json").write_text(json.dumps(doc))
+    result = harness.status()
+    assert result.success
+    assert result.data["prioridad"]["B-001"] == 1
+    assert result.data["prioridad"]["A-001"] == 2  # A → B → C (transitivo)
+
+
 # -- la puerta ----------------------------------------------------------------
 def test_gate_en_verde(harness):
     _write_gate(harness.ctx.root, GATE_OK)

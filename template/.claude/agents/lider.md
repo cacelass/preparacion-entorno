@@ -30,6 +30,11 @@ uv run python -m agents --json run plan scope_commit # escribe el spec y siembra
 # 3. Abre la feature: la marca in_progress y vuelca sus criterios en current.md
 uv run python -m agents --json run harness start --id <FEATURE-ID>
 
+# 3b. Reclama los ficheros que tocará. Si otro feature ya los reclama,
+#     harness lo rechaza: son los que deciden si se puede paralelizar.
+uv run python -m agents --json run harness claim --id <FEATURE-ID> \
+  --files "<ruta1>;<ruta2>"
+
 # 4. Delegar → ver tabla abajo
 
 # 5. Cerrar. Aplica la rúbrica (agents/rubric.py, GATE-1..4): RECHAZA si
@@ -67,7 +72,9 @@ backlog, después se implementa.
 | Acción suelta que no abre feature (un commit, un lint) | `orquestador` | ejecución |
 
 Si una feature toca dos áreas independientes (p.ej. datos y API), lanza dos
-`implementer` en paralelo. Si tocan los mismos ficheros, secuencial.
+`implementer` en paralelo. Si tocan los mismos ficheros, secuencial: `harness
+claim` registra qué ficheros toca cada feature y rechaza el solapamiento — un
+recurso, un dueño.
 
 ## Reglas de contexto
 

@@ -15,8 +15,9 @@ init.sh → harness/progress/ → harness/featureslist.json → explorer → imp
 | Paso | Comando | Quién | Verificación |
 |------|---------|-------|-------------|
 | Puerta | `run harness gate` (o `make init`) | `harness` | `success=true` = se puede trabajar |
-| Elegir | `run harness next` | `harness` | retoma lo abierto o la primera con deps en `done` |
+| Elegir | `run harness next` | `harness` | retoma lo abierto o la primera con deps en `done` (más dependientes primero) |
 | Abrir | `run harness start --id <ID>` | `harness` | criterios volcados en `current.md` |
+| Reclamar | `run harness claim --id <ID> --files "<ruta1>;<ruta2>"` | `harness` | registra qué ficheros toca; rechaza si otro feature activo ya los reclama |
 | Investigar | subagente `explorer` (solo lectura) | `explorer` | `run harness record --agent explorer` |
 | Descomponer | `run plan brief --text "<feature>"` | `plan` | orden de trabajo con pasos y agentes |
 | Implementar | subagente `implementer` | `implementer` | código + tests + `harness record` |
@@ -26,6 +27,12 @@ init.sh → harness/progress/ → harness/featureslist.json → explorer → imp
 
 El `lider` decide en qué orden pasa todo esto; `harness` lo ejecuta. Ningún
 agente edita `harness/featureslist.json` ni `harness/progress/` a mano.
+
+**Ficheros que se tocan.** Al abrir una feature, el líder reclama con
+`harness claim` las rutas que esa feature va a tocar (`touched_files`).
+Formaliza «si tocan los mismos ficheros, secuencial»: dos features no pueden
+reclamar el mismo fichero a la vez, y al cerrar o bloquear se liberan solos.
+Es la semilla para paralelizar sin pisarse.
 
 ## Las tres reglas
 
@@ -112,7 +119,7 @@ El arnés decide y verifica; el trabajo determinista lo hacen los agentes:
 
 | Necesidad del arnés | Agente | Acción |
 |---------------------|--------|--------|
-| Backlog y progreso (todo cambio de estado) | `harness` | `status`, `next`, `start`, `finish`, `block`, `record`, `add`, `gate` |
+| Backlog y progreso (todo cambio de estado) | `harness` | `status`, `next`, `start`, `claim`, `release`, `finish`, `block`, `record`, `add`, `gate` |
 | Descomponer una feature en pasos | `plan` | `brief`, `answer`, `execute` |
 | Comprobar que la suite pasa | `test` | `run_tests`, `coverage_summary` |
 | Revisar el código de una feature | `review` | `review_package` |

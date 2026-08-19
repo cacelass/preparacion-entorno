@@ -306,3 +306,42 @@ proporcional al daño, siguiendo el patrón type-to-confirm de GitHub:
 - **Fuera de alcance (señalizado)**: `DSKIT_ASSUME_YES=deny` (fail-closed en
   CI — dontAsk > bypassPermissions) y ventana de frescura tipo sudo.
 - Suite del template: **677 pasan, 2 skipped**.
+
+## Tickets del arnés: touched_files, claim/release y prioridad (Ago 2026)
+
+Formalización de «si tocan los mismos ficheros, secuencial» y prioridad por
+dependencias, siguiendo la filosofía de `template/.opencode/agents/lider.md`
+(un recurso, un dueño):
+
+- **`touched_files`** — campo OPCIONAL (lista de rutas) en `harness/featureslist.json`.
+  Solo `harness` lo escribe. `harness add` lo crea a `[]`; `start`/`approve` lo
+  reinician; `finish`/`block` lo liberan. No reescribimos los seeds del backlog.
+- **`harness claim --id <ID> --files "<r1>;<r2>"`** — registra los ficheros que
+  toca una feature in_progress; rechaza (success=false + needs) si otro feature
+  activo (no done/blocked) ya los reclama. Es la semilla para paralelizar sin pisarse.
+- **`harness release --id <ID>`** — libera (touched_files → []).
+- **Prioridad** — `HarnessAgent._peso_dependientes(doc)` = cierre transitivo del
+  grafo inverso (cuántas features dependen de cada una). `_eligible` ordena por
+  peso descendente, sort estable (empates → orden de backlog). `next`/`status`
+  exponen `prioridad` en `data`. Sin cambiar la filosofía secuencial (1 feature
+  a la vez).
+- **Robustez de `next`**: el aviso de `plan scope` ahora dispara si SCOPE-001
+  está ENTRE los elegibles (no solo si es eligible[0]), porque el orden por peso
+  puede desplazarlo (test: `test_next_propone_plan_scope_en_proyecto_sin_spec`).
+- **Esquema validado en 3 sitios** (mismo contrato): `template/init.sh` (bloque
+  Python), `template/agents/evals/runner.py::_problemas_backlog`,
+  `.github/scripts/validate_template.py::validate_backlog`. WARN si dos features
+  reclaman el mismo fichero.
+- **Contrato** (contracts.py harness): can += claim/release + prioridad; cannot
+  += "dejar que dos features reclamen el mismo fichero".
+- **Doc**: prompts `harness_agent.md` (prosa + AUTOGEN a mano, no prompts_sync
+  sobre template), `harness_workflow.md` (paso Reclamar + nota), `lider.md` +
+  espejo `.claude/agents/lider.md` (paso 3b), `agents_reference.md`, `README.md`,
+  `rag_tool.py::_backlog_a_markdown` (indexa touched_files).
+- **Tests**: +19 en `test_harness_agent.py` (claim/release, solapamiento,
+  finish/block/start liberan, prioridad, empates). Suite harness: **87 pasan**;
+  suite completa agentes: 663 pasan / 16 skip (14 fail solo por deps opcionales
+  ausentes: sklearn/graphify — no son regresión).
+- **AUTOGEN manual**: sobre el template no corre `prompts_sync` (Jinja2 rompe
+  imports); las filas claim/release del bloque AUTOGEN de harness_agent.md se
+  añadieron a mano y deben coincidir con lo que generaría `make prompts-sync`.
