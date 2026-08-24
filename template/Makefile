@@ -6,6 +6,7 @@
         profile \
         mlflow \
 {% if use_sdd %}        mutation crap {% endif %}\
+{% if use_integration %}        integration {% endif %}\
         monitor tune serve query \
 {% if use_docker %}        docker-run docker-update docker-down {% endif %}\
 {% if use_demo %}        demo-export demo-serve {% endif %}\
@@ -58,6 +59,8 @@ help:
 	@echo "    make audit          radon cc + agents audit (complejidad + equipo)"
 {% if use_sdd %}	@echo "    make mutation       mutation testing de un módulo (spec-driven)"
 	@echo "    make crap           métrica CRAP de un módulo (complejidad × cobertura)"
+{% endif %}
+{% if use_integration %}	@echo "    make integration    tests de integración contra servicios reales (Docker, sin mocks)"
 {% endif %}
 {% if use_demo %}	@echo ""
 	@echo "  Demo"
@@ -295,6 +298,14 @@ mutation:
 crap:
 	@echo "▶  Métrica CRAP de $(TARGET) — riesgo de cambio"
 	uv run python -m agents --json run mutation crap_report --target $(TARGET)
+{% endif %}
+{% if use_integration %}
+# ─────────────────────────────────────────────────────────────────────────────
+#  Tests de integración: servicios reales (Docker), sin mocks
+# ─────────────────────────────────────────────────────────────────────────────
+integration:
+	@echo "▶  Tests de integración contra servicios reales (Docker, sin mocks)"
+	uv run python -m agents --json run integration run_integration_tests
 {% endif %}
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -194,6 +194,16 @@ use_docker:
   default: "{{ proyecto_perfil == 'completo' }}"
   when: "{{ proyecto_perfil == 'manual' }}"
 
+# --- Tests de integración con servicio real (Docker) ---
+# Levanta servicios reales (p. ej. Postgres vía docker compose) durante los
+# tests en vez de usar mocks: evidencia real > simulación. Requiere Docker y
+# que `use_docker` esté activo (usa el motor de contenedores del proyecto).
+use_integration:
+  type: bool
+  help: "Añadir agente de tests de integración? Levanta servicios reales (Postgres vía Docker) durante los tests, sin mocks. (requiere Docker y use_docker)"
+  default: "{{ proyecto_perfil == 'completo' }}"
+  when: "{{ proyecto_perfil == 'manual' }}"
+
 # --- Calibración de confianza (solo redes_neuronales) ---
 use_calibration:
   type: bool
@@ -351,6 +361,11 @@ _message_before_copy: >-
     Demo activa (demo/). Flujo: make train → make demo-export → sirve con
     make demo-serve. Es un directorio local, sin auto-deploy.
   {% endif %}
+  {% if use_integration and not use_docker %}
+    AVISO: use_integration=yes con use_docker=no — el agente de integración
+    necesita el motor de contenedores de use_docker. Actívalo o el agente
+    devolverá success=false al intentar levantar servicios.
+  {% endif %}
   {% if proyecto_perfil == 'completo' or proyecto_perfil == 'manual' %}
     NOTA: se instalaron las dependencias automáticamente (perfil {{ proyecto_perfil }}).
   {% else %}
@@ -374,6 +389,7 @@ _tasks:
     {% if use_optuna %}--extra optuna{% endif %}
     {% if use_monitoring %}--extra monitoring{% endif %}
     {% if use_rag %}--extra rag{% endif %}
+    {% if use_integration %}--extra integration{% endif %}
     {% if use_demo %}--extra onnx{% endif %}
     && uv run python -c 'import sklearn; print("scikit-learn OK")'
     {% if ml_type == 'redes_neuronales' %}
@@ -456,6 +472,12 @@ _exclude:
   - "{% if not use_docker %}agents/prompts/docker_agent.md{% endif %}"
   - "{% if not use_docker %}agents/tests/test_docker_agent.py{% endif %}"
   - "{% if not use_docker %}agents/tests/test_docker_tool.py{% endif %}"
+  - "{% if not use_integration %}agents/agents/integration_agent.py{% endif %}"
+  - "{% if not use_integration %}agents/tools/integration_tool.py{% endif %}"
+  - "{% if not use_integration %}agents/prompts/integration_agent.md{% endif %}"
+  - "{% if not use_integration %}agents/tests/test_integration_agent.py{% endif %}"
+  - "{% if not use_integration %}tests/compose.integration.yml{% endif %}"
+  - "{% if not use_integration %}tests/integration{% endif %}"
   - "{% if not use_mlflow %}agents/agents/mlflow_agent.py{% endif %}"
   - "{% if not use_mlflow %}agents/prompts/mlflow_agent.md{% endif %}"
   - "{% if not use_mlflow %}agents/tests/test_mlflow_agent.py{% endif %}"

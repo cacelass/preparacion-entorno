@@ -81,7 +81,7 @@ recurso, un dueño.
 
 ## Apóyate en los agentes Python
 
-Este proyecto ya tiene {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes que hacen el trabajo determinista. **No lo hagas
+Este proyecto ya tiene {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_integration else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes que hacen el trabajo determinista. **No lo hagas
 a mano ni se lo mandes a un subagente si ya existe el agente.**
 
 **Antes de delegar, confirma que el agente existe:** este proyecto se generó

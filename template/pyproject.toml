@@ -52,6 +52,13 @@ dev = [
     "snakeviz",
 ]
 
+{% if use_integration %}
+# Tests de integración: driver para conectarse al servicio real (Postgres).
+integration = [
+    "psycopg[binary]",
+]
+{% endif %}
+
 # ML supervisado: clasificación + regresión
 supervisado = [
     "lightgbm",
@@ -207,9 +214,13 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts   = "-v --tb=short --cov={{ project_slug }} --cov-report=term-missing"
+# La suite normal no corre los tests de integración: requieren servicios reales
+# (Docker) y solo se ejecutan explícitamente con `make integration` (agente
+# `integration`). Sin esta exclusión, `make test`/init.sh fallarían sin Docker.
+addopts   = "-v --tb=short --cov={{ project_slug }} --cov-report=term-missing -m 'not integration'"
 markers   = [
     "smoke: test de humo — verifica que el pipeline arranca sin errores con datos sintéticos",
+    "integration: test contra servicios reales (Postgres vía Docker) — requiere Docker y use_integration",
 ]
 
 [tool.ruff]

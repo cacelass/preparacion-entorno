@@ -87,6 +87,8 @@ ROUTING_BENCHMARKS: list[tuple[str, str]] = [
     ("haz mutation testing al módulo de features", "mutation"),
     ("ejecuta el mutation testing", "mutation"),
     ("calcula la métrica CRAP de utils.py", "mutation"),
+    ("ejecuta los tests de integración contra la base de datos", "integration"),
+    ("levanta los servicios para los tests de integración", "integration"),
     ("revisa el Dockerfile", "docker"),
     ("diagnóstico del proyecto", "doctor"),
     ("actualiza el changelog", "documentation"),

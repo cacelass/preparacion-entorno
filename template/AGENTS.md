@@ -136,7 +136,7 @@ uv run python -m agents describe <agente>   # acciones y contrato de uno
 
 | Perfil | Agentes | Qué incluye |
 |--------|---------|-------------|
-| `minimo` | {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} | Núcleo de calidad (harness, git, test, review, data, ml...) |
+| `minimo` | {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_integration else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} | Núcleo de calidad (harness, git, test, review, data, ml...) |
 | `estandar` | núcleo + rag + mutation | Arnés de calidad: RAG + spec-driven |
 | `completo` | todos | Todos los agentes, incluidos periféricos (supervisor, research, audit, installer) y extras |
 | `manual` | según lo elegido | Lo que hayas marcado una a una |
@@ -505,7 +505,7 @@ información, hazlo.
 
 ## Referencia (bajo demanda)
 
-El catálogo — los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes con su responsabilidad, los workflows por
+El catálogo — los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_integration else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes con su responsabilidad, los workflows por
 dominio, GStack, la arquitectura y el vault — vive aparte para no ocupar
 contexto en cada sesión:
 

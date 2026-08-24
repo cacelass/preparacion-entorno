@@ -48,13 +48,17 @@ class PytestTool:
     @staticmethod
     def run(
         root: Path, *, path: str = "tests/", markers: str | None = None, junit_xml_path: Path | None = None,
-        timeout: int = 600,
+        timeout: int = 600, overrides: list[str] | None = None,
     ) -> ProcessResult:
         args = ["uv", "run", "pytest", path, "-v"]
         if markers:
             args += ["-m", markers]
         if junit_xml_path:
             args.append(f"--junitxml={junit_xml_path}")
+        # `overrides` permite anular config de pyproject (p. ej. `-o addopts=`
+        # para correr los tests de integración que la suite normal excluye).
+        if overrides:
+            args += overrides
         return run_command(args, cwd=root, timeout=timeout)
 
     @staticmethod

@@ -14,7 +14,7 @@ de decisión de tus agentes, no un sustituto de ellos.**
 
 - **Razonan** — `lider`, `explorer`, `implementer`, `reviewer`: markdown en
   `.opencode/agents/`. Deciden *qué* se hace, *cómo* y *cuándo está hecho*.
-- **Ejecutan** — los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes Python de la tabla de abajo. Acciones
+- **Ejecutan** — los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_integration else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes Python de la tabla de abajo. Acciones
   deterministas, sin ambigüedad. Entre ellos, `harness` es el dueño mecánico
   del backlog y del progreso.
 ```
@@ -43,6 +43,7 @@ el modelo pueda ignorar.
 | `cicd` | Genera y valida workflows de CI/CD |
 | `test` | Ejecuta pytest, resumen cobertura, módulos sin test |
 {% if use_sdd %}| `mutation` | **Mutation testing y CRAP**: ejecuta tools/mutate.py (¿muerden los tests?) y mide el riesgo de cambio por función |{% endif %}
+{% if use_integration %}| `integration` | **Tests de integración**: levanta servicios reales (Postgres vía Docker) y corre `tests/integration/` sin mocks |{% endif %}
 | `dependency` | Detecta paquetes desactualizados y vulnerabilidades |
 | `secrets` | Escanea secretos hardcodeados |
 {% if use_mlflow %}| `mlflow` | Lista runs, mejor run, comparativa rendimiento |{% endif %}
@@ -229,7 +230,7 @@ agents/
 ## Integración con opencode
 
 El agente **primary** es el `lider` del arnés — es con quien hablas por defecto.
-El `orquestador` pasó a **subagente**: es el gateway a los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes Python,
+El `orquestador` pasó a **subagente**: es el gateway a los {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_integration else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agentes Python,
 al que el líder delega las acciones sueltas vía
 `uv run python -m agents [ask|run|pipeline|doctor]`.
 
@@ -242,7 +243,7 @@ al que el líder delega las acciones sueltas vía
               └── orquestador (subagent) ── routing por keywords
                        │
                        └── [Python agent system]
-                           ├── {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agents (harness, git, test, review, docker{% if use_sdd %}, mutation{% endif %}{% if use_rag %}, rag{% endif %}, doc...)
+                           ├── {{ 19 + (1 if use_rag else 0) + (1 if use_sdd else 0) + (1 if use_api else 0) + (1 if use_docker else 0) + (1 if use_integration else 0) + (1 if use_mlflow else 0) + (1 if graphify_mode != 'no' else 0) + (4 if proyecto_perfil in ['completo', 'manual'] else 0) }} agents (harness, git, test, review, docker{% if use_sdd %}, mutation{% endif %}{% if use_rag %}, rag{% endif %}, doc...)
                            ├── GStack pipelines (develop, fix, release...)
                            └── audit trail + contracts
 ```

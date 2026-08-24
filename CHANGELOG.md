@@ -508,6 +508,34 @@ lo que falló— como diagrama Mermaid pegable en `progress/`. Una stack con
 `run_if` deja de leerse como una lista en cuanto pasa de tres pasos, y el
 resumen de texto enseña el resultado pero no la forma.
 
+### Agente `integration`: tests de integración con servicio real, sin mocks
+
+Nueva opción `use_integration` (por defecto en el perfil `completo`): agente
+Python `integration` que levanta servicios reales (p. ej. Postgres vía Docker)
+declarados en `tests/compose.integration.yml` durante `pytest tests/integration/`
+y los baja siempre al terminar (`finally`). Es la alternativa sin mocks que
+propone la filosofía del arnés: un mock da "seguridad falsa".
+
+- **`agents/agents/integration_agent.py`**: `run_integration_tests` (sube
+  servicios con `docker compose up -d --wait`, corre la suite, baja en
+  `finally`) y `status` (qué servicios hay y su estado).
+- **`agents/tools/integration_tool.py`**: envoltorio fino sobre `docker compose`
+  para el ciclo de vida de servicios de test (distinto de `docker_tool`, que es
+  análisis estático).
+- **`tests/compose.integration.yml` + `tests/integration/`**: ejemplo con
+  Postgres (`postgres:16-alpine`) y un test que escribe/lee una fila real,
+  marcado `@pytest.mark.integration`.
+- **La suite normal no requiere Docker**: `pyproject.toml` excluye el marker
+  `integration` del `addopts` (`-m 'not integration'`); solo `make integration`
+  lo corre. El agente anula ese addopts con `-o addopts=` (nuevo parámetro
+  `overrides` en `PytestTool.run`).
+- **Gating por extra**: el agente, tool, prompt, test y los ficheros
+  `tests/integration/` se excluyen si `use_integration=false`; el contrato en
+  `contracts.py` se mantiene (tolerado por `validate_contracts`).
+- **Extra `integration`** (`psycopg[binary]`) y target `make integration`.
+- Contrato, prompt (+ AUTOGEN a mano), routing benchmarks y fórmulas de conteo
+  de agentes actualizadas (AGENTS.md, orquestador.md, lider.md, agents_reference).
+
 ---
 
 ## [1.13.4] — 2026-07-29

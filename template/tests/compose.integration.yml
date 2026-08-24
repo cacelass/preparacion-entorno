@@ -1,0 +1,30 @@
+# compose.integration.yml — servicios para los tests de integración
+# Generado por dskit (https://github.com/cacelass/dskit)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Lo levanta el agente `integration` (make integration) para correr
+# tests/integration/ contra un servicio REAL, sin mocks. Se baja siempre al
+# terminar (finally), aunque los tests fallen.
+#
+# NO es docker-compose.yml (el de producción/chat): este es solo de tests.
+# Uso directo:
+#   docker compose -f tests/compose.integration.yml up -d --wait
+#   docker compose -f tests/compose.integration.yml down
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: {{ project_slug }}-integration-pg
+    # Puerto fijo para que los tests lo conozcan; usa uno alto para no chocar
+    # con un Postgres local.
+    ports:
+      - "54329:5432"
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

@@ -299,6 +299,29 @@ CONTRACTS: dict[str, Contract] = {
         ),
         collaborates=("test", "review"),
     ),
+    "integration": Contract(
+        role="Ejecuta tests de integración contra servicios reales (Docker), sin mocks.",
+        can=(
+            "levantar los servicios declarados en tests/compose.integration.yml "
+            "(p. ej. Postgres) con docker compose y esperar a que estén sanos",
+            "correr pytest tests/integration/ contra esos servicios reales y resumir "
+            "pass/fail/errors desde el reporte JUnit",
+            "bajar los servicios siempre al terminar, aunque los tests fallen (finally)",
+            "informar del estado de los servicios de integración (docker compose ps)",
+        ),
+        cannot=(
+            "escribir tests nuevos ni decidir qué probar → implementer/reviewer",
+            "arreglar los tests que fallan → refactor (código) o el humano",
+            "analizar/lint Dockerfiles o compose de producción → docker",
+            "levantar servicios si el proyecto se generó sin use_docker/use_integration — devuelve needs",
+        ),
+        needs=(
+            "Docker disponible en el sistema",
+            "que exista tests/compose.integration.yml (extra use_integration)",
+            "el motor de contenedores de use_docker activo",
+        ),
+        collaborates=("test", "docker"),
+    ),
 
     # ── Datos y ML ───────────────────────────────────────────────────────
     "data": Contract(
